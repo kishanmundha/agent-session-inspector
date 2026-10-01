@@ -1614,10 +1614,10 @@ function eventSummary(event: AgentEvent): { label: string; preview: string } {
         preview: d.success ? "completed" : `failed${d.error ? `: ${shorten(d.error, 80)}` : ""}`,
       };
     case "system.message": {
-      const content = String(d.content ?? "");
+      const chars = (d.charLength as number) || String(d.content ?? "").length;
       return {
         label: "System",
-        preview: `${d.role ?? "system"} · ${content.length.toLocaleString()} chars`,
+        preview: `${d.role ?? "system"} · ${chars.toLocaleString()} chars`,
       };
     }
     case "hook.start":

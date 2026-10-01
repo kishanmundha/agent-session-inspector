@@ -48,8 +48,8 @@ export function TokenOptimizer({
   const breakdown = [
     {
       label: "System context",
-      note: "VS Code managed",
-      chars: analysis.systemMessageChars,
+      note: "agent managed",
+      chars: analysis.systemContextChars,
       bar: "bg-red-400 dark:bg-red-500",
       text: "text-red-700 dark:text-red-400",
     },

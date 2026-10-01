@@ -97,6 +97,15 @@ const EDIT_TOOLS = /^(Edit|Write|MultiEdit|NotebookEdit|Update)$/;
 /** Human labels for the attachment kinds Claude Code injects. */
 const ATTACHMENT_LABELS: Record<string, string> = {
   deferred_tools_delta: "Tool catalog",
+  deferred_tools_record: "Tool catalog",
+  tool_definitions: "Tool definitions",
+  environment: "Environment",
+  model: "Model identity",
+  session_context: "Session context",
+  date: "Date",
+  date_change: "Date",
+  batching_reminder_sent: "Reminder",
+  silent_turn_reminder: "Reminder",
   agent_listing_delta: "Agent listing",
   mcp_instructions_delta: "MCP instructions",
   skill_listing: "Skill listing",
@@ -139,8 +148,30 @@ function describeAttachment(
 
   switch (type) {
     case "total_tokens_reminder":
+    case "batching_reminder_sent":
+    case "silent_turn_reminder":
+    case "model":
       body = joinText(attachment.text);
       break;
+    case "date":
+    case "date_change":
+      subject = (attachment.date as string) ?? (attachment.newDate as string);
+      break;
+    case "environment":
+      body = joinText(attachment.snapshot);
+      break;
+    case "session_context":
+      body = Object.values((attachment.context as Record<string, unknown>) ?? {})
+        .map((v) => joinText(v))
+        .join("\n\n");
+      break;
+    case "deferred_tools_record": {
+      const entries = (attachment.entries as { name?: string }[]) ?? [];
+      items = entries.map((entry) => String(entry?.name ?? "tool"));
+      itemsLabel = "tools";
+      body = joinText(entries);
+      break;
+    }
     case "edited_text_file":
       subject = attachment.filename as string;
       body = joinText(attachment.snippet);
@@ -231,6 +262,37 @@ function describeAttachment(
   };
 }
 
+/** `prompt_snapshot` is where Claude Code records the system prompt it sent. */
+function systemPromptOf(attachment: Record<string, unknown>): string {
+  const sections = Array.isArray(attachment.systemPrompt)
+    ? attachment.systemPrompt.map((s) => joinText(s).trim())
+    : [joinText(attachment.systemPrompt).trim()];
+  return sections.filter(Boolean).join("\n\n");
+}
+
+/** Tool schemas sent alongside the system prompt; listed by name, sized in full. */
+function describeToolDefinitions(tools: unknown[], chars: number): Record<string, unknown> {
+  const names = tools.map((tool) => String((tool as { name?: string })?.name ?? "tool"));
+  return {
+    attachmentType: "tool_definitions",
+    label: ATTACHMENT_LABELS.tool_definitions,
+    items: names.slice(0, 200),
+    itemCount: names.length,
+    itemsLabel: "tools",
+    content: "",
+    charLength: chars,
+    truncated: false,
+  };
+}
+
+/** CLAUDE.md / AGENTS.md files loaded into the system prompt. */
+function instructionFilesText(attachment: Record<string, unknown>): string {
+  const files = (attachment.files as { path?: string; type?: string; content?: string }[]) ?? [];
+  return files
+    .map((file) => `# ${file.path ?? "instructions"}${file.type ? ` (${file.type})` : ""}\n${file.content ?? ""}`)
+    .join("\n\n");
+}
+
 interface ParsedSession {
   meta: SessionMeta;
   events: AgentEvent[];
@@ -246,6 +308,8 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
   const toolNames = new Map<string, string>();
   /** Streamed messages repeat their usage on every block record; count once. */
   const usageSeen = new Set<string>();
+  let lastSystemPrompt = "";
+  let lastToolDefinitions = "";
 
   const meta: SessionMeta = { provider: "claude", id };
   let firstTimestamp = "";
@@ -312,9 +376,55 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
         }, rec.uuid, rec.parentUuid);
         continue;
 
-      case "attachment":
-        push(ts, "context.attachment", describeAttachment(rec.attachment ?? {}), rec.uuid, rec.parentUuid);
+      case "attachment": {
+        const attachment = rec.attachment ?? {};
+        if (attachment.type === "prompt_snapshot") {
+          // The snapshot is re-recorded whenever any part of it changes, so
+          // only emit the parts that differ from what was last shown.
+          const prompt = systemPromptOf(attachment);
+          if (prompt && prompt !== lastSystemPrompt) {
+            lastSystemPrompt = prompt;
+            // The one-line CLI prefix only appears on some snapshots, so it
+            // is shown but kept out of the comparison above.
+            const prefix = joinText(attachment.cliPrefix).trim();
+            const { text, chars, truncated } = capText(
+              prefix ? `${prefix}\n\n${prompt}` : prompt,
+            );
+            push(ts, "system.message", {
+              role: "system_prompt",
+              content: text,
+              charLength: chars,
+              truncated,
+            }, rec.uuid, rec.parentUuid);
+          }
+          if (Array.isArray(attachment.tools)) {
+            const serialized = JSON.stringify(attachment.tools);
+            if (serialized !== lastToolDefinitions) {
+              lastToolDefinitions = serialized;
+              push(
+                ts,
+                "context.attachment",
+                describeToolDefinitions(attachment.tools, serialized.length),
+                rec.uuid,
+                rec.parentUuid,
+              );
+            }
+          }
+          continue;
+        }
+        if (attachment.type === "instructions") {
+          const { text, chars, truncated } = capText(instructionFilesText(attachment));
+          push(ts, "system.message", {
+            role: "instructions",
+            content: text,
+            charLength: chars,
+            truncated,
+          }, rec.uuid, rec.parentUuid);
+          continue;
+        }
+        push(ts, "context.attachment", describeAttachment(attachment), rec.uuid, rec.parentUuid);
         continue;
+      }
 
       case "system": {
         if (rec.subtype === "api_error") {

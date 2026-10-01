@@ -164,8 +164,12 @@ export function analyzeTokenUsage(
       case "assistant.thinking":
         thinkingChars += String(d.content ?? "").length;
         break;
+      // Each agent records its system prompt differently (Copilot as events,
+      // Claude Code as prompt snapshots, Codex as base instructions plus
+      // developer messages); adapters map all of them onto system.message.
+      // Prefer charLength: content is capped for display.
       case "system.message":
-        systemMessageChars += String(d.content ?? "").length;
+        systemMessageChars += num(d.charLength) || String(d.content ?? "").length;
         systemMessageCount++;
         break;
       case "context.attachment":
@@ -281,7 +285,7 @@ export function analyzeTokenUsage(
       category: "Injected Context",
       title: `~${Math.round(attachmentChars / 1000)}K chars of auto-attached context`,
       description:
-        "Attachments (file snapshots, reminders, tool/skill listings) are injected each turn. Trimming unused MCP servers and skills shrinks every request.",
+        "Attachments (tool definitions, tool/skill listings, file snapshots, reminders) are injected by the agent. Trimming unused MCP servers and skills shrinks every request.",
       focus: { categories: ["context"] },
     });
   }
@@ -371,6 +375,9 @@ export function analyzeTokenUsage(
     hints,
     topToolsByCount,
     systemMessageChars,
+    // Codex world_state is left out: its content is replayed in the developer
+    // messages already counted above.
+    systemContextChars: systemMessageChars + attachmentChars,
     toolResultChars,
     assistantChars,
     compactionCount,

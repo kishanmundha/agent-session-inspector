@@ -35,6 +35,24 @@ function flattenContent(content: unknown): string {
     .join("\n");
 }
 
+/**
+ * Codex delivers part of its system context as user-role messages wrapped in
+ * a marker (environment, plugin list, AGENTS.md). These openers identify them.
+ */
+const INJECTED_USER_CONTEXT =
+  /^\s*(<(environment_context|recommended_plugins|user_instructions|turn_aborted|subagent_notification)>|# AGENTS\.md instructions for )/;
+
+/** True when every part of a user-role message is harness-injected context. */
+function isInjectedUserContext(content: unknown): boolean {
+  const parts = Array.isArray(content) ? content : [content];
+  if (parts.length === 0) return false;
+  return parts.every((part) => {
+    const text =
+      typeof part === "string" ? part : (part as { text?: unknown } | null)?.text;
+    return typeof text === "string" && INJECTED_USER_CONTEXT.test(text);
+  });
+}
+
 interface RolloutLine {
   timestamp?: string;
   type?: string;
@@ -150,6 +168,25 @@ function parseFile(filePath: string): ParsedSession {
             content: capped.text,
             charLength: capped.chars,
             truncated: capped.truncated,
+          });
+        }
+        // Tool schemas ride along with the base instructions on every request.
+        if (Array.isArray(p.dynamic_tools) && p.dynamic_tools.length > 0) {
+          const names = (p.dynamic_tools as { name?: string; tools?: { name?: string }[] }[])
+            .flatMap((entry) =>
+              Array.isArray(entry.tools)
+                ? entry.tools.map((tool) => `${entry.name ?? "tools"}.${tool?.name ?? "tool"}`)
+                : [entry.name ?? "tool"],
+            );
+          push(ts, "context.attachment", {
+            attachmentType: "tool_definitions",
+            label: "Tool definitions",
+            items: names.slice(0, 200),
+            itemCount: names.length,
+            itemsLabel: "tools",
+            content: "",
+            charLength: JSON.stringify(p.dynamic_tools).length,
+            truncated: false,
           });
         }
         continue;
@@ -339,7 +376,7 @@ function parseFile(filePath: string): ParsedSession {
               if (hasAgentEvents) break; // already emitted from event_msg
               push(ts, "assistant.message", { content: capped.text, model: meta.model });
             } else if (role === "user") {
-              if (hasUserEvents) {
+              if (hasUserEvents || isInjectedUserContext(p.content)) {
                 // Injected per-turn context rather than something the user typed.
                 push(ts, "system.message", {
                   role: "user_context",

@@ -130,7 +130,10 @@ export interface TokenHint {
 export interface TokenAnalysis {
   hints: TokenHint[];
   topToolsByCount: { name: string; count: number }[];
+  /** System prompt and instruction messages only. */
   systemMessageChars: number;
+  /** Everything the agent injects itself: system messages plus attached context. */
+  systemContextChars: number;
   toolResultChars: number;
   assistantChars: number;
   compactionCount: number;
