@@ -7,12 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "deploy:docker": "./scripts/deploy-docker.sh"
+    "deploy:docker": "./scripts/deploy-docker.sh",
+    "package": "./scripts/package-release.sh"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
-    "@types/better-sqlite3": "^9.6.0",
-    "better-sqlite3": "^13.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "geist": "^1.7.2",
@@ -29,7 +31,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^20",
+    "@types/node": "^22.20.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

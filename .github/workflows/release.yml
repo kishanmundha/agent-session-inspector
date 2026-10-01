@@ -1,0 +1,32 @@
+name: Release
+
+# Pushing a tag like v0.2.0 builds the standalone app and publishes it, with
+# install.sh, as a GitHub release. install.sh downloads from the latest release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: ./scripts/package-release.sh "$GITHUB_REF_NAME"
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            dist/agent-session-visualizer.tar.gz dist/install.sh \
+            --title "$GITHUB_REF_NAME" --generate-notes

@@ -10,3 +10,4 @@ pnpm-debug.log*
 README.md
 .env
 .env.*
+dist

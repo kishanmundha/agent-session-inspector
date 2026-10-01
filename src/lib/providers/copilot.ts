@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import yaml from "js-yaml";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import type {
   AgentEvent,
   CheckpointFile,
@@ -24,12 +24,12 @@ function loadCheckpointTitles(): Map<string, string> {
   const map = new Map<string, string>();
   if (!fs.existsSync(SESSION_STORE_DB)) return map;
   try {
-    const db = new Database(SESSION_STORE_DB, { readonly: true, fileMustExist: true });
+    const db = new DatabaseSync(SESSION_STORE_DB, { readOnly: true });
     const rows = db
       .prepare(
         "SELECT session_id, title FROM checkpoints WHERE title IS NOT NULL AND title != '' ORDER BY id DESC",
       )
-      .all() as { session_id: string; title: string }[];
+      .all() as unknown as { session_id: string; title: string }[];
     // First row per session wins (highest id = latest checkpoint).
     for (const row of rows) {
       if (!map.has(row.session_id)) map.set(row.session_id, row.title);

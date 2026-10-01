@@ -52,6 +52,31 @@ Whichever directories exist on the machine show up; the rest are hidden.
 
 ## Getting started
 
+Install the prebuilt app (needs [Node.js](https://nodejs.org) 22.13 or newer):
+
+```bash
+curl -fsSL https://github.com/kishanmundha/agent-session-visualizer/releases/latest/download/install.sh | bash
+```
+
+Then start it:
+
+```bash
+agent-session-visualizer
+```
+
+It serves on [http://localhost:3000](http://localhost:3000) (or the next free
+port), bound to `127.0.0.1` only, and opens your browser. `--port`, `--host` and
+`--no-open` change that; `--help` lists everything.
+
+The app lives in `~/.agent-session-visualizer` with a command linked into
+`~/.local/bin`. Re-run the install command to update. To uninstall:
+
+```bash
+rm -rf ~/.agent-session-visualizer ~/.local/bin/agent-session-visualizer
+```
+
+### From source
+
 ```bash
 pnpm install
 pnpm dev
@@ -74,6 +99,24 @@ at it:
 ```bash
 node scripts/demo-data.mjs /tmp/asv-demo
 HOME=/tmp/asv-demo pnpm dev
+```
+
+### Releasing
+
+Push a version tag and the [release workflow](.github/workflows/release.yml)
+builds the app and publishes `agent-session-visualizer.tar.gz` and `install.sh`
+as a GitHub release, which is what the install command downloads:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+`pnpm package` builds the same archive locally into `dist/`. To test the
+installer against it without publishing:
+
+```bash
+ASV_TARBALL_URL="file://$PWD/dist/agent-session-visualizer.tar.gz" bash install.sh
 ```
 
 ## How it works
