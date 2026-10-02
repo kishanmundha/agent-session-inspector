@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, Copy, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -10,11 +11,14 @@ type Status = "idle" | "copied" | "failed";
 export function CopyButton({
   value,
   label = "Copy",
+  size = "xs",
   className,
   children,
 }: {
   value: string;
   label?: string;
+  /** Match the neighbouring controls: `sm` beside `sm` buttons and inputs. */
+  size?: "xs" | "sm";
   className?: string;
   children?: React.ReactNode;
 }) {
@@ -40,14 +44,13 @@ export function CopyButton({
     <Tooltip>
       <TooltipTrigger
         render={
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size={children ? size : `icon-${size}`}
             onClick={copy}
             aria-label={label}
             className={cn(
-              "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs transition-colors",
-              "text-muted-foreground hover:bg-muted hover:text-foreground",
-              "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
+              "text-muted-foreground",
               status === "copied" && "text-emerald-600 dark:text-emerald-400",
               status === "failed" && "text-destructive",
               className,
@@ -55,7 +58,7 @@ export function CopyButton({
           >
             <Icon className="size-3.5" aria-hidden />
             {children}
-          </button>
+          </Button>
         }
       />
       <TooltipContent>

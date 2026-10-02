@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
@@ -20,22 +21,21 @@ export function ScrollToTop({ threshold = 600 }: { threshold?: number }) {
     <Tooltip>
       <TooltipTrigger
         render={
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="icon-lg"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             aria-label="Back to top"
             tabIndex={visible ? 0 : -1}
             className={cn(
-              "fixed bottom-6 right-6 z-30 inline-flex size-10 items-center justify-center rounded-full",
-              "border border-border bg-card text-muted-foreground shadow-lg backdrop-blur",
-              "transition-all hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              "fixed bottom-6 right-6 z-30 size-10 rounded-full bg-card text-muted-foreground shadow-lg dark:bg-card",
               visible
                 ? "translate-y-0 opacity-100"
                 : "pointer-events-none translate-y-2 opacity-0",
             )}
           >
-            <ArrowUp className="size-4" aria-hidden />
-          </button>
+            <ArrowUp aria-hidden />
+          </Button>
         }
       />
       <TooltipContent side="left">Back to top</TooltipContent>

@@ -8,6 +8,15 @@ import {
   Lightbulb,
   TriangleAlert,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { BarList } from "@/components/common/bar-list";
 import { CostDialog } from "./cost-dialog";
 import { formatCost, formatTokens } from "@/lib/format";
@@ -125,31 +134,39 @@ function CostSection({ cost }: { cost: CostSummary }) {
         </>
       )}
 
-      <div className="mt-4 overflow-x-auto border-t border-border pt-3">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="text-muted-foreground">
-              <th className="pb-1.5 text-left font-medium">Model</th>
-              <th className="pb-1.5 text-right font-medium">Input</th>
-              <th className="pb-1.5 text-right font-medium">Cache write</th>
-              <th className="pb-1.5 text-right font-medium">Cache read</th>
-              <th className="pb-1.5 text-right font-medium">Output</th>
-              <th className="pb-1.5 text-right font-medium">Cost</th>
-            </tr>
-          </thead>
-          <tbody className="font-mono tabular-nums">
+      <div className="mt-4 border-t border-border pt-1.5">
+        <Table className="text-xs">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              {["Model", "Input", "Cache write", "Cache read", "Output", "Cost"].map(
+                (label, i) => (
+                  <TableHead
+                    key={label}
+                    className={cn("h-8 px-0 text-muted-foreground", i > 0 && "pl-3 text-right")}
+                  >
+                    {label}
+                  </TableHead>
+                ),
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody className="font-mono tabular-nums">
             {cost.byModel.map((m) => (
-              <tr key={m.model} className="border-t border-border/60">
-                <td className="py-1.5 pr-3 text-foreground">{m.model}</td>
-                <td className="py-1.5 text-right">{formatTokens(m.inputTokens) ?? "—"}</td>
-                <td className="py-1.5 text-right">
+              <TableRow key={m.model} className="border-border/60">
+                <TableCell className="px-0 py-1.5 text-foreground">{m.model}</TableCell>
+                <TableCell className="py-1.5 pr-0 pl-3 text-right">
+                  {formatTokens(m.inputTokens) ?? "—"}
+                </TableCell>
+                <TableCell className="py-1.5 pr-0 pl-3 text-right">
                   {formatTokens(m.cacheWriteTokens) ?? "—"}
-                </td>
-                <td className="py-1.5 text-right">
+                </TableCell>
+                <TableCell className="py-1.5 pr-0 pl-3 text-right">
                   {formatTokens(m.cacheReadTokens) ?? "—"}
-                </td>
-                <td className="py-1.5 text-right">{formatTokens(m.outputTokens) ?? "—"}</td>
-                <td className="py-1.5 text-right font-semibold text-foreground">
+                </TableCell>
+                <TableCell className="py-1.5 pr-0 pl-3 text-right">
+                  {formatTokens(m.outputTokens) ?? "—"}
+                </TableCell>
+                <TableCell className="py-1.5 pr-0 pl-3 text-right font-semibold text-foreground">
                   {m.costUSD === null ? (
                     <span className="font-sans font-normal text-muted-foreground">
                       no price
@@ -157,11 +174,11 @@ function CostSection({ cost }: { cost: CostSummary }) {
                   ) : (
                     formatCost(m.costUSD)
                   )}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
@@ -173,14 +190,14 @@ function CostSection({ cost }: { cost: CostSummary }) {
         )}
         API-equivalent estimate at list prices on the day of each request, not a
         bill: subscription and request-based plans charge differently.{" "}
-        <button
-          type="button"
+        <Button
+          variant="link"
           onClick={() => setDetailOpen(true)}
           aria-haspopup="dialog"
-          className="font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+          className="inline h-auto rounded-sm p-0 text-xs text-foreground underline underline-offset-2 hover:text-brand"
         >
           See the rates and arithmetic
-        </button>
+        </Button>
         {partial && (
           <>
             {" "}
@@ -362,7 +379,7 @@ export function TokenOptimizer({
           <Lightbulb className="size-4 text-brand" aria-hidden />
           Optimization hints
           {sortedHints.length > 0 && (
-            <span className="rounded bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
+            <span className="rounded-sm bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
               {sortedHints.length}
             </span>
           )}
@@ -399,7 +416,7 @@ export function TokenOptimizer({
                         </span>
                         <span className="sr-only">{cfg.label}</span>
                         {hint.saving && (
-                          <span className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-foreground">
+                          <span className="rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-foreground">
                             save ~{hint.saving}
                           </span>
                         )}
@@ -411,14 +428,15 @@ export function TokenOptimizer({
                         {hint.description}
                       </p>
                       {hint.focus && (
-                        <button
-                          type="button"
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => hint.focus && onFocusHint(hint.focus)}
-                          className="mt-2.5 inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                          className="mt-2.5"
                         >
                           View related events
-                          <ArrowRight className="size-3" aria-hidden />
-                        </button>
+                          <ArrowRight data-icon="inline-end" aria-hidden />
+                        </Button>
                       )}
                     </div>
                   </div>

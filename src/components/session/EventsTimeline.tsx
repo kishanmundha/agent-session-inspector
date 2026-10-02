@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
 import { SearchInput } from "@/components/common/search-input";
@@ -408,9 +410,9 @@ function UserMessageCard({ data }: { data: Record<string, unknown> }) {
         {expanded ? content : preview}{hasMore && !expanded && "..."}
       </div>
       {hasMore && (
-        <button onClick={() => setExpanded(!expanded)} className="text-xs text-violet-600 dark:text-violet-400 hover:underline mt-1">
+        <Button variant="link" size="xs" onClick={() => setExpanded(!expanded)} className="h-auto px-0 font-normal text-violet-600 dark:text-violet-400 mt-1">
           {expanded ? "Show less" : `Show more (${content.length} chars)`}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -445,9 +447,9 @@ function AssistantMessageCard({ data }: { data: Record<string, unknown> }) {
             {expanded ? content : preview}{hasMore && !expanded && "..."}
           </div>
           {hasMore && (
-            <button onClick={() => setExpanded(!expanded)} className="text-xs text-sky-600 dark:text-sky-400 hover:underline mt-1">
+            <Button variant="link" size="xs" onClick={() => setExpanded(!expanded)} className="h-auto px-0 font-normal text-sky-600 dark:text-sky-400 mt-1">
               {expanded ? "Show less" : `Show more (${content.length} chars)`}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -456,7 +458,7 @@ function AssistantMessageCard({ data }: { data: Record<string, unknown> }) {
           {toolRequests.map((tr: unknown, i) => {
             const tool = tr as Record<string, unknown>;
             return (
-              <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 border border-amber-300 dark:bg-amber-900/50 dark:border-amber-800 rounded text-xs text-amber-800 dark:text-amber-300 font-mono">
+              <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 border border-amber-300 dark:bg-amber-900/50 dark:border-amber-800 rounded-sm text-xs text-amber-800 dark:text-amber-300 font-mono">
                 🔧 {tool.name as string}
               </span>
             );
@@ -480,7 +482,7 @@ function ToolExecutionCard({ data, type }: { data: Record<string, unknown>; type
       <div className="flex items-center gap-2">
         <span className="font-mono text-amber-700 dark:text-amber-300 font-semibold">{toolName}</span>
         {type === "tool.execution_complete" && (
-          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+          <span className={`text-xs px-1.5 py-0.5 rounded-sm font-medium ${
             success
               ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-400"
               : "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-400"
@@ -491,11 +493,11 @@ function ToolExecutionCard({ data, type }: { data: Record<string, unknown>; type
       </div>
       {args && Object.keys(args).length > 0 && (
         <div>
-          <button onClick={() => setShowArgs(!showArgs)} className="text-xs text-amber-600 dark:text-amber-500 hover:underline">
+          <Button variant="link" size="xs" onClick={() => setShowArgs(!showArgs)} className="h-auto px-0 font-normal text-amber-600 dark:text-amber-500">
             {showArgs ? "▼" : "▶"} Arguments
-          </button>
+          </Button>
           {showArgs && (
-            <pre className="mt-1 p-2 bg-muted rounded text-xs text-foreground overflow-auto max-h-48 font-mono border border-border">
+            <pre className="mt-1 p-2 bg-muted rounded-sm text-xs text-foreground overflow-auto max-h-48 font-mono border border-border">
               {JSON.stringify(args, null, 2)}
             </pre>
           )}
@@ -503,11 +505,11 @@ function ToolExecutionCard({ data, type }: { data: Record<string, unknown>; type
       )}
       {result && (
         <div>
-          <button onClick={() => setShowResult(!showResult)} className="text-xs text-amber-600 dark:text-amber-500 hover:underline">
+          <Button variant="link" size="xs" onClick={() => setShowResult(!showResult)} className="h-auto px-0 font-normal text-amber-600 dark:text-amber-500">
             {showResult ? "▼" : "▶"} Result
-          </button>
+          </Button>
           {showResult && (
-            <pre className="mt-1 p-2 bg-muted rounded text-xs text-foreground overflow-auto max-h-48 font-mono border border-border">
+            <pre className="mt-1 p-2 bg-muted rounded-sm text-xs text-foreground overflow-auto max-h-48 font-mono border border-border">
               {JSON.stringify(result, null, 2)}
             </pre>
           )}
@@ -604,12 +606,14 @@ function SystemMessageCard({ data }: { data: Record<string, unknown> }) {
       </div>
 
       {hasMore && (
-        <button
+        <Button
+          variant="link"
+          size="xs"
           onClick={() => setExpanded(!expanded)}
-          className="text-xs text-slate-700 dark:text-slate-300 hover:underline"
+          className="h-auto px-0 font-normal text-slate-700 dark:text-slate-300"
         >
           {expanded ? "Show less" : `Show full system prompt (${content.length.toLocaleString()} chars)`}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -634,7 +638,7 @@ function HookEventCard({ data, type }: { data: Record<string, unknown>; type: "h
           </Badge>
         )}
         {type === "hook.end" && success !== undefined && (
-          <span className={`text-xs px-1.5 py-0.5 rounded font-medium border ${
+          <span className={`text-xs px-1.5 py-0.5 rounded-sm font-medium border ${
             success
               ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800"
               : "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800"
@@ -657,12 +661,14 @@ function HookEventCard({ data, type }: { data: Record<string, unknown>; type: "h
             {hasMore && !expanded && "..."}
           </pre>
           {hasMore && (
-            <button
+            <Button
+              variant="link"
+              size="xs"
               onClick={() => setExpanded(!expanded)}
-              className="text-xs text-cyan-700 dark:text-cyan-300 hover:underline mt-1"
+              className="h-auto px-0 font-normal text-cyan-700 dark:text-cyan-300 mt-1"
             >
               {expanded ? "Show less" : `Show more (${prompt.length.toLocaleString()} chars)`}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -710,7 +716,7 @@ function AutoModeResolvedCard({ data }: { data: Record<string, unknown> }) {
             {candidateModels.slice(0, 8).map((candidate, idx) => (
               <span
                 key={idx}
-                className="inline-flex items-center px-2 py-0.5 rounded border border-fuchsia-300 bg-fuchsia-100/70 text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-900/40 dark:text-fuchsia-300 text-xs font-mono"
+                className="inline-flex items-center px-2 py-0.5 rounded-sm border border-fuchsia-300 bg-fuchsia-100/70 text-fuchsia-800 dark:border-fuchsia-800 dark:bg-fuchsia-900/40 dark:text-fuchsia-300 text-xs font-mono"
               >
                 {String(candidate)}
               </span>
@@ -726,7 +732,7 @@ function AutoModeResolvedCard({ data }: { data: Record<string, unknown> }) {
             {Object.entries(categoryScores).slice(0, 6).map(([name, value]) => (
               <div
                 key={name}
-                className="text-xs border border-fuchsia-200 bg-fuchsia-50/70 dark:border-fuchsia-900/80 dark:bg-fuchsia-950/25 rounded px-2 py-1 flex items-center justify-between gap-2"
+                className="text-xs border border-fuchsia-200 bg-fuchsia-50/70 dark:border-fuchsia-900/80 dark:bg-fuchsia-950/25 rounded-sm px-2 py-1 flex items-center justify-between gap-2"
               >
                 <span className="text-muted-foreground">{name}</span>
                 <span className="font-mono text-foreground">{String(value)}</span>
@@ -783,11 +789,11 @@ function ExternalToolCard({ data, type }: { data: Record<string, unknown>; type:
 
       {type === "external_tool.requested" && argumentsObj && Object.keys(argumentsObj).length > 0 && (
         <div>
-          <button onClick={() => setShowArgs(!showArgs)} className="text-xs text-lime-700 dark:text-lime-400 hover:underline">
+          <Button variant="link" size="xs" onClick={() => setShowArgs(!showArgs)} className="h-auto px-0 font-normal text-lime-700 dark:text-lime-400">
             {showArgs ? "▼" : "▶"} Arguments
-          </button>
+          </Button>
           {showArgs && (
-            <pre className="mt-1 p-2 bg-background/70 rounded text-xs text-foreground overflow-auto max-h-40 font-mono border border-lime-200 dark:border-lime-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            <pre className="mt-1 p-2 bg-background/70 rounded-sm text-xs text-foreground overflow-auto max-h-40 font-mono border border-lime-200 dark:border-lime-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
               {JSON.stringify(argumentsObj, null, 2)}
             </pre>
           )}
@@ -812,12 +818,12 @@ function SessionBinaryAssetCard({ data }: { data: Record<string, unknown> }) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
         {byteLength !== undefined && (
-          <div className="rounded border border-rose-200 dark:border-rose-900 px-2 py-1 bg-rose-100/60 dark:bg-rose-950/25">
+          <div className="rounded-sm border border-rose-200 dark:border-rose-900 px-2 py-1 bg-rose-100/60 dark:bg-rose-950/25">
             size: <span className="font-mono text-foreground">{byteLength.toLocaleString()} bytes</span>
           </div>
         )}
         {rawData && (
-          <div className="rounded border border-rose-200 dark:border-rose-900 px-2 py-1 bg-rose-100/60 dark:bg-rose-950/25">
+          <div className="rounded-sm border border-rose-200 dark:border-rose-900 px-2 py-1 bg-rose-100/60 dark:bg-rose-950/25">
             payload: <span className="font-mono text-foreground">{rawData.length.toLocaleString()} chars</span>
           </div>
         )}
@@ -870,12 +876,12 @@ function UsageCheckpointCard({ data }: { data: Record<string, unknown> }) {
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
         {aiu !== undefined && (
-          <div className="rounded border border-teal-200 dark:border-teal-900 px-2 py-1 bg-teal-100/60 dark:bg-teal-950/25">
+          <div className="rounded-sm border border-teal-200 dark:border-teal-900 px-2 py-1 bg-teal-100/60 dark:bg-teal-950/25">
             total AIU: <span className="font-mono text-foreground">{formatCompactNumber(aiu)}</span>
           </div>
         )}
         {totalPremiumRequests !== undefined && (
-          <div className="rounded border border-teal-200 dark:border-teal-900 px-2 py-1 bg-teal-100/60 dark:bg-teal-950/25">
+          <div className="rounded-sm border border-teal-200 dark:border-teal-900 px-2 py-1 bg-teal-100/60 dark:bg-teal-950/25">
             premium req: <span className="font-mono text-foreground">{totalPremiumRequests}</span>
           </div>
         )}
@@ -903,10 +909,10 @@ function ModelChangeCard({ data }: { data: Record<string, unknown> }) {
         <span className="font-mono font-semibold">{newModel || "unknown"}</span>
       </div>
       <div className="flex items-center gap-2 flex-wrap text-xs">
-        <span className="px-2 py-0.5 rounded border border-violet-200 dark:border-violet-900 bg-violet-100/60 dark:bg-violet-950/25 text-muted-foreground">
+        <span className="px-2 py-0.5 rounded-sm border border-violet-200 dark:border-violet-900 bg-violet-100/60 dark:bg-violet-950/25 text-muted-foreground">
           effort: <span className="font-mono text-foreground">{reasoningEffort ?? "default"}</span>
         </span>
-        <span className="px-2 py-0.5 rounded border border-violet-200 dark:border-violet-900 bg-violet-100/60 dark:bg-violet-950/25 text-muted-foreground">
+        <span className="px-2 py-0.5 rounded-sm border border-violet-200 dark:border-violet-900 bg-violet-100/60 dark:bg-violet-950/25 text-muted-foreground">
           context: <span className="font-mono text-foreground">{contextTier ?? "default"}</span>
         </span>
       </div>
@@ -935,17 +941,17 @@ function CompactionStartCard({ data }: { data: Record<string, unknown> }) {
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-xs">
         {systemTokens !== undefined && (
-          <div className="rounded border border-violet-200 dark:border-violet-900 px-2 py-1 bg-violet-100/60 dark:bg-violet-950/25">
+          <div className="rounded-sm border border-violet-200 dark:border-violet-900 px-2 py-1 bg-violet-100/60 dark:bg-violet-950/25">
             system: <span className="font-mono text-foreground">{formatCompactNumber(systemTokens)}</span>
           </div>
         )}
         {conversationTokens !== undefined && (
-          <div className="rounded border border-violet-200 dark:border-violet-900 px-2 py-1 bg-violet-100/60 dark:bg-violet-950/25">
+          <div className="rounded-sm border border-violet-200 dark:border-violet-900 px-2 py-1 bg-violet-100/60 dark:bg-violet-950/25">
             convo: <span className="font-mono text-foreground">{formatCompactNumber(conversationTokens)}</span>
           </div>
         )}
         {toolDefinitionsTokens !== undefined && (
-          <div className="rounded border border-violet-200 dark:border-violet-900 px-2 py-1 bg-violet-100/60 dark:bg-violet-950/25">
+          <div className="rounded-sm border border-violet-200 dark:border-violet-900 px-2 py-1 bg-violet-100/60 dark:bg-violet-950/25">
             tools: <span className="font-mono text-foreground">{formatCompactNumber(toolDefinitionsTokens)}</span>
           </div>
         )}
@@ -979,7 +985,7 @@ function CompactionCompleteCard({ data }: { data: Record<string, unknown> }) {
       </div>
 
       {error && (
-        <div className="text-xs text-red-700 dark:text-red-300 bg-red-100/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded px-2 py-1.5 font-mono whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+        <div className="text-xs text-red-700 dark:text-red-300 bg-red-100/70 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-sm px-2 py-1.5 font-mono whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
           {error}
         </div>
       )}
@@ -1066,12 +1072,14 @@ function ThinkingCard({ data }: { data: Record<string, unknown> }) {
         {hasMore && !expanded && "…"}
       </div>
       {hasMore && (
-        <button
+        <Button
+          variant="link"
+          size="xs"
           onClick={() => setExpanded(!expanded)}
-          className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+          className="h-auto px-0 font-normal text-indigo-600 dark:text-indigo-400"
         >
           {expanded ? "Show less" : `Show more (${charLength.toLocaleString()} chars)`}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -1107,19 +1115,21 @@ function NameChips({ items, label }: { items: string[]; label?: string }) {
         {visible.map((item) => (
           <span
             key={item}
-            className="max-w-full truncate rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground/80"
+            className="max-w-full truncate rounded-sm border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground/80"
             title={item}
           >
             {item}
           </span>
         ))}
         {!expanded && items.length > visible.length && (
-          <button
+          <Button
+            variant="ghost"
+            size="xs"
             onClick={() => setExpanded(true)}
-            className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+            className="text-[11px] font-normal text-muted-foreground"
           >
             +{items.length - visible.length} more
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -1157,12 +1167,14 @@ function ExpandableText({
         {!expanded && hasMore && "…"}
       </pre>
       {hasMore && (
-        <button
+        <Button
+          variant="link"
+          size="xs"
           onClick={() => setExpanded(!expanded)}
-          className={cn("text-xs hover:underline", accentCls)}
+          className={cn("h-auto px-0 font-normal", accentCls)}
         >
           {expanded ? "Show less" : `Show more (${total.toLocaleString()} chars)`}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -1217,7 +1229,7 @@ function PatchAppliedCard({ data }: { data: Record<string, unknown> }) {
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <span
-          className={`rounded px-1.5 py-0.5 text-xs font-medium ${
+          className={`rounded-sm px-1.5 py-0.5 text-xs font-medium ${
             success === false
               ? "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-400"
               : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-400"
@@ -1233,7 +1245,7 @@ function PatchAppliedCard({ data }: { data: Record<string, unknown> }) {
         <ul className="space-y-1">
           {changes.slice(0, 12).map((change) => (
             <li key={change.file} className="flex items-center gap-2 text-xs">
-              <span className="rounded border border-emerald-300 bg-emerald-100/70 px-1 font-mono text-[10px] uppercase text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+              <span className="rounded-sm border border-emerald-300 bg-emerald-100/70 px-1 font-mono text-[10px] uppercase text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
                 {change.type}
               </span>
               <span className="truncate font-mono text-foreground/80" title={change.file}>
@@ -1276,7 +1288,7 @@ function FactGrid({ facts }: { facts: [string, unknown][] }) {
       {shown.map(([label, value]) => (
         <div
           key={label}
-          className="flex items-center justify-between gap-2 rounded border border-border bg-muted/40 px-2 py-1 text-xs"
+          className="flex items-center justify-between gap-2 rounded-sm border border-border bg-muted/40 px-2 py-1 text-xs"
         >
           <span className="text-muted-foreground">{label}</span>
           <span className="min-w-0 truncate font-mono text-foreground" title={String(value)}>
@@ -1380,7 +1392,7 @@ function TurnAbortedCard({ data }: { data: Record<string, unknown> }) {
   const durationMs = data.durationMs as number | undefined;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="rounded bg-orange-100 px-1.5 py-0.5 font-medium text-orange-800 dark:bg-orange-900/60 dark:text-orange-300">
+      <span className="rounded-sm bg-orange-100 px-1.5 py-0.5 font-medium text-orange-800 dark:bg-orange-900/60 dark:text-orange-300">
         {(data.reason as string) ?? "aborted"}
       </span>
       {durationMs !== undefined && (
@@ -1449,9 +1461,9 @@ function GenericDataCard({ data }: { data: Record<string, unknown> }) {
         {expanded ? json : preview}{hasMore && !expanded && "..."}
       </pre>
       {hasMore && (
-        <button onClick={() => setExpanded(!expanded)} className="text-xs text-muted-foreground hover:text-foreground mt-1 hover:underline">
+        <Button variant="link" size="xs" onClick={() => setExpanded(!expanded)} className="h-auto px-0 font-normal text-muted-foreground hover:text-foreground mt-1">
           {expanded ? "Collapse" : "Expand"}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -1948,7 +1960,7 @@ function EventCard({
             aria-hidden
           />
           <span
-            className={`max-w-[9rem] shrink-0 truncate rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold ${visual.chipCls ?? cfg.typeCls}`}
+            className={`max-w-[9rem] shrink-0 truncate rounded-sm px-1.5 py-0.5 font-mono text-[11px] font-semibold ${visual.chipCls ?? cfg.typeCls}`}
             title={summary.label}
           >
             {summary.label}
@@ -1979,7 +1991,7 @@ function EventCard({
 
           {gap !== null && gap > 5000 && (
             <span
-              className="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline"
+              className="hidden shrink-0 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline"
               title="Gap since the previous event"
             >
               +{gap > 60000 ? `${(gap / 60000).toFixed(1)}m` : `${(gap / 1000).toFixed(1)}s`}
@@ -2008,38 +2020,28 @@ function EventCard({
               <span className="mr-auto truncate pl-1 font-mono text-[11px] text-muted-foreground">
                 {event.type}
               </span>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="xs"
                 onClick={() => setShowHelp(!showHelp)}
                 aria-expanded={showHelp}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-colors",
-                  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-                  showHelp
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
+                className="text-muted-foreground"
               >
                 <Info className="size-3.5" aria-hidden />
                 About
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
+                size="xs"
                 onClick={() => setShowRaw(!showRaw)}
                 aria-expanded={showRaw}
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] transition-colors",
-                  "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-                  showRaw
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
+                className="text-muted-foreground"
               >
                 <Braces className="size-3.5" aria-hidden />
                 {showRaw ? "Hide raw" : "Raw"}
-              </button>
+              </Button>
               <CopyButton value={rawJson} label="Copy raw JSON">
-                <span className="text-[11px]">Copy</span>
+                Copy
               </CopyButton>
             </div>
 
@@ -2244,22 +2246,20 @@ export function EventsTimeline({ events, focusRequest }: Props) {
             className="w-full sm:w-56"
           />
 
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={() => setFiltersOpen((v) => !v)}
             aria-expanded={filtersOpen}
             className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
-              "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
               selectedCategories.length + selectedSubKeys.length > 0
-                ? "border-foreground/25 bg-muted text-foreground"
-                : "border-border text-muted-foreground hover:text-foreground",
+                ? "border-foreground/25 bg-muted"
+                : "text-muted-foreground",
             )}
           >
             <SlidersHorizontal className="size-3.5" aria-hidden />
             Filters
             {selectedCategories.length + selectedSubKeys.length > 0 && (
-              <span className="rounded bg-foreground/10 px-1 tabular-nums">
+              <span className="rounded-sm bg-foreground/10 px-1 tabular-nums">
                 {selectedCategories.length + selectedSubKeys.length}
               </span>
             )}
@@ -2270,7 +2270,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
               )}
               aria-hidden
             />
-          </button>
+          </Button>
 
           <ToolbarToggle
             active={!showSystem}
@@ -2288,30 +2288,27 @@ export function EventsTimeline({ events, focusRequest }: Props) {
           />
 
           {activeFilterCount > 0 && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="inline-flex h-9 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
-            >
+            <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
               <X className="size-3.5" aria-hidden />
               Clear
-            </button>
+            </Button>
           )}
 
           <div className="ml-auto flex shrink-0 items-center gap-1">
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="icon"
                     onClick={() =>
                       setExpandAll({ nonce: Date.now(), mode: "open" })
                     }
                     aria-label="Expand all events"
-                    className="inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                    className="text-muted-foreground"
                   >
                     <ChevronsUpDown className="size-3.5" aria-hidden />
-                  </button>
+                  </Button>
                 }
               />
               <TooltipContent>Expand all</TooltipContent>
@@ -2319,16 +2316,17 @@ export function EventsTimeline({ events, focusRequest }: Props) {
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="icon"
                     onClick={() =>
                       setExpandAll({ nonce: Date.now(), mode: "closed" })
                     }
                     aria-label="Collapse all events"
-                    className="inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                    className="text-muted-foreground"
                   >
                     <ChevronsDownUp className="size-3.5" aria-hidden />
-                  </button>
+                  </Button>
                 }
               />
               <TooltipContent>Collapse all</TooltipContent>
@@ -2359,7 +2357,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
                       )
                     }
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs transition-all",
+                      "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 font-mono text-xs transition-all",
                       "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
                       representativeType
                         ? getTypeChipClass(representativeType)
@@ -2449,20 +2447,21 @@ export function EventsTimeline({ events, focusRequest }: Props) {
               {filtered.length.toLocaleString()} matching events
             </p>
             <div className="flex gap-2">
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => showMore(visibleCount + PAGE_SIZE)}
-                className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
               >
                 Load {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => showMore(filtered.length)}
-                className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                className="text-muted-foreground"
               >
                 Show all
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -2478,13 +2477,9 @@ export function EventsTimeline({ events, focusRequest }: Props) {
             <p className="max-w-sm text-xs text-muted-foreground">
               {events.length.toLocaleString()} events are recorded in this session.
             </p>
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="mt-2 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted"
-            >
+            <Button variant="outline" size="sm" onClick={clearFilters} className="mt-2">
               Clear filters
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -2510,21 +2505,15 @@ function ToolbarToggle({
     <Tooltip>
       <TooltipTrigger
         render={
-          <button
-            type="button"
-            onClick={onClick}
-            aria-pressed={active}
-            className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
-              "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-              active
-                ? "border-foreground/25 bg-muted text-foreground"
-                : "border-border text-muted-foreground hover:text-foreground",
-            )}
+          <Toggle
+            variant="outline"
+            pressed={active}
+            onPressedChange={onClick}
+            className="gap-1.5 text-muted-foreground aria-pressed:border-foreground/25 aria-pressed:text-foreground"
           >
             <Icon className="size-3.5" aria-hidden />
             {label}
-          </button>
+          </Toggle>
         }
       />
       <TooltipContent>{title}</TooltipContent>

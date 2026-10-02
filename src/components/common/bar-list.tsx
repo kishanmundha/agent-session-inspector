@@ -42,9 +42,9 @@ export function BarList({
           >
             {name}
           </div>
-          <div className="h-4 flex-1 overflow-hidden rounded bg-muted">
+          <div className="h-4 flex-1 overflow-hidden rounded-sm bg-muted">
             <div
-              className={cn("h-full rounded", color)}
+              className={cn("h-full rounded-sm", color)}
               style={{ width: `${Math.max((value / max) * 100, 2)}%` }}
             />
           </div>

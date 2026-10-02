@@ -2,8 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+import { Segmented } from "./segmented";
 
 export type Theme = "light" | "dark" | "system";
 
@@ -86,52 +85,23 @@ function setTheme(theme: Theme) {
   emit();
 }
 
-const OPTIONS: { value: Theme; label: string; Icon: typeof Sun }[] = [
-  { value: "light", label: "Light", Icon: Sun },
-  { value: "dark", label: "Dark", Icon: Moon },
-  { value: "system", label: "System", Icon: Monitor },
+const OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
 ];
 
 export function ThemeToggle({ className }: { className?: string }) {
   const theme = useSyncExternalStore(subscribe, readTheme, readServerTheme);
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="Color theme"
-      className={cn(
-        "inline-flex items-center gap-0.5 rounded-lg border border-border bg-muted/60 p-0.5",
-        className,
-      )}
-    >
-      {OPTIONS.map(({ value, label, Icon }) => {
-        const active = theme === value;
-        return (
-          <Tooltip key={value}>
-            <TooltipTrigger
-              render={
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  aria-label={`${label} theme`}
-                  onClick={() => setTheme(value)}
-                  className={cn(
-                    "inline-flex size-6 items-center justify-center rounded-md transition-colors",
-                    "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-                    active
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <Icon className="size-3.5" aria-hidden />
-                </button>
-              }
-            />
-            <TooltipContent>{label}</TooltipContent>
-          </Tooltip>
-        );
-      })}
-    </div>
+    <Segmented
+      label="Color theme"
+      size="default"
+      value={theme}
+      onChange={setTheme}
+      options={OPTIONS}
+      className={className}
+    />
   );
 }

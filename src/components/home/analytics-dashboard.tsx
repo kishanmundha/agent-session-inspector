@@ -5,8 +5,19 @@ import Link from "next/link";
 import { AlertTriangle, BarChart3, Download } from "lucide-react";
 import { BarList } from "@/components/common/bar-list";
 import { EmptyState } from "@/components/common/empty-state";
+import { OptionSelect } from "@/components/common/option-select";
+import { Segmented } from "@/components/common/segmented";
 import { Skeleton } from "@/components/common/skeleton";
 import { StatCard, StatCardGrid } from "@/components/common/stat-card";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   METRICS,
   METRIC_LABELS,
@@ -21,7 +32,7 @@ import { formatCost, formatCount, formatDuration, formatTokens } from "@/lib/for
 import { PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
 import type { AnalyticsSession } from "@/lib/providers/types";
 import { cn } from "@/lib/utils";
-import { CalendarHeatmap, HourHeatmap, Segmented, WeeklyBars } from "./analytics-charts";
+import { CalendarHeatmap, HourHeatmap, WeeklyBars } from "./analytics-charts";
 
 const RANGES: { value: string; label: string; days: number | null }[] = [
   { value: "7", label: "Last 7 days", days: 7 },
@@ -49,15 +60,25 @@ const PROJECT_OPTIONS: { value: ProjectKey; label: string }[] = [
   { value: "costUSD", label: "Cost" },
 ];
 
+const AGENT_COLUMNS = [
+  "Agent",
+  "Sessions",
+  "Cost",
+  "Messages",
+  "Tool calls",
+  "Output",
+  "Active",
+  "Msgs/min",
+  "Tools/min",
+  "Top tools",
+];
+
 function formatTop(key: TopKey, session: SessionRow): string {
   if (key === "costUSD") return formatCost(session.costUSD);
   if (key === "activeMs") return formatDuration(session.activeMs);
   if (key === "outputTokens") return formatTokens(session.outputTokens) ?? "0";
   return session.messages.toLocaleString();
 }
-
-const selectCls =
-  "h-9 rounded-lg border border-input bg-background px-2 text-xs text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40";
 
 function Panel({
   title,
@@ -146,6 +167,18 @@ export function AnalyticsDashboard({ reloadToken }: { reloadToken: number }) {
   );
   const models = useMemo(() => modelsOf(sessions ?? []), [sessions]);
 
+  const providerOptions = useMemo(
+    () => [
+      { value: "all", label: "All agents" },
+      ...providers.map((id) => ({ value: id as string, label: providerStyle(id).shortLabel })),
+    ],
+    [providers],
+  );
+  const modelOptions = useMemo(
+    () => [{ value: "all", label: "All models" }, ...models.map((m) => ({ value: m, label: m }))],
+    [models],
+  );
+
   const topSessions = useMemo(
     () =>
       data
@@ -198,56 +231,37 @@ export function AnalyticsDashboard({ reloadToken }: { reloadToken: number }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <OptionSelect
           value={range}
-          onChange={(e) => setRange(e.target.value)}
+          onChange={setRange}
+          options={RANGES}
           aria-label="Date range"
-          className={selectCls}
-        >
-          {RANGES.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
+        />
         {providers.length > 1 && (
-          <select
+          <OptionSelect
             value={provider}
-            onChange={(e) => setProvider(e.target.value)}
+            onChange={setProvider}
+            options={providerOptions}
             aria-label="Agent"
-            className={selectCls}
-          >
-            <option value="all">All agents</option>
-            {providers.map((id) => (
-              <option key={id} value={id}>
-                {providerStyle(id).shortLabel}
-              </option>
-            ))}
-          </select>
+          />
         )}
         {models.length > 1 && (
-          <select
+          <OptionSelect
             value={model}
-            onChange={(e) => setModel(e.target.value)}
+            onChange={setModel}
+            options={modelOptions}
             aria-label="Model"
-            className={cn(selectCls, "max-w-48")}
-          >
-            <option value="all">All models</option>
-            {models.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+            className="max-w-56"
+          />
         )}
-        <button
-          type="button"
+        <Button
+          variant="outline"
           onClick={() => downloadCsv(`agent-activity-${range}.csv`, daysToCsv(data.days))}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+          className="ml-auto"
         >
-          <Download className="size-3.5" aria-hidden />
+          <Download aria-hidden />
           Export CSV
-        </button>
+        </Button>
       </div>
 
       {totals.sessions === 0 ? (
@@ -416,50 +430,55 @@ export function AnalyticsDashboard({ reloadToken }: { reloadToken: number }) {
           </div>
 
           <Panel title="Agent comparison">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="text-xs uppercase tracking-wider text-muted-foreground">
-                  <tr className="border-b border-border">
-                    <th className="py-2 pr-3 font-medium">Agent</th>
-                    <th className="px-3 py-2 text-right font-medium">Sessions</th>
-                    <th className="px-3 py-2 text-right font-medium">Cost</th>
-                    <th className="px-3 py-2 text-right font-medium">Messages</th>
-                    <th className="px-3 py-2 text-right font-medium">Tool calls</th>
-                    <th className="px-3 py-2 text-right font-medium">Output</th>
-                    <th className="px-3 py-2 text-right font-medium">Active</th>
-                    <th className="px-3 py-2 text-right font-medium">Msgs/min</th>
-                    <th className="px-3 py-2 text-right font-medium">Tools/min</th>
-                    <th className="py-2 pl-3 font-medium">Top tools</th>
-                  </tr>
-                </thead>
-                <tbody className="tabular-nums">
-                  {data.agents.map((a) => (
-                    <tr key={a.provider} className="border-b border-border last:border-0">
-                      <td className="py-2 pr-3">
-                        <span className="flex items-center gap-2 font-medium">
-                          <span
-                            className={cn("size-2 rounded-full", providerStyle(a.provider).dotCls)}
-                            aria-hidden
-                          />
-                          {providerStyle(a.provider).shortLabel}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-right">{a.sessions.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right">{formatCost(a.costUSD)}</td>
-                      <td className="px-3 py-2 text-right">{a.messages.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right">{a.toolCalls.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right">{formatTokens(a.outputTokens) ?? "0"}</td>
-                      <td className="px-3 py-2 text-right">{formatDuration(a.activeMs)}</td>
-                      <td className="px-3 py-2 text-right">{perMinute(a.messages, a.activeMs)}</td>
-                      <td className="px-3 py-2 text-right">{perMinute(a.toolCalls, a.activeMs)}</td>
-                      <td className="max-w-56 truncate py-2 pl-3 font-mono text-xs text-muted-foreground">
-                        {a.topTools.join(", ") || "—"}
-                      </td>
-                    </tr>
+            <Table className="min-w-[720px]">
+              <TableHeader>
+                <TableRow className="text-xs uppercase tracking-wider hover:bg-transparent">
+                  {AGENT_COLUMNS.map((label, i) => (
+                    <TableHead
+                      key={label}
+                      className={cn(
+                        "text-muted-foreground",
+                        i > 0 && i < AGENT_COLUMNS.length - 1 && "text-right",
+                      )}
+                    >
+                      {label}
+                    </TableHead>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="tabular-nums">
+                {data.agents.map((a) => (
+                  <TableRow key={a.provider}>
+                    <TableCell>
+                      <span className="flex items-center gap-2 font-medium">
+                        <span
+                          className={cn("size-2 rounded-full", providerStyle(a.provider).dotCls)}
+                          aria-hidden
+                        />
+                        {providerStyle(a.provider).shortLabel}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">{a.sessions.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{formatCost(a.costUSD)}</TableCell>
+                    <TableCell className="text-right">{a.messages.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{a.toolCalls.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      {formatTokens(a.outputTokens) ?? "0"}
+                    </TableCell>
+                    <TableCell className="text-right">{formatDuration(a.activeMs)}</TableCell>
+                    <TableCell className="text-right">
+                      {perMinute(a.messages, a.activeMs)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {perMinute(a.toolCalls, a.activeMs)}
+                    </TableCell>
+                    <TableCell className="max-w-56 truncate font-mono text-xs text-muted-foreground">
+                      {a.topTools.join(", ") || "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Panel>
         </>
       )}

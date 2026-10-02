@@ -63,7 +63,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
   return (
     <Link
       href={`/sessions/${s.provider}/${s.id}`}
-      className="group block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      className="group block min-w-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <article className="relative rounded-xl border border-border bg-card px-4 py-3 transition-all duration-150 hover:border-brand/40 hover:shadow-md hover:shadow-foreground/5">
         <div className="flex items-start justify-between gap-3">
@@ -154,7 +154,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                   <Tooltip>
                     <TooltipTrigger
                       render={
-                        <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                        <span className="inline-flex items-center rounded-sm border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
                           {formatCost(cost)}
                           {unpriced.length > 0 && "+"}
                         </span>
@@ -170,7 +170,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                   <Tooltip>
                     <TooltipTrigger
                       render={
-                        <span className="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-xs text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300">
+                        <span className="inline-flex items-center gap-1 rounded-sm border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-xs text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300">
                           <ArrowUpFromLine className="size-3" aria-hidden />
                           {formatTokens(input)}
                         </span>
@@ -185,7 +185,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                   <Tooltip>
                     <TooltipTrigger
                       render={
-                        <span className="inline-flex items-center gap-1 rounded border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 font-mono text-xs text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">
+                        <span className="inline-flex items-center gap-1 rounded-sm border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 font-mono text-xs text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">
                           <ArrowDownToLine className="size-3" aria-hidden />
                           {formatTokens(output)}
                         </span>

@@ -8,6 +8,15 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { CopyButton } from "@/components/common/copy-button";
 import { formatCost } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -85,48 +94,47 @@ export function CostDialog({
           </DialogDescription>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-border">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-muted/60 text-muted-foreground">
-                <th className="px-3 py-2 text-left font-medium">Token type</th>
-                <th className="px-3 py-2 text-right font-medium">Tokens</th>
-                <th className="px-3 py-2 text-right font-medium">Rate / 1M</th>
-                <th className="px-3 py-2 text-right font-medium">Cost</th>
-              </tr>
-            </thead>
-            <tbody className="tabular-nums">
+        <div className="overflow-hidden rounded-lg border border-border">
+          <Table className="text-xs">
+            <TableHeader>
+              <TableRow className="bg-muted/60 hover:bg-muted/60">
+                <TableHead className="h-8 px-3 text-muted-foreground">Token type</TableHead>
+                <TableHead className="h-8 px-3 text-right text-muted-foreground">Tokens</TableHead>
+                <TableHead className="h-8 px-3 text-right text-muted-foreground">
+                  Rate / 1M
+                </TableHead>
+                <TableHead className="h-8 px-3 text-right text-muted-foreground">Cost</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="tabular-nums">
               {cost.byModel.map((model) => (
                 <Fragment key={model.model}>
-                  <tr className="border-t border-border bg-muted/30">
-                    <th
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead
                       colSpan={3}
                       scope="rowgroup"
-                      className="px-3 py-1.5 text-left font-mono font-semibold text-foreground"
+                      className="h-auto px-3 py-1.5 font-mono font-semibold"
                     >
                       {model.model}
-                    </th>
-                    <td className="px-3 py-1.5 text-right font-mono font-semibold text-foreground">
+                    </TableHead>
+                    <TableCell className="px-3 py-1.5 text-right font-mono font-semibold text-foreground">
                       {multiModel && model.costUSD !== null && formatCost(model.costUSD)}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                   {cost.lines
                     .filter((line) => line.model === model.model)
                     .map((line) => (
-                      <tr
-                        key={`${line.kind}-${line.rate}`}
-                        className="border-t border-border/60"
-                      >
-                        <td className="px-3 py-1.5 text-foreground">
+                      <TableRow key={`${line.kind}-${line.rate}`} className="border-border/60">
+                        <TableCell className="px-3 py-1.5 text-foreground">
                           {CLASS_LABEL[line.kind]}
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-mono">
+                        </TableCell>
+                        <TableCell className="px-3 py-1.5 text-right font-mono">
                           {line.tokens.toLocaleString()}
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-mono">
+                        </TableCell>
+                        <TableCell className="px-3 py-1.5 text-right font-mono">
                           {line.rate === null ? "—" : formatRate(line.rate)}
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-mono text-foreground">
+                        </TableCell>
+                        <TableCell className="px-3 py-1.5 text-right font-mono text-foreground">
                           {line.usd === null ? (
                             <span className="font-sans text-muted-foreground">
                               no price
@@ -134,28 +142,24 @@ export function CostDialog({
                           ) : (
                             formatCost(line.usd)
                           )}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
                 </Fragment>
               ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t border-border bg-muted/60">
-                <th
-                  colSpan={3}
-                  scope="row"
-                  className="px-3 py-2 text-left font-semibold text-foreground"
-                >
+            </TableBody>
+            <TableFooter className="bg-muted/60">
+              <TableRow className="hover:bg-transparent">
+                <TableHead colSpan={3} scope="row" className="h-auto px-3 py-2 font-semibold">
                   Total
-                </th>
-                <td className="px-3 py-2 text-right font-mono font-bold tabular-nums text-foreground">
+                </TableHead>
+                <TableCell className="px-3 py-2 text-right font-mono font-bold tabular-nums text-foreground">
                   {formatCost(cost.totalUSD)}
                   {partial && "+"}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
         </div>
 
         <p className="text-xs text-muted-foreground">

@@ -42,39 +42,6 @@ function HeatFooter({ readout, hint }: { readout: string | null; hint: string })
   );
 }
 
-export function Segmented<T extends string>({
-  value,
-  onChange,
-  options,
-  label,
-}: {
-  value: T;
-  onChange: (value: T) => void;
-  options: { value: T; label: string }[];
-  label: string;
-}) {
-  return (
-    <div role="group" aria-label={label} className="inline-flex rounded-lg bg-muted p-[3px]">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={value === o.value}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "rounded-md px-2 py-0.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-            value === o.value
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 const fullDate = (date: Date) =>
   date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 

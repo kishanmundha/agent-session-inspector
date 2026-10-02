@@ -12,6 +12,7 @@ import {
   Lightbulb,
   Zap,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CopyButton } from "@/components/common/copy-button";
@@ -40,7 +41,7 @@ const SESSION_TABS = [
 
 function TabCount({ value }: { value: number }) {
   return (
-    <span className="ml-1 rounded bg-foreground/10 px-1.5 text-[11px] tabular-nums">
+    <span className="ml-1 rounded-sm bg-foreground/10 px-1.5 text-[11px] tabular-nums">
       {value}
     </span>
   );
@@ -138,13 +139,15 @@ function Session({
       {/* Sticky bar: back, current session, tab navigation. */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto flex h-[var(--cv-topbar-h)] max-w-6xl items-center gap-3 px-4 sm:px-6">
-          <Link
-            href="/?tab=sessions"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+          <Button
+            variant="ghost"
+            nativeButton={false}
+            render={<Link href="/?tab=sessions" />}
+            className="text-muted-foreground"
           >
-            <ArrowLeft className="size-4" aria-hidden />
+            <ArrowLeft aria-hidden />
             <span className="hidden sm:inline">Sessions</span>
-          </Link>
+          </Button>
           <span className="text-muted-foreground/50" aria-hidden>
             /
           </span>
@@ -180,19 +183,12 @@ function Session({
             </p>
             <p className="max-w-sm text-xs text-muted-foreground">{error}</p>
             <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={retry}
-                className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
-              >
+              <Button variant="outline" size="sm" onClick={retry}>
                 Retry
-              </button>
-              <Link
-                href="/?tab=sessions"
-                className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
-              >
+              </Button>
+              <Button size="sm" nativeButton={false} render={<Link href="/?tab=sessions" />}>
                 Back to sessions
-              </Link>
+              </Button>
             </div>
           </div>
         </div>

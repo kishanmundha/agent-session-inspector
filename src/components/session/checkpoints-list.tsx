@@ -5,6 +5,7 @@ import { Bookmark, ChevronRight, FileText, FlaskConical } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { CopyButton } from "@/components/common/copy-button";
 import { EmptyState } from "@/components/common/empty-state";
+import { SearchInput } from "@/components/common/search-input";
 import { cn } from "@/lib/utils";
 import type { CheckpointFile } from "./types";
 
@@ -120,13 +121,12 @@ export function PathList({
   return (
     <div className="space-y-2">
       {paths.length > 8 && (
-        <input
-          type="search"
+        <SearchInput
           value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          onChange={setFilter}
           placeholder="Filter paths…"
           aria-label="Filter paths"
-          className="h-9 w-full max-w-sm rounded-lg border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+          className="w-full max-w-sm"
         />
       )}
       {visible.map((p) => (

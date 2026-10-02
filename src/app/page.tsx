@@ -10,9 +10,12 @@ import {
   ListTree,
   RefreshCw,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Toggle } from "@/components/ui/toggle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/common/empty-state";
+import { OptionSelect } from "@/components/common/option-select";
 import { ScrollToTop } from "@/components/common/scroll-to-top";
 import { SearchInput } from "@/components/common/search-input";
 import { SessionCardSkeleton } from "@/components/common/skeleton";
@@ -194,18 +197,19 @@ function Home() {
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="icon"
                     onClick={refresh}
                     disabled={loading}
                     aria-label="Refresh"
-                    className="inline-flex size-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-50"
+                    className="text-muted-foreground"
                   >
                     <RefreshCw
                       className={cn("size-3.5", loading && "animate-spin")}
                       aria-hidden
                     />
-                  </button>
+                  </Button>
                 }
               />
               <TooltipContent>Refresh</TooltipContent>
@@ -225,13 +229,9 @@ function Home() {
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">{error}</p>
             </div>
-            <button
-              type="button"
-              onClick={refresh}
-              className="shrink-0 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted"
-            >
+            <Button variant="outline" size="sm" onClick={refresh}>
               Retry
-            </button>
+            </Button>
           </div>
         )}
 
@@ -244,14 +244,14 @@ function Home() {
             <TabsTrigger value="sessions" className="px-3">
               <ListTree className="size-4" aria-hidden />
               Sessions
-              <span className="ml-1 rounded bg-foreground/10 px-1.5 text-[11px] tabular-nums">
+              <span className="ml-1 rounded-sm bg-foreground/10 px-1.5 text-[11px] tabular-nums">
                 {sessions.length}
               </span>
             </TabsTrigger>
             <TabsTrigger value="logs" className="px-3">
               <FileText className="size-4" aria-hidden />
               Logs
-              <span className="ml-1 rounded bg-foreground/10 px-1.5 text-[11px] tabular-nums">
+              <span className="ml-1 rounded-sm bg-foreground/10 px-1.5 text-[11px] tabular-nums">
                 {logs.length}
               </span>
             </TabsTrigger>
@@ -295,21 +295,17 @@ function Home() {
                 aria-label="Search sessions"
                 className="w-full max-w-sm"
               />
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="sr-only sm:not-sr-only">Sort</span>
-                <select
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="hidden sm:inline" aria-hidden>
+                  Sort
+                </span>
+                <OptionSelect
                   value={sort}
-                  onChange={(e) => setSort(e.target.value as SortKey)}
+                  onChange={setSort}
+                  options={SORT_OPTIONS}
                   aria-label="Sort sessions"
-                  className="h-9 rounded-lg border border-input bg-background px-2 text-xs text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
-                >
-                  {SORT_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                />
+              </div>
               <span className="ml-auto text-xs tabular-nums text-muted-foreground">
                 {loading
                   ? "Loading…"
@@ -335,13 +331,9 @@ function Home() {
                   }
                   action={
                     search ? (
-                      <button
-                        type="button"
-                        onClick={() => setSearch("")}
-                        className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted"
-                      >
+                      <Button variant="outline" size="sm" onClick={() => setSearch("")}>
                         Clear search
-                      </button>
+                      </Button>
                     ) : undefined
                   }
                 />
@@ -374,20 +366,16 @@ function ProviderChip({
   dotCls?: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
-        active
-          ? "border-brand/50 bg-brand/10 text-foreground"
-          : "border-border bg-background text-muted-foreground hover:text-foreground",
-      )}
+    <Toggle
+      variant="outline"
+      size="sm"
+      pressed={active}
+      onPressedChange={onClick}
+      className="gap-1.5 rounded-full bg-background px-3 text-xs text-muted-foreground aria-pressed:border-brand/50 aria-pressed:bg-brand/10 aria-pressed:text-foreground"
     >
       {dotCls && <span className={cn("size-1.5 rounded-full", dotCls)} aria-hidden />}
       {label}
-      <span className="rounded bg-foreground/10 px-1.5 tabular-nums">{count}</span>
-    </button>
+      <span className="rounded-sm bg-foreground/10 px-1.5 tabular-nums">{count}</span>
+    </Toggle>
   );
 }

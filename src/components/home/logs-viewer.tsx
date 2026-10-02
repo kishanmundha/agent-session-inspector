@@ -8,6 +8,8 @@ import {
   WrapText,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Toggle } from "@/components/ui/toggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
 import { EmptyState } from "@/components/common/empty-state";
 import { SearchInput } from "@/components/common/search-input";
@@ -144,7 +146,7 @@ export function LogsViewer({
           placeholder="Filter files…"
           aria-label="Filter log files"
         />
-        <ScrollArea className="min-h-0 flex-1 rounded-lg border border-border">
+        <ScrollArea className="min-h-0 flex-1 rounded-xl border border-border">
           <div className="space-y-1 p-2">
             {visibleFiles.map((log) => {
               const active = selected === log.name;
@@ -184,56 +186,64 @@ export function LogsViewer({
       </div>
 
       {/* Content */}
-      <div className="flex min-h-0 h-[60vh] flex-col overflow-hidden rounded-lg border border-border lg:h-auto">
+      <div className="flex min-h-0 h-[60vh] flex-col overflow-hidden rounded-xl border border-border lg:h-auto">
         {selected ? (
           <>
             <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/60 px-3 py-2">
-              <span className="truncate font-mono text-xs text-foreground">
+              <span className="min-w-0 truncate font-mono text-xs text-foreground">
                 {selected}
               </span>
               {errorCount > 0 && (
-                <span className="inline-flex items-center gap-1 rounded border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
+                <span className="inline-flex items-center gap-1 rounded-sm border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
                   <AlertCircle className="size-3" aria-hidden />
                   {errorCount} error{errorCount === 1 ? "" : "s"}
                 </span>
               )}
-              <div className="ml-auto flex items-center gap-2">
+              {/* Every control here is the `sm` size, so the row shares one height. */}
+              <div className="ml-auto flex w-full items-center gap-1.5 sm:w-auto">
                 <SearchInput
                   value={lineFilter}
                   onChange={setLineFilter}
+                  size="sm"
                   placeholder="Filter lines…"
                   aria-label="Filter log lines"
-                  className="w-40"
+                  className="min-w-0 flex-1 sm:w-44 sm:flex-none"
                 />
-                <button
-                  type="button"
-                  onClick={() => setErrorsOnly((v) => !v)}
-                  aria-pressed={errorsOnly}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors",
-                    errorsOnly
-                      ? "border-destructive/40 bg-destructive/10 text-destructive"
-                      : "border-border text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <AlertCircle className="size-3.5" aria-hidden />
-                  Problems
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWrap((v) => !v)}
-                  aria-pressed={wrap}
-                  aria-label="Toggle line wrapping"
-                  className={cn(
-                    "inline-flex items-center rounded-md border px-2 py-1 text-xs transition-colors",
-                    wrap
-                      ? "border-border bg-muted text-foreground"
-                      : "border-border text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <WrapText className="size-3.5" aria-hidden />
-                </button>
-                <CopyButton value={content} label="Copy log" />
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Toggle
+                        variant="outline"
+                        size="sm"
+                        pressed={errorsOnly}
+                        onPressedChange={setErrorsOnly}
+                        className="bg-background text-muted-foreground aria-pressed:border-destructive/40 aria-pressed:bg-destructive/10 aria-pressed:text-destructive"
+                      >
+                        <AlertCircle aria-hidden />
+                        Problems
+                      </Toggle>
+                    }
+                  />
+                  <TooltipContent>Show only errors and warnings</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <Toggle
+                        variant="outline"
+                        size="sm"
+                        pressed={wrap}
+                        onPressedChange={setWrap}
+                        aria-label="Wrap long lines"
+                        className="bg-background text-muted-foreground aria-pressed:text-foreground"
+                      >
+                        <WrapText aria-hidden />
+                      </Toggle>
+                    }
+                  />
+                  <TooltipContent>Wrap long lines</TooltipContent>
+                </Tooltip>
+                <CopyButton value={content} label="Copy log" size="sm" />
               </div>
             </div>
 
@@ -259,7 +269,7 @@ export function LogsViewer({
                     <div
                       key={line.n}
                       className={cn(
-                        "flex gap-3 rounded px-1 leading-5 hover:bg-muted/60",
+                        "flex gap-3 rounded-sm px-1 leading-5 hover:bg-muted/60",
                         LEVEL_STYLE[line.level],
                       )}
                     >
