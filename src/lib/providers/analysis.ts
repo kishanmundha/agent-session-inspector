@@ -1,10 +1,12 @@
 import type {
+  ActivitySlot,
   AgentEvent,
   ProviderId,
   SessionStats,
   TokenAnalysis,
   TokenHint,
 } from "./types";
+import { ACTIVITY_SLOT_MS } from "./types";
 import { bucketUsage } from "./pricing";
 
 /**
@@ -99,6 +101,7 @@ export function quickStatsFromEvents(events: AgentEvent[]) {
     totalInputTokens: stats.totalInputTokens,
     totalOutputTokens: stats.totalOutputTokens,
     usage: bucketUsage(events),
+    activity: summarizeActivity(events),
   };
 }
 
@@ -110,6 +113,69 @@ function toolNameOf(data: Record<string, unknown>): string | null {
     if (typeof v === "string" && v) return v;
   }
   return null;
+}
+
+/** A longer gap between events is time away from the session, not time in it. */
+const IDLE_GAP_MS = 5 * 60_000;
+
+/**
+ * Collapses a session into short slots of activity: small enough to cache
+ * with the session list, detailed enough to chart by day, hour and tool.
+ */
+export function summarizeActivity(events: AgentEvent[]): ActivitySlot[] {
+  const slots = new Map<number, ActivitySlot>();
+  // Output tokens reported as running totals, kept apart from per-message
+  // usage so a provider that reports both is not counted twice.
+  const fromTotals = new Map<number, number>();
+  let messageOutput = 0;
+  let totalsOutput = 0;
+  let previous = NaN;
+
+  for (const e of events) {
+    const at = Date.parse(e.timestamp);
+    if (Number.isNaN(at)) continue;
+    const t = Math.floor(at / ACTIVITY_SLOT_MS) * ACTIVITY_SLOT_MS;
+    let slot = slots.get(t);
+    if (!slot) {
+      slot = { t, messages: 0, toolCalls: 0, outputTokens: 0, activeMs: 0 };
+      slots.set(t, slot);
+    }
+
+    switch (e.type) {
+      case "user.message":
+      case "assistant.message":
+        slot.messages++;
+        break;
+      case "tool.execution_start":
+      case "external_tool.requested": {
+        const name = toolNameOf(e.data) ?? "unknown";
+        slot.toolCalls++;
+        slot.tools ??= {};
+        slot.tools[name] = (slot.tools[name] ?? 0) + 1;
+        break;
+      }
+    }
+
+    const output = num(e.data.outputTokens);
+    slot.outputTokens += output;
+    messageOutput += output;
+
+    const runningOutput = num(totalsOf(e)?.outputTokens);
+    if (runningOutput > totalsOutput) {
+      fromTotals.set(t, (fromTotals.get(t) ?? 0) + runningOutput - totalsOutput);
+      totalsOutput = runningOutput;
+    }
+
+    if (at > previous && at - previous <= IDLE_GAP_MS) slot.activeMs += at - previous;
+    if (!(at < previous)) previous = at;
+  }
+
+  // Same rule as computeSessionStats: whichever accounting saw more wins.
+  if (totalsOutput > messageOutput) {
+    for (const slot of slots.values()) slot.outputTokens = fromTotals.get(slot.t) ?? 0;
+  }
+
+  return [...slots.values()].sort((a, b) => a.t - b.t);
 }
 
 /** Rough char→token ratio used only for order-of-magnitude hints. */

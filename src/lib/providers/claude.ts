@@ -502,7 +502,9 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
       case "assistant": {
         const message = rec.message;
         if (!message) continue;
-        if (message.model) meta.model = message.model;
+        // "<synthetic>" marks a message Claude Code wrote itself (an API error,
+        // an expired login), not a model that ran.
+        if (message.model && message.model !== "<synthetic>") meta.model = message.model;
 
         const usage = message.usage;
         const messageKey = message.id ?? rec.requestId ?? rec.uuid ?? "";

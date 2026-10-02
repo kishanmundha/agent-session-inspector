@@ -15,12 +15,14 @@ export function BarList({
   max: explicitMax,
   emptyLabel = "None",
   limit,
+  format = (value) => value.toLocaleString(),
 }: {
   items: BarItem[];
   color?: string;
   max?: number;
   emptyLabel?: string;
   limit?: number;
+  format?: (value: number) => string;
 }) {
   if (items.length === 0) {
     return <p className="text-xs text-muted-foreground">{emptyLabel}</p>;
@@ -47,7 +49,7 @@ export function BarList({
             />
           </div>
           <div className="w-12 shrink-0 text-right font-medium tabular-nums text-foreground">
-            {value.toLocaleString()}
+            {format(value)}
           </div>
         </div>
       ))}

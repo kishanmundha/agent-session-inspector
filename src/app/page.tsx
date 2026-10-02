@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  BarChart3,
   Bot,
   FileText,
   Inbox,
@@ -18,9 +19,13 @@ import { SessionCardSkeleton } from "@/components/common/skeleton";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { SessionCard, type SessionMeta } from "@/components/home/session-card";
 import { LogsViewer, type LogFile } from "@/components/home/logs-viewer";
+import { AnalyticsDashboard } from "@/components/home/analytics-dashboard";
 import { providerStyle } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
+import { useTabParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
+
+const HOME_TABS = ["analytics", "sessions", "logs"] as const;
 
 type SortKey = "recent" | "oldest" | "cost" | "tokens" | "events" | "name";
 
@@ -42,6 +47,16 @@ function sessionLabel(s: SessionMeta) {
 }
 
 export default function HomePage() {
+  // useTabParam reads the URL, which needs a Suspense boundary to prerender.
+  return (
+    <Suspense>
+      <Home />
+    </Suspense>
+  );
+}
+
+function Home() {
+  const [tab, setTab] = useTabParam(HOME_TABS, "analytics");
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [provider, setProvider] = useState<string>("all");
@@ -220,8 +235,12 @@ export default function HomePage() {
           </div>
         )}
 
-        <Tabs defaultValue="sessions">
-          <TabsList className="mb-5">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="mb-5 max-w-full justify-start overflow-x-auto">
+            <TabsTrigger value="analytics" className="px-3">
+              <BarChart3 className="size-4" aria-hidden />
+              Analytics
+            </TabsTrigger>
             <TabsTrigger value="sessions" className="px-3">
               <ListTree className="size-4" aria-hidden />
               Sessions
@@ -237,6 +256,10 @@ export default function HomePage() {
               </span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="analytics">
+            <AnalyticsDashboard reloadToken={reloadToken} />
+          </TabsContent>
 
           <TabsContent value="sessions">
             {availableProviders.length > 1 && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { Suspense, use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -27,6 +27,16 @@ import {
 } from "@/components/session/checkpoints-list";
 import type { EventFocusRequest, SessionData } from "@/components/session/types";
 import { firstLine } from "@/lib/format";
+import { useTabParam } from "@/lib/use-tab-param";
+
+const SESSION_TABS = [
+  "events",
+  "checkpoints",
+  "files",
+  "research",
+  "workspace",
+  "optimizer",
+] as const;
 
 function TabCount({ value }: { value: number }) {
   return (
@@ -36,16 +46,27 @@ function TabCount({ value }: { value: number }) {
   );
 }
 
-export default function SessionPage({
+export default function SessionPage(props: {
+  params: Promise<{ provider: string; id: string }>;
+}) {
+  // useTabParam reads the URL, which needs a Suspense boundary.
+  return (
+    <Suspense>
+      <Session {...props} />
+    </Suspense>
+  );
+}
+
+function Session({
   params,
 }: {
   params: Promise<{ provider: string; id: string }>;
 }) {
   const { provider, id } = use(params);
+  const [tabParam, setActiveTab] = useTabParam(SESSION_TABS, "events");
   const [data, setData] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("events");
   const [eventFocusRequest, setEventFocusRequest] =
     useState<EventFocusRequest | null>(null);
 
@@ -100,6 +121,14 @@ export default function SessionPage({
     setReloadToken((t) => t + 1);
   }
 
+  // Checkpoints and research only exist for some sessions; a link to a tab
+  // this session lacks opens the timeline instead of an empty panel.
+  const activeTab =
+    (tabParam === "checkpoints" && data?.checkpoints.length === 0) ||
+    (tabParam === "research" && data?.research.length === 0)
+      ? "events"
+      : tabParam;
+
   const title = data
     ? (data.meta.title ?? firstLine(data.meta.name) ?? data.meta.id)
     : id;
@@ -110,7 +139,7 @@ export default function SessionPage({
       <div className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto flex h-[var(--cv-topbar-h)] max-w-6xl items-center gap-3 px-4 sm:px-6">
           <Link
-            href="/"
+            href="/?tab=sessions"
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
           >
             <ArrowLeft className="size-4" aria-hidden />
@@ -159,7 +188,7 @@ export default function SessionPage({
                 Retry
               </button>
               <Link
-                href="/"
+                href="/?tab=sessions"
                 className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
               >
                 Back to sessions

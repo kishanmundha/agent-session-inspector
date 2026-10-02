@@ -17,6 +17,9 @@ const SESSION_INDEX = path.join(CODEX_DIR, "session_index.jsonl");
 
 const TEXT_CAP = 20_000;
 
+/** `model_provider` values that run the model on this machine, e.g. "ollama-launch-codex-app". */
+const LOCAL_PROVIDER = /ollama|lm-?studio|llama\.?cpp|localhost/i;
+
 function capText(value: unknown): { text: string; chars: number; truncated: boolean } {
   const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
   if (text.length <= TEXT_CAP) return { text, chars: text.length, truncated: false };
@@ -110,6 +113,9 @@ function parseFile(filePath: string): ParsedSession {
   let billedCached = 0;
   let billedOutput = 0;
 
+  /** Set when the session's model provider is a local runtime, which bills nothing. */
+  let localModel = false;
+
   /** call_id → tool name, so tool outputs can be labelled like every other provider. */
   const toolNames = new Map<string, string>();
 
@@ -149,6 +155,7 @@ function parseFile(filePath: string): ParsedSession {
         meta.cwd = p.cwd as string | undefined;
         meta.host_type = (p.originator as string) ?? (p.source as string);
         meta.client_name = p.cli_version as string | undefined;
+        localModel = LOCAL_PROVIDER.test(String(p.model_provider ?? ""));
         const git = p.git as Record<string, unknown> | undefined;
         if (git) {
           meta.branch = git.branch as string | undefined;
@@ -299,6 +306,7 @@ function parseFile(filePath: string): ParsedSession {
                 inputTokens: Math.max(0, stepInput - stepCached),
                 outputTokens: stepOutput,
                 cacheReadTokens: stepCached,
+                local: localModel || undefined,
               } satisfies BilledUsage,
               usage: {
                 inputTokens: total.input_tokens ?? 0,

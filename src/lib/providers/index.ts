@@ -2,8 +2,11 @@ import { copilotProvider } from "./copilot";
 import { claudeProvider } from "./claude";
 import { codexProvider } from "./codex";
 import { analyzeTokenUsage, computeSessionStats } from "./analysis";
-import { priceBuckets, priceEvents } from "./pricing";
+import { priceBucket, priceBuckets, priceEvents } from "./pricing";
+import { firstLine } from "@/lib/format";
 import type {
+  ActivitySlot,
+  AnalyticsSession,
   LogFile,
   ProviderId,
   ProviderInfo,
@@ -37,10 +40,14 @@ function byRecency(a: SessionMeta, b: SessionMeta) {
 
 /**
  * Swaps the cached usage buckets for a cost priced against the current table,
- * so a price change shows up without re-parsing any transcript.
+ * so a price change shows up without re-parsing any transcript. The activity
+ * slots are dropped too: only the analytics endpoint ships them.
  */
-function withCost({ usage, ...meta }: SessionMeta): SessionMeta {
-  const cost = priceBuckets(usage);
+function withCost(session: SessionMeta): SessionMeta {
+  const meta = { ...session };
+  delete meta.usage;
+  delete meta.activity;
+  const cost = priceBuckets(session.usage);
   if (!cost) return meta;
   return {
     ...meta,
@@ -65,6 +72,56 @@ export function listSessions(providerId?: string): SessionMeta[] {
     }
   }
   return sessions.sort(byRecency);
+}
+
+/** Last path segment of the repository, else of the working directory. */
+function projectOf(meta: SessionMeta): string {
+  const source = meta.repository ?? meta.cwd ?? "";
+  return source.split(/[\\/]/).filter(Boolean).pop() ?? "unknown";
+}
+
+/** The session's activity with each slot's usage priced at today's table. */
+function pricedActivity(meta: SessionMeta): Pick<AnalyticsSession, "activity" | "unpricedModels"> {
+  const slots = new Map<number, ActivitySlot>();
+  for (const slot of meta.activity ?? []) slots.set(slot.t, { ...slot });
+  const unpriced = new Set<string>();
+  for (const bucket of meta.usage ?? []) {
+    const cost = priceBucket(bucket);
+    if (cost === null) {
+      unpriced.add(bucket.model ?? "unknown");
+      continue;
+    }
+    const slot = bucket.t === undefined ? undefined : slots.get(bucket.t);
+    if (slot) slot.costUSD = (slot.costUSD ?? 0) + cost;
+  }
+  return {
+    activity: [...slots.values()],
+    unpricedModels: unpriced.size > 0 ? [...unpriced] : undefined,
+  };
+}
+
+/** Every session reduced to what the analytics dashboard aggregates. */
+export function listAnalyticsSessions(): AnalyticsSession[] {
+  const sessions: AnalyticsSession[] = [];
+  for (const provider of PROVIDERS) {
+    if (!provider.isAvailable()) continue;
+    try {
+      for (const meta of provider.listSessions()) {
+        if (!meta.activity || meta.activity.length === 0) continue;
+        sessions.push({
+          provider: meta.provider,
+          id: meta.id,
+          label: meta.title ?? firstLine(meta.name) ?? meta.id,
+          project: projectOf(meta),
+          model: meta.model,
+          ...pricedActivity(meta),
+        });
+      }
+    } catch {
+      // Same as listSessions: one unreadable provider should not blank the page.
+    }
+  }
+  return sessions;
 }
 
 export function listProviders(): ProviderInfo[] {

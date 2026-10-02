@@ -2,6 +2,7 @@ import os from "os";
 import path from "path";
 import bundledPrices from "./prices.json";
 import { createFileCache, safeReadFile } from "./fs-utils";
+import { ACTIVITY_SLOT_MS } from "./types";
 import type {
   AgentEvent,
   BilledUsage,
@@ -106,7 +107,9 @@ export function costOf(usage: BilledUsage, timestamp?: string): UsageLine[] {
   const table = loadTable(PRICING_OVERRIDE_PATH);
   const key = resolveModel(usage.model, table);
   let rates: Record<TokenClass, number> | null = null;
-  if (key) {
+  if (usage.local) {
+    rates = { input: 0, cacheWrite: 0, cacheWrite1h: 0, cacheRead: 0, output: 0 };
+  } else if (key) {
     const p = entryAt(table[key], timestamp);
     const cacheWrite = p.cacheWrite ?? p.input;
     // The speed premium applies to every class.
@@ -239,22 +242,27 @@ export function priceEvents(events: AgentEvent[]): CostSummary {
 }
 
 /**
- * Collapses a session's usage to one record per model and day. That is small
- * enough to cache with the session list yet still priceable at read time,
- * including across a price change.
+ * Collapses a session's usage to one record per model and activity slot. That
+ * is small enough to cache with the session list yet still priceable at read
+ * time, including across a price change, and fine enough to chart cost by day
+ * and hour.
  */
 export function bucketUsage(events: AgentEvent[]): UsageBucket[] {
   const buckets = new Map<string, UsageBucket>();
   for (const event of events) {
     const day = event.timestamp?.slice(0, 10) ?? "";
+    const at = Date.parse(event.timestamp);
+    const t = Number.isNaN(at) ? undefined : Math.floor(at / ACTIVITY_SLOT_MS) * ACTIVITY_SLOT_MS;
     for (const usage of billedUsageOf(event)) {
-      const key = `${usage.model ?? ""}|${day}|${usage.fast ? 1 : 0}`;
+      const key = `${usage.model ?? ""}|${t ?? day}|${usage.fast ? 1 : 0}|${usage.local ? 1 : 0}`;
       const bucket = buckets.get(key);
       if (!bucket) {
         buckets.set(key, {
           day,
+          t,
           model: usage.model,
           fast: usage.fast,
+          local: usage.local,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
           cacheReadTokens: usage.cacheReadTokens ?? 0,
@@ -272,6 +280,15 @@ export function bucketUsage(events: AgentEvent[]): UsageBucket[] {
     }
   }
   return [...buckets.values()];
+}
+
+/** One bucket's cost, or null when its model has no price. */
+export function priceBucket(bucket: UsageBucket): number | null {
+  let cost: number | null = null;
+  for (const line of costOf(bucket, bucket.day || undefined)) {
+    if (line.usd !== null) cost = (cost ?? 0) + line.usd;
+  }
+  return cost;
 }
 
 export function priceBuckets(buckets: UsageBucket[] | undefined): CostSummary | null {

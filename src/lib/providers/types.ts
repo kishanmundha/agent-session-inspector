@@ -53,6 +53,46 @@ export interface SessionMeta {
   estimatedCostUSD?: number;
   /** Models that used tokens but have no price, so the estimate is a floor. */
   unpricedModels?: string[];
+  /** When the session was busy, kept by adapters for cross-session analytics. */
+  activity?: ActivitySlot[];
+}
+
+/**
+ * Slots are this short so the browser can regroup them into days and hours in
+ * its own time zone, including zones offset by 30 or 45 minutes.
+ */
+export const ACTIVITY_SLOT_MS = 15 * 60_000;
+
+/** What happened in one slot of a session. */
+export interface ActivitySlot {
+  /** Slot start, epoch milliseconds. */
+  t: number;
+  /** User and assistant messages. */
+  messages: number;
+  toolCalls: number;
+  outputTokens: number;
+  /** Time spent working: gaps between events, ignoring idle stretches. */
+  activeMs: number;
+  /** Tool calls by tool name; absent when the slot made none. */
+  tools?: Record<string, number>;
+  /**
+   * Estimated list-price cost of the slot's usage. Never cached: the analytics
+   * endpoint prices it on each read, so a price change applies at once.
+   */
+  costUSD?: number;
+}
+
+/** One session as the analytics dashboard sees it. */
+export interface AnalyticsSession {
+  provider: ProviderId;
+  id: string;
+  label: string;
+  /** Repository or working-directory name the session ran in. */
+  project: string;
+  model?: string;
+  activity: ActivitySlot[];
+  /** Models that used tokens but have no price, so the cost is a floor. */
+  unpricedModels?: string[];
 }
 
 /**
@@ -71,11 +111,21 @@ export interface BilledUsage {
   cacheWrite1hTokens?: number;
   /** Request ran in a premium speed tier. */
   fast?: boolean;
+  /**
+   * The model ran on the user's own machine (Ollama, LM Studio, …), so no
+   * tokens were billed: the usage costs $0 whatever the price table says.
+   */
+  local?: boolean;
 }
 
-/** Usage summed over one model and one calendar day (YYYY-MM-DD). */
+/**
+ * Usage summed over one model and one activity slot. `day` (YYYY-MM-DD) picks
+ * the price entry in force; `t` lines the bucket up with its `ActivitySlot`.
+ */
 export interface UsageBucket extends BilledUsage {
   day: string;
+  /** Slot start, epoch milliseconds; absent when the record had no timestamp. */
+  t?: number;
 }
 
 /** Dollars per token class. */
