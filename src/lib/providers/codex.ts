@@ -3,6 +3,7 @@ import path from "path";
 import os from "os";
 import type {
   AgentEvent,
+  BilledUsage,
   SessionDetail,
   SessionMeta,
   SessionProvider,
@@ -103,6 +104,11 @@ function parseFile(filePath: string): ParsedSession {
   }
   const hasUserEvents = eventMsgKinds.has("user_message");
   const hasAgentEvents = eventMsgKinds.has("agent_message");
+
+  /** Running totals already attributed to an earlier usage checkpoint. */
+  let billedInput = 0;
+  let billedCached = 0;
+  let billedOutput = 0;
 
   /** call_id → tool name, so tool outputs can be labelled like every other provider. */
   const toolNames = new Map<string, string>();
@@ -276,7 +282,24 @@ function parseFile(filePath: string): ParsedSession {
               | undefined;
             const total = info?.total_token_usage ?? {};
             const last = info?.last_token_usage ?? {};
+            // Totals are cumulative, so what this checkpoint billed is the
+            // step since the previous one. OpenAI counts cached tokens inside
+            // input_tokens; split them out so each class is priced once.
+            const stepInput = Math.max(0, (total.input_tokens ?? 0) - billedInput);
+            const stepCached = Math.max(0, (total.cached_input_tokens ?? 0) - billedCached);
+            const stepOutput = Math.max(0, (total.output_tokens ?? 0) - billedOutput);
+            if (info) {
+              billedInput = total.input_tokens ?? 0;
+              billedCached = total.cached_input_tokens ?? 0;
+              billedOutput = total.output_tokens ?? 0;
+            }
             push(ts, "session.usage_checkpoint", {
+              billedUsage: {
+                model: meta.model,
+                inputTokens: Math.max(0, stepInput - stepCached),
+                outputTokens: stepOutput,
+                cacheReadTokens: stepCached,
+              } satisfies BilledUsage,
               usage: {
                 inputTokens: total.input_tokens ?? 0,
                 cachedInputTokens: total.cached_input_tokens ?? 0,
@@ -526,7 +549,7 @@ export const codexProvider: SessionProvider = {
         content: JSON.stringify({ rollout: filePath, ...named }, null, 2),
         language: "json",
       },
-    } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis">;
+    } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 
   listLogs() {

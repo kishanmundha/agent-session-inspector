@@ -5,6 +5,7 @@ import type {
   TokenAnalysis,
   TokenHint,
 } from "./types";
+import { bucketUsage } from "./pricing";
 
 /**
  * Cumulative session totals an adapter can attach to any event (usually a
@@ -97,6 +98,7 @@ export function quickStatsFromEvents(events: AgentEvent[]) {
     userMessageCount: stats.totalUserMessages,
     totalInputTokens: stats.totalInputTokens,
     totalOutputTokens: stats.totalOutputTokens,
+    usage: bucketUsage(events),
   };
 }
 

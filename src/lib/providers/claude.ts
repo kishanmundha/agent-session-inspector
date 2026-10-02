@@ -3,6 +3,7 @@ import path from "path";
 import os from "os";
 import type {
   AgentEvent,
+  BilledUsage,
   SessionDetail,
   SessionMeta,
   SessionProvider,
@@ -32,6 +33,12 @@ interface ClaudeUsage {
   output_tokens?: number;
   cache_read_input_tokens?: number;
   cache_creation_input_tokens?: number;
+  /** Cache writes split by TTL; the two TTLs are billed at different rates. */
+  cache_creation?: {
+    ephemeral_5m_input_tokens?: number;
+    ephemeral_1h_input_tokens?: number;
+  };
+  speed?: string;
 }
 
 interface ClaudeBlock {
@@ -507,6 +514,18 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
             inputTokens:
               (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
             cacheReadTokens: usage.cache_read_input_tokens ?? 0,
+            billedUsage: {
+              model: message.model,
+              inputTokens: usage.input_tokens ?? 0,
+              outputTokens: usage.output_tokens ?? 0,
+              cacheReadTokens: usage.cache_read_input_tokens ?? 0,
+              // Older transcripts have no TTL split; those writes were 5-minute.
+              cacheWriteTokens: usage.cache_creation
+                ? usage.cache_creation.ephemeral_5m_input_tokens ?? 0
+                : usage.cache_creation_input_tokens ?? 0,
+              cacheWrite1hTokens: usage.cache_creation?.ephemeral_1h_input_tokens ?? 0,
+              fast: usage.speed === "fast",
+            } satisfies BilledUsage,
           };
         }
 
@@ -660,7 +679,7 @@ export const claudeProvider: SessionProvider = {
         ),
         language: "json",
       },
-    } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis">;
+    } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 
   listLogs() {

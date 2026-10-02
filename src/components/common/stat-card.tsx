@@ -1,40 +1,67 @@
+import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
  * Summary metric: small uppercase label, large value, muted sub-line.
  * Laid out by `StatCardGrid`, which auto-fills to the available width.
+ * With `onClick` the whole card is a button that opens more detail.
  */
 export function StatCard({
   label,
   value,
   sub,
   accent = false,
+  onClick,
 }: {
   label: string;
   value: string;
   sub?: string;
   accent?: boolean;
+  onClick?: () => void;
 }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="text-xs uppercase tracking-wider text-muted-foreground">
+  const body = (
+    <>
+      <span className="flex items-center justify-between gap-2 text-xs uppercase tracking-wider text-muted-foreground">
         {label}
-      </div>
-      <div
+        {onClick && (
+          <Info
+            className="size-3.5 shrink-0 opacity-60 transition-opacity group-hover:opacity-100"
+            aria-hidden
+          />
+        )}
+      </span>
+      <span
         className={cn(
-          "mt-1.5 text-2xl font-bold leading-none tabular-nums",
+          "mt-1.5 block text-2xl font-bold leading-none tabular-nums",
           accent ? "text-brand" : "text-foreground",
         )}
       >
         {value}
-      </div>
+      </span>
       {sub && (
-        <div className="mt-1 truncate text-xs text-muted-foreground" title={sub}>
+        <span
+          className="mt-1 block truncate text-xs normal-case text-muted-foreground"
+          title={sub}
+        >
           {sub}
-        </div>
+        </span>
       )}
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-haspopup="dialog"
+        className="group block rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-brand/40 hover:bg-muted/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        {body}
+      </button>
+    );
+  }
+  return <div className="rounded-xl border border-border bg-card p-4">{body}</div>;
 }
 
 export function StatCardGrid({ children }: { children: React.ReactNode }) {

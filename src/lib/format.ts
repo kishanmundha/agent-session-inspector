@@ -29,6 +29,14 @@ export function formatTokens(n?: number | null) {
   return String(n);
 }
 
+/** Dollar amounts: $412 / $12.40 / $0.37 / <$0.01. */
+export function formatCost(usd: number) {
+  if (usd <= 0) return "$0";
+  if (usd < 0.01) return "<$0.01";
+  if (usd >= 100) return `$${Math.round(usd).toLocaleString()}`;
+  return `$${usd.toFixed(2)}`;
+}
+
 export function formatCount(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 10_000) return `${(n / 1_000).toFixed(0)}K`;

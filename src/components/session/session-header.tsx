@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   CalendarDays,
   Clock,
@@ -10,15 +11,17 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
 import { StatCard, StatCardGrid } from "@/components/common/stat-card";
+import { CostDialog } from "./cost-dialog";
 import {
   firstLine,
+  formatCost,
   formatDuration,
   formatFullDateTime,
   timeAgo,
 } from "@/lib/format";
 import { providerStyle } from "@/lib/provider-meta";
 import { cn } from "@/lib/utils";
-import type { SessionMeta, SessionStats } from "./types";
+import type { CostSummary, SessionMeta, SessionStats } from "./types";
 
 function tokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -29,16 +32,20 @@ function tokens(n: number) {
 export function SessionHeader({
   meta,
   stats,
+  cost,
   activeMs,
 }: {
   meta: SessionMeta;
   stats?: SessionStats;
+  cost?: CostSummary;
   /** First-to-last event span. Real working time, unlike created→updated. */
   activeMs?: number | null;
 }) {
   const rawName = firstLine(meta.name);
   const title = meta.title ?? rawName;
   const subtitle = meta.title ? rawName : undefined;
+
+  const [costOpen, setCostOpen] = useState(false);
 
   const provider = providerStyle(meta.provider);
   const input = stats?.totalInputTokens ?? 0;
@@ -156,6 +163,18 @@ export function SessionHeader({
                 sub="in + out + cache"
                 accent
               />
+              {cost && cost.byModel.some((m) => m.costUSD !== null) && (
+                <StatCard
+                  label="Est. cost"
+                  value={`${formatCost(cost.totalUSD)}${cost.unpricedModels.length > 0 ? "+" : ""}`}
+                  sub={
+                    cost.unpricedModels.length > 0
+                      ? `excludes ${cost.unpricedModels.join(", ")}`
+                      : "at API list prices"
+                  }
+                  onClick={() => setCostOpen(true)}
+                />
+              )}
               {/* Only surface the token buckets the session actually reported —
                   empty "—" cards are noise. */}
               {input > 0 && (
@@ -189,6 +208,9 @@ export function SessionHeader({
                 />
               )}
             </StatCardGrid>
+            {cost && (
+              <CostDialog cost={cost} open={costOpen} onOpenChange={setCostOpen} />
+            )}
           </div>
         )}
       </div>

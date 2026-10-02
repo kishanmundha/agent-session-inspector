@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 import { DatabaseSync } from "node:sqlite";
 import type {
   AgentEvent,
+  BilledUsage,
   CheckpointFile,
   LogFile,
   SessionDetail,
@@ -85,6 +86,33 @@ function usageFromShutdown(data: Record<string, unknown>): ShutdownUsage | null 
 }
 
 /**
+ * Per-model usage for pricing. Copilot's inputTokens includes cache reads and
+ * writes, so they are subtracted to leave only the uncached remainder.
+ */
+function billedUsageFromShutdown(data: Record<string, unknown>): BilledUsage[] {
+  const split = (model: string | undefined, u: Record<string, number>): BilledUsage => {
+    const cacheRead = u.cacheReadTokens ?? 0;
+    const cacheWrite = u.cacheWriteTokens ?? 0;
+    return {
+      model,
+      inputTokens: Math.max(0, (u.inputTokens ?? 0) - cacheRead - cacheWrite),
+      outputTokens: u.outputTokens ?? 0,
+      cacheReadTokens: cacheRead,
+      cacheWriteTokens: cacheWrite,
+    };
+  };
+  const metrics = data.modelMetrics as
+    | Record<string, { usage?: Record<string, number> }>
+    | undefined;
+  if (metrics) {
+    return Object.entries(metrics).map(([model, entry]) => split(model, entry?.usage ?? {}));
+  }
+  // The older shape has no per-model split; the session's last model stands in.
+  const usage = usageFromShutdown(data);
+  return usage ? [split(data.currentModel as string | undefined, { ...usage })] : [];
+}
+
+/**
  * Copilot's on-disk events already use the canonical `category.subCategory`
  * vocabulary, so normalization here only adds the derived fields the shared
  * analysis layer expects.
@@ -123,9 +151,17 @@ function normalize(raw: AgentEvent): AgentEvent {
 
 function readEvents(id: string): AgentEvent[] {
   const eventsPath = path.join(SESSION_STATE_DIR, id, "events.jsonl");
-  return readJsonl<AgentEvent>(eventsPath)
+  const events = readJsonl<AgentEvent>(eventsPath)
     .filter((e) => e && typeof e.type === "string")
     .map(normalize);
+
+  // The stats layer treats shutdown totals as cumulative (latest wins);
+  // pricing follows the same rule so a resumed session is not counted twice.
+  const lastShutdown = events.findLast((e) => e.type === "session.shutdown");
+  if (lastShutdown) {
+    lastShutdown.data.billedUsage = billedUsageFromShutdown(lastShutdown.data);
+  }
+  return events;
 }
 
 function metaFromYaml(id: string, checkpointTitle?: string): SessionMeta {
@@ -214,7 +250,7 @@ export const copilotProvider: SessionProvider = {
         content: safeReadFile(path.join(sessionDir, "workspace.yaml")),
         language: "yaml",
       },
-    } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis">;
+    } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 
   listLogs(): LogFile[] {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -8,8 +9,15 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { BarList } from "@/components/common/bar-list";
+import { CostDialog } from "./cost-dialog";
+import { formatCost, formatTokens } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { SessionStats, TokenAnalysis, TokenHint } from "./types";
+import type {
+  CostSummary,
+  SessionStats,
+  TokenAnalysis,
+  TokenHint,
+} from "./types";
 
 const SEVERITY = {
   high: {
@@ -34,14 +42,169 @@ const SEVERITY = {
 
 const SEVERITY_ORDER = ["high", "medium", "low"] as const;
 
+/** Where the money went: by token class, then by model. */
+function CostSection({ cost }: { cost: CostSummary }) {
+  const [detailOpen, setDetailOpen] = useState(false);
+  if (cost.byModel.length === 0) return null;
+
+  const classes = [
+    {
+      label: "Output",
+      note: "replies + reasoning",
+      usd: cost.breakdown.output,
+      bar: "bg-sky-400 dark:bg-sky-500",
+    },
+    {
+      label: "Cache writes",
+      note: "new context stored",
+      usd: cost.breakdown.cacheWrite,
+      bar: "bg-amber-400 dark:bg-amber-500",
+    },
+    {
+      label: "Cache reads",
+      note: "context re-sent each turn",
+      usd: cost.breakdown.cacheRead,
+      bar: "bg-emerald-400 dark:bg-emerald-500",
+    },
+    {
+      label: "Uncached input",
+      usd: cost.breakdown.input,
+      bar: "bg-red-400 dark:bg-red-500",
+    },
+  ].filter((c) => c.usd > 0);
+
+  const cacheRead = cost.byModel.reduce((sum, m) => sum + m.cacheReadTokens, 0);
+  const allInput = cost.byModel.reduce(
+    (sum, m) => sum + m.inputTokens + m.cacheWriteTokens + m.cacheReadTokens,
+    0,
+  );
+  const partial = cost.unpricedModels.length > 0;
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-5">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="text-sm font-semibold text-foreground">Estimated cost</h2>
+        <span className="font-mono text-lg font-bold tabular-nums text-foreground">
+          {formatCost(cost.totalUSD)}
+          {partial && "+"}
+        </span>
+      </div>
+
+      {cost.totalUSD > 0 && (
+        <>
+          <div className="mb-4 flex h-2.5 overflow-hidden rounded-full bg-muted">
+            {classes.map(({ label, usd, bar }) => (
+              <div
+                key={label}
+                className={bar}
+                style={{ width: `${(usd / cost.totalUSD) * 100}%` }}
+              />
+            ))}
+          </div>
+          <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+            {classes.map(({ label, note, usd, bar }) => (
+              <div key={label} className="flex items-center gap-2 text-xs">
+                <span className={cn("size-2 shrink-0 rounded-full", bar)} aria-hidden />
+                <span className="min-w-0 flex-1 truncate text-foreground">
+                  {label}
+                  {note && (
+                    <span className="ml-1 hidden text-muted-foreground sm:inline">
+                      ({note})
+                    </span>
+                  )}
+                </span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {formatCost(usd)}
+                </span>
+                <span className="w-9 text-right tabular-nums text-muted-foreground">
+                  {Math.round((usd / cost.totalUSD) * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <div className="mt-4 overflow-x-auto border-t border-border pt-3">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-muted-foreground">
+              <th className="pb-1.5 text-left font-medium">Model</th>
+              <th className="pb-1.5 text-right font-medium">Input</th>
+              <th className="pb-1.5 text-right font-medium">Cache write</th>
+              <th className="pb-1.5 text-right font-medium">Cache read</th>
+              <th className="pb-1.5 text-right font-medium">Output</th>
+              <th className="pb-1.5 text-right font-medium">Cost</th>
+            </tr>
+          </thead>
+          <tbody className="font-mono tabular-nums">
+            {cost.byModel.map((m) => (
+              <tr key={m.model} className="border-t border-border/60">
+                <td className="py-1.5 pr-3 text-foreground">{m.model}</td>
+                <td className="py-1.5 text-right">{formatTokens(m.inputTokens) ?? "—"}</td>
+                <td className="py-1.5 text-right">
+                  {formatTokens(m.cacheWriteTokens) ?? "—"}
+                </td>
+                <td className="py-1.5 text-right">
+                  {formatTokens(m.cacheReadTokens) ?? "—"}
+                </td>
+                <td className="py-1.5 text-right">{formatTokens(m.outputTokens) ?? "—"}</td>
+                <td className="py-1.5 text-right font-semibold text-foreground">
+                  {m.costUSD === null ? (
+                    <span className="font-sans font-normal text-muted-foreground">
+                      no price
+                    </span>
+                  ) : (
+                    formatCost(m.costUSD)
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        {allInput > 0 && cacheRead > 0 && (
+          <>
+            {Math.round((cacheRead / allInput) * 100)}% of input was served from
+            cache.{" "}
+          </>
+        )}
+        API-equivalent estimate at list prices on the day of each request, not a
+        bill: subscription and request-based plans charge differently.{" "}
+        <button
+          type="button"
+          onClick={() => setDetailOpen(true)}
+          aria-haspopup="dialog"
+          className="font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+        >
+          See the rates and arithmetic
+        </button>
+        {partial && (
+          <>
+            {" "}
+            No price is known for {cost.unpricedModels.join(", ")}, so the total
+            leaves {cost.unpricedModels.length > 1 ? "them" : "it"} out; add one in{" "}
+            <code className="font-mono">~/.agent-session-visualizer/pricing.json</code>.
+          </>
+        )}
+      </p>
+      <CostDialog cost={cost} open={detailOpen} onOpenChange={setDetailOpen} />
+    </section>
+  );
+}
+
 export function TokenOptimizer({
   analysis,
   stats,
+  cost,
   eventTypeCounts,
   onFocusHint,
 }: {
   analysis: TokenAnalysis;
   stats: SessionStats;
+  cost: CostSummary;
   eventTypeCounts: { name: string; value: number }[];
   onFocusHint: (focus: NonNullable<TokenHint["focus"]>) => void;
 }) {
@@ -74,6 +237,8 @@ export function TokenOptimizer({
 
   return (
     <div className="space-y-6">
+      <CostSection cost={cost} />
+
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="mb-4 text-sm font-semibold text-foreground">
           Context usage breakdown

@@ -128,6 +128,8 @@ one canonical event vocabulary and the UI only ever sees that.
 src/lib/providers/
   types.ts      canonical model: SessionMeta, AgentEvent, SessionDetail, SessionProvider
   analysis.ts   provider-agnostic stats + token-cost hints
+  pricing.ts    dated price table lookup, per-event and per-session cost
+  prices.json   bundled list prices, USD per million tokens
   fs-utils.ts   jsonl reading, directory walking, mtime-keyed caching
   copilot.ts    ~/.copilot adapter
   claude.ts     ~/.claude adapter
@@ -146,6 +148,39 @@ Token accounting is centralized: adapters put per-message usage on the event
 running totals, attach `data.sessionTotals`. The latest `sessionTotals` wins over
 summation.
 
+### Cost estimates
+
+Each session, and each request in the timeline, shows an estimated cost in
+dollars. Adapters attach `data.billedUsage` to the events that carry usage, with
+uncached input, cache reads, cache writes and output kept as separate,
+non-overlapping counts, and `pricing.ts` multiplies them by the model's list
+price. The Token Optimizer tab splits the total by token class and by model.
+
+The figure is an API-equivalent estimate, not a bill: subscription and
+request-based plans charge differently, and requests an agent makes outside the
+transcript (title generation, for example) are not counted.
+
+Prices are never stored with a session; cost is computed on every load. To
+correct a price, add a model the bundled table does not know, or record a price
+change, create `~/.agent-session-visualizer/pricing.json`. It is merged over
+[`prices.json`](src/lib/providers/prices.json) per model and picked up without a
+restart:
+
+```json
+{
+  "my-local-model": { "input": 0, "output": 0 },
+  "claude-opus-5-5": [
+    { "input": 4, "output": 20, "cacheRead": 0.2, "cacheWrite": 5, "cacheWrite1h": 8 },
+    { "from": "2027-01-01", "input": 3, "output": 15, "cacheRead": 0.15, "cacheWrite": 3.75, "cacheWrite1h": 6 }
+  ]
+}
+```
+
+A model with several entries is priced by date: each request uses the entry
+whose `from` day is the latest one on or before the request, so a price change
+does not rewrite the cost of older sessions. Models with no price show as
+unpriced and are left out of the total rather than counted as free.
+
 ### Adding a provider
 
 1. Write `src/lib/providers/<name>.ts` exporting a `SessionProvider`: `info`,
@@ -153,7 +188,8 @@ summation.
    (return empty when the agent has no log directory).
 2. Map its records onto the canonical event types; cap huge payloads before they
    reach the client, and set `resultChars` on tool results so the token review
-   can size them.
+   can size them. Attach `billedUsage` wherever the transcript reports usage so
+   the session can be priced.
 3. Register it in `src/lib/providers/index.ts` and add its id to
    `ProviderId` in `types.ts`.
 4. Add its badge colours to `src/lib/provider-meta.ts`.

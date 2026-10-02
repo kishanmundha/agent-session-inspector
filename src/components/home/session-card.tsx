@@ -12,7 +12,13 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { firstLine, formatDateTime, formatTokens, timeAgo } from "@/lib/format";
+import {
+  firstLine,
+  formatCost,
+  formatDateTime,
+  formatTokens,
+  timeAgo,
+} from "@/lib/format";
 import { providerStyle } from "@/lib/provider-meta";
 import { cn } from "@/lib/utils";
 import type { SessionMeta } from "@/components/session/types";
@@ -46,6 +52,10 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
   const subtitle = s.title ? rawName : undefined;
   const input = s.totalInputTokens ?? 0;
   const output = s.totalOutputTokens ?? 0;
+  const cost = s.estimatedCostUSD;
+  const unpriced = s.unpricedModels ?? [];
+  // A session that only used unpriced models has nothing worth showing.
+  const showCost = cost != null && (cost > 0 || unpriced.length === 0);
   const hasStats =
     !!s.eventCount || !!s.toolCallCount || !!s.userMessageCount || input + output > 0;
   const provider = providerStyle(s.provider);
@@ -138,8 +148,24 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
             )}
             {!!s.eventCount && <Stat icon={Zap} value={s.eventCount} label="events" />}
 
-            {input + output > 0 && (
+            {(input + output > 0 || showCost) && (
               <div className="ml-auto flex items-center gap-1.5">
+                {showCost && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <span className="inline-flex items-center rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 font-mono text-xs text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          {formatCost(cost)}
+                          {unpriced.length > 0 && "+"}
+                        </span>
+                      }
+                    />
+                    <TooltipContent>
+                      Estimated cost at API list prices
+                      {unpriced.length > 0 && ` · excludes ${unpriced.join(", ")}`}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 {input > 0 && (
                   <Tooltip>
                     <TooltipTrigger

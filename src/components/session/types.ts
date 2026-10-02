@@ -5,7 +5,12 @@
 export type {
   AgentEvent,
   CheckpointFile,
+  CostBreakdown,
+  CostLine,
+  CostSummary,
   LogFile,
+  ModelCost,
+  PriceEntry,
   ProviderId,
   ProviderInfo,
   RawMetaDoc,
@@ -18,6 +23,7 @@ export type {
 import type {
   AgentEvent,
   CheckpointFile,
+  CostSummary,
   RawMetaDoc,
   SessionMeta,
   SessionStats,
@@ -33,6 +39,7 @@ export interface SessionData {
   rawMeta: RawMetaDoc;
   stats: SessionStats;
   tokenAnalysis: TokenAnalysis;
+  cost: CostSummary;
 }
 
 export interface EventFocusRequest {

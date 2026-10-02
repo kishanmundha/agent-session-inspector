@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
 import { SearchInput } from "@/components/common/search-input";
+import { formatCost } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 import type { AgentEvent } from "./types";
@@ -1801,6 +1802,7 @@ function EventCard({
 
   const summary = eventSummary(event);
   const tokenBadge = eventTokenBadge(event);
+  const costUSD = typeof event.data.costUSD === "number" ? event.data.costUSD : null;
   const typeParts = splitEventType(event.type);
   const categoryVisual = CATEGORY_VISUAL[typeParts.category];
   const visual = categoryVisual ?? cfg;
@@ -1963,6 +1965,15 @@ function EventCard({
               {tokenBadge.input > 0 && `↓${formatCompactNumber(tokenBadge.input)}`}
               {tokenBadge.input > 0 && tokenBadge.output > 0 && " "}
               {tokenBadge.output > 0 && `↑${formatCompactNumber(tokenBadge.output)}`}
+            </span>
+          )}
+
+          {costUSD !== null && costUSD > 0 && (
+            <span
+              className="hidden shrink-0 font-mono text-[11px] tabular-nums text-emerald-700 dark:text-emerald-400 sm:inline"
+              title="Estimated cost of this request at API list prices"
+            >
+              {formatCost(costUSD)}
             </span>
           )}
 

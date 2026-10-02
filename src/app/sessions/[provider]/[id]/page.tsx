@@ -172,6 +172,7 @@ export default function SessionPage({
           <SessionHeader
             meta={data.meta}
             stats={data.stats}
+            cost={data.cost}
             activeMs={activeMs}
           />
 
@@ -271,6 +272,7 @@ export default function SessionPage({
                 <TokenOptimizer
                   analysis={data.tokenAnalysis}
                   stats={data.stats}
+                  cost={data.cost}
                   eventTypeCounts={eventTypeCounts}
                   onFocusHint={(focus) => {
                     setActiveTab("events");

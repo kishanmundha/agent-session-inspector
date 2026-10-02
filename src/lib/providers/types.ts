@@ -47,6 +47,108 @@ export interface SessionMeta {
   userMessageCount?: number;
   totalOutputTokens?: number;
   totalInputTokens?: number;
+  /** Per-model usage kept by adapters so the list can be priced at read time. */
+  usage?: UsageBucket[];
+  /** Estimated list-price cost; absent when the session reported no usage. */
+  estimatedCostUSD?: number;
+  /** Models that used tokens but have no price, so the estimate is a floor. */
+  unpricedModels?: string[];
+}
+
+/**
+ * What a model request is billed for. Unlike the display counters, the token
+ * classes here never overlap, whatever the provider's own accounting does.
+ */
+export interface BilledUsage {
+  model?: string;
+  /** Uncached input: excludes cache reads and cache writes. */
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  /** Cache writes at the provider's default TTL. */
+  cacheWriteTokens?: number;
+  /** Cache writes at the extended (1 hour) TTL, billed higher. */
+  cacheWrite1hTokens?: number;
+  /** Request ran in a premium speed tier. */
+  fast?: boolean;
+}
+
+/** Usage summed over one model and one calendar day (YYYY-MM-DD). */
+export interface UsageBucket extends BilledUsage {
+  day: string;
+}
+
+/** Dollars per token class. */
+export interface CostBreakdown {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+/**
+ * List prices in USD per million tokens. A model maps to one entry per price
+ * change; `from` (YYYY-MM-DD) is the day that entry took effect, and usage is
+ * priced with the entry in force on the day it happened. Nothing derived from
+ * these is stored, so correcting a price re-prices every session.
+ */
+export interface PriceEntry {
+  from?: string;
+  input: number;
+  output: number;
+  /** Defaults to `input` for providers that do not discount cache hits. */
+  cacheRead?: number;
+  /** Defaults to `input` for providers that do not bill cache writes apart. */
+  cacheWrite?: number;
+  /** Extended-TTL cache writes; defaults to `cacheWrite`. */
+  cacheWrite1h?: number;
+  /** Multiplier applied to every token class in the premium speed tier. */
+  fast?: number;
+}
+
+export type TokenClass = "input" | "cacheWrite" | "cacheWrite1h" | "cacheRead" | "output";
+
+/** One receipt row: the tokens of one class a model was billed at one rate. */
+export interface CostLine {
+  model: string;
+  kind: TokenClass;
+  tokens: number;
+  /** USD per million tokens; null when the model has no price. */
+  rate: number | null;
+  usd: number | null;
+}
+
+export interface ModelCost {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  /** Both cache TTLs combined. */
+  cacheWriteTokens: number;
+  /** null when the price table has no entry for this model. */
+  costUSD: number | null;
+}
+
+/**
+ * API-equivalent estimate at list prices. It is not a bill: subscription and
+ * request-based plans charge differently.
+ */
+export interface CostSummary {
+  totalUSD: number;
+  /** The total split by what was billed, across all priced models. */
+  breakdown: CostBreakdown;
+  byModel: ModelCost[];
+  /** The arithmetic behind the total, in display order. */
+  lines: CostLine[];
+  /**
+   * The price entries in force for each model, keyed the way the override
+   * file expects; null for a model with no price. Lets the UI hand the user a
+   * correct starting point for that file.
+   */
+  prices: Record<string, PriceEntry[] | null>;
+  /** Where user price overrides are read from, with the home dir as `~`. */
+  overridePath: string;
+  unpricedModels: string[];
 }
 
 /**
@@ -158,6 +260,7 @@ export interface SessionDetail {
   rawMeta: RawMetaDoc;
   stats: SessionStats;
   tokenAnalysis: TokenAnalysis;
+  cost: CostSummary;
 }
 
 /** Everything an adapter must implement to appear in the app. */
@@ -165,7 +268,7 @@ export interface SessionProvider {
   info: Omit<ProviderInfo, "available" | "sessionCount">;
   isAvailable(): boolean;
   listSessions(): SessionMeta[];
-  getSession(id: string): Omit<SessionDetail, "stats" | "tokenAnalysis"> | null;
+  getSession(id: string): Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost"> | null;
   listLogs(): LogFile[];
   getLogContent(name: string): string;
 }

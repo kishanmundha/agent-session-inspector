@@ -22,11 +22,12 @@ import { providerStyle } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
 import { cn } from "@/lib/utils";
 
-type SortKey = "recent" | "oldest" | "tokens" | "events" | "name";
+type SortKey = "recent" | "oldest" | "cost" | "tokens" | "events" | "name";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "recent", label: "Most recent" },
   { value: "oldest", label: "Oldest first" },
+  { value: "cost", label: "Highest cost" },
   { value: "tokens", label: "Most tokens" },
   { value: "events", label: "Most events" },
   { value: "name", label: "Name (A–Z)" },
@@ -128,6 +129,10 @@ export default function HomePage() {
     switch (sort) {
       case "oldest":
         return sorted.reverse();
+      case "cost":
+        return sorted.sort(
+          (a, b) => (b.estimatedCostUSD ?? 0) - (a.estimatedCostUSD ?? 0),
+        );
       case "tokens":
         return sorted.sort((a, b) => totalTokens(b) - totalTokens(a));
       case "events":

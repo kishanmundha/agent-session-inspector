@@ -2,6 +2,7 @@ import { copilotProvider } from "./copilot";
 import { claudeProvider } from "./claude";
 import { codexProvider } from "./codex";
 import { analyzeTokenUsage, computeSessionStats } from "./analysis";
+import { priceBuckets, priceEvents } from "./pricing";
 import type {
   LogFile,
   ProviderId,
@@ -34,6 +35,20 @@ function byRecency(a: SessionMeta, b: SessionMeta) {
   return bt - at;
 }
 
+/**
+ * Swaps the cached usage buckets for a cost priced against the current table,
+ * so a price change shows up without re-parsing any transcript.
+ */
+function withCost({ usage, ...meta }: SessionMeta): SessionMeta {
+  const cost = priceBuckets(usage);
+  if (!cost) return meta;
+  return {
+    ...meta,
+    estimatedCostUSD: cost.totalUSD,
+    unpricedModels: cost.unpricedModels.length > 0 ? cost.unpricedModels : undefined,
+  };
+}
+
 /** Sessions from one provider, or from every available provider, newest first. */
 export function listSessions(providerId?: string): SessionMeta[] {
   const providers = providerId
@@ -44,7 +59,7 @@ export function listSessions(providerId?: string): SessionMeta[] {
   for (const provider of providers) {
     if (!provider.isAvailable()) continue;
     try {
-      sessions.push(...provider.listSessions());
+      sessions.push(...provider.listSessions().map(withCost));
     } catch {
       // A broken transcript directory should not take down the whole list.
     }
@@ -77,6 +92,8 @@ export function getSession(providerId: string, id: string): SessionDetail | null
 
   return {
     ...detail,
+    meta: withCost(detail.meta),
+    cost: priceEvents(detail.events),
     stats: computeSessionStats(detail.events),
     tokenAnalysis: analyzeTokenUsage(detail.events, provider.info.id),
   };
