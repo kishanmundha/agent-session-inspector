@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { PALETTES, PALETTE_STORAGE_KEY } from "./palette-picker";
 import { Segmented } from "./segmented";
 
 export type Theme = "light" | "dark" | "system";
@@ -9,8 +10,9 @@ export type Theme = "light" | "dark" | "system";
 export const THEME_STORAGE_KEY = "cv-theme";
 
 /**
- * Runs before first paint (see layout.tsx) so the resolved theme is on <html>
- * ahead of hydration and the page never flashes the wrong palette.
+ * Runs before first paint (see layout.tsx) so the resolved theme and the
+ * chosen palette are on <html> ahead of hydration and the page never flashes
+ * the wrong colours.
  */
 export const themeInitScript = `
 (function () {
@@ -19,6 +21,10 @@ export const themeInitScript = `
     var theme = stored === "light" || stored === "dark" ? stored
       : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     document.documentElement.classList.toggle("dark", theme === "dark");
+    var palette = localStorage.getItem("${PALETTE_STORAGE_KEY}");
+    if (${JSON.stringify(PALETTES.slice(1).map((p) => p.value))}.indexOf(palette) !== -1) {
+      document.documentElement.dataset.palette = palette;
+    }
   } catch (e) {}
 })();
 `;

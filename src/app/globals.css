@@ -62,28 +62,11 @@
   --color-text-muted: var(--cv-text-muted);
 }
 
-/* Light mode — warm neutrals tuned to sit with the terracotta accent. */
+/* Tokens that never change with the palette, plus the shadcn tokens that are
+   just another name for a palette colour. A palette only has to set the
+   base colours listed in the "Ocean" blocks below; everything here follows. */
 :root {
-  --background: #fbfaf9;
-  --foreground: #1c1b19;
-  --card: #ffffff;
-  --card-foreground: #1c1b19;
-  --popover: #ffffff;
-  --popover-foreground: #1c1b19;
-  --primary: #c05f3d;
-  --primary-foreground: #ffffff;
-  --secondary: #f2f0ed;
-  --secondary-foreground: #1c1b19;
-  --muted: #f2f0ed;
-  --muted-foreground: #6f6a63;
-  --accent: #f2f0ed;
-  --accent-foreground: #1c1b19;
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: #e3dfda;
-  --input: #e3dfda;
-  --ring: #c05f3d;
   --radius: 0.625rem;
-  color-scheme: light;
 
   /* Heights of the session page's stacked sticky layers. The tab strip sticks
      under the top bar and the timeline toolbar under the tabs, so all three
@@ -91,85 +74,334 @@
   --cv-topbar-h: 47px;
   --cv-tabbar-h: 48px;
 
-  /* Brand accents. `brand` is the terracotta used for identity and active
-     state; `brand-2` is the periwinkle used for the second series in charts. */
-  --cv-brand: #c05f3d;
-  --cv-brand-fg: #ffffff;
-  --cv-brand-2: #4f6ae0;
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  --primary: var(--cv-brand);
+  --primary-foreground: var(--cv-brand-fg);
+  --secondary: var(--muted);
+  --secondary-foreground: var(--foreground);
+  --accent: var(--muted);
+  --accent-foreground: var(--foreground);
+  --input: var(--border);
+  --ring: var(--cv-brand);
 
-  /* Chart series, ordered. */
-  --chart-1: #c05f3d;
-  --chart-2: #4f6ae0;
-  --chart-3: #2f9e63;
-  --chart-4: #9257d4;
-  --chart-5: #b8892a;
+  /* Chart series, ordered. The first two follow the palette's accents. */
+  --chart-1: var(--cv-brand);
+  --chart-2: var(--cv-brand-2);
 
-  --sidebar: #f7f5f3;
-  --sidebar-foreground: #1c1b19;
-  --sidebar-primary: #c05f3d;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f2f0ed;
-  --sidebar-accent-foreground: #1c1b19;
-  --sidebar-border: #e3dfda;
-  --sidebar-ring: #c05f3d;
-
-  /* App-specific light values */
-  --cv-surface: #f2f0ed;
-  --cv-surface-raised: #eae7e2;
-  --cv-surface-overlay: #ddd8d1;
-  --cv-border-subtle: #e9e5e0;
-  --cv-text-subtle: #4a4640;
-  --cv-text-muted: #8a847c;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--cv-brand);
+  --sidebar-primary-foreground: var(--cv-brand-fg);
+  --sidebar-accent: var(--muted);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--cv-brand);
 }
 
-/* Dark mode — the cool slate panels and terracotta accent of the reference. */
+/* Ocean (default palette), light — cool neutrals with an ocean-blue accent.
+   `brand` is used for identity and active state; `brand-2` is the second
+   series in charts. */
+:root {
+  color-scheme: light;
+  --background: #f2f4f7;
+  --foreground: #16181d;
+  --card: #ffffff;
+  --muted: #e9ecf0;
+  --muted-foreground: #646b78;
+  --border: #dce0e6;
+  --sidebar: #eef0f4;
+  --destructive: oklch(0.577 0.245 27.325);
+
+  --cv-surface: #e9ecf0;
+  --cv-surface-raised: #e0e4ea;
+  --cv-surface-overlay: #d0d5dd;
+  --cv-border-subtle: #e4e7ec;
+  --cv-text-subtle: #454a55;
+  --cv-text-muted: #78808d;
+
+  --cv-brand: #2f6fb0;
+  --cv-brand-fg: #ffffff;
+  --cv-brand-2: #b5657a;
+
+  --chart-3: #5b9477;
+  --chart-4: #8672b0;
+  --chart-5: #a98c4c;
+}
+
+/* Ocean, dark — cool slate panels. */
 .dark {
   color-scheme: dark;
   --background: #0f1115;
   --foreground: #e6e8ec;
   --card: #181b21;
-  --card-foreground: #e6e8ec;
-  --popover: #181b21;
-  --popover-foreground: #e6e8ec;
-  --primary: #d97757;
-  --primary-foreground: #1a1210;
-  --secondary: #1f232b;
-  --secondary-foreground: #e6e8ec;
   --muted: #1f232b;
   --muted-foreground: #9aa2b1;
-  --accent: #1f232b;
-  --accent-foreground: #e6e8ec;
-  --destructive: #e5484d;
   --border: #2a2f3a;
-  --input: #2a2f3a;
-  --ring: #d97757;
-
-  --cv-brand: #d97757;
-  --cv-brand-fg: #1a1210;
-  --cv-brand-2: #6c8cff;
-
-  --chart-1: #d97757;
-  --chart-2: #6c8cff;
-  --chart-3: #4fb477;
-  --chart-4: #b07cff;
-  --chart-5: #d4a24a;
-
   --sidebar: #181b21;
-  --sidebar-foreground: #e6e8ec;
-  --sidebar-primary: #d97757;
-  --sidebar-primary-foreground: #1a1210;
-  --sidebar-accent: #1f232b;
-  --sidebar-accent-foreground: #e6e8ec;
-  --sidebar-border: #2a2f3a;
-  --sidebar-ring: #d97757;
+  --destructive: #e5484d;
 
-  /* App-specific dark values */
   --cv-surface: #181b21;
   --cv-surface-raised: #1f232b;
   --cv-surface-overlay: #2a2f3a;
   --cv-border-subtle: #23272f;
   --cv-text-subtle: #b8bfcb;
   --cv-text-muted: #7d8593;
+
+  --cv-brand: #74aee6;
+  --cv-brand-fg: #0f1620;
+  --cv-brand-2: #d493a3;
+
+  --chart-3: #86bd9d;
+  --chart-4: #a999d1;
+  --chart-5: #c9b072;
+}
+
+/* Alternative palettes, chosen with the palette picker and applied as
+   `data-palette` on <html>. Each sets the same base colours as Ocean, with
+   neutrals tinted towards its accent; a palette whose accent would collide
+   with a later chart series also moves that series. The dark selectors are
+   more specific than `.dark`, so they win regardless of order. */
+[data-palette="sage"] {
+  --background: #f9fbfa;
+  --foreground: #161d18;
+  --card: #ffffff;
+  --muted: #f1f5f2;
+  --muted-foreground: #65766b;
+  --border: #e0e8e3;
+  --sidebar: #f5f7f6;
+  --cv-surface: #f1f5f2;
+  --cv-surface-raised: #e8edea;
+  --cv-surface-overlay: #d8e1db;
+  --cv-border-subtle: #e9efeb;
+  --cv-text-subtle: #46534a;
+  --cv-text-muted: #819287;
+  --cv-brand: #4f7a63;
+  --cv-brand-fg: #ffffff;
+  --cv-brand-2: #b5657a;
+  --chart-3: #4f7fb5;
+}
+
+.dark[data-palette="sage"] {
+  --background: #101612;
+  --foreground: #e6eae7;
+  --card: #19201b;
+  --muted: #202a23;
+  --muted-foreground: #9eaea3;
+  --border: #2b3930;
+  --sidebar: #19201b;
+  --cv-surface: #19201b;
+  --cv-surface-raised: #202a23;
+  --cv-surface-overlay: #2b3930;
+  --cv-border-subtle: #232e27;
+  --cv-text-subtle: #bcc7c0;
+  --cv-text-muted: #7f9084;
+  --cv-brand: #8fbfa3;
+  --cv-brand-fg: #121c15;
+  --cv-brand-2: #d493a3;
+  --chart-3: #84ade0;
+}
+
+[data-palette="plum"] {
+  --background: #faf9fb;
+  --foreground: #1b161d;
+  --card: #ffffff;
+  --muted: #f4f1f5;
+  --muted-foreground: #726477;
+  --border: #e6e0e9;
+  --sidebar: #f7f5f8;
+  --cv-surface: #f4f1f5;
+  --cv-surface-raised: #ece7ee;
+  --cv-surface-overlay: #dfd7e2;
+  --cv-border-subtle: #ede9ef;
+  --cv-text-subtle: #504554;
+  --cv-text-muted: #8e8093;
+  --cv-brand: #7d5f8c;
+  --cv-brand-fg: #ffffff;
+  --cv-brand-2: #3d8a8a;
+  --chart-4: #b5657a;
+}
+
+.dark[data-palette="plum"] {
+  --background: #151016;
+  --foreground: #e9e6ea;
+  --card: #1f1821;
+  --muted: #281f2b;
+  --muted-foreground: #aa9daf;
+  --border: #362a39;
+  --sidebar: #1f1821;
+  --cv-surface: #1f1821;
+  --cv-surface-raised: #281f2b;
+  --cv-surface-overlay: #362a39;
+  --cv-border-subtle: #2c232f;
+  --cv-text-subtle: #c5bcc8;
+  --cv-text-muted: #8c7e91;
+  --cv-brand: #bda3cc;
+  --cv-brand-fg: #1a111d;
+  --cv-brand-2: #7fc1c2;
+  --chart-4: #d493a3;
+}
+
+[data-palette="rose"] {
+  --background: #fbf9f9;
+  --foreground: #1e1517;
+  --card: #ffffff;
+  --muted: #f5f1f2;
+  --muted-foreground: #796368;
+  --border: #e9dfe2;
+  --sidebar: #f8f4f5;
+  --cv-surface: #f5f1f2;
+  --cv-surface-raised: #eee7e9;
+  --cv-surface-overlay: #e3d6d9;
+  --cv-border-subtle: #efe8ea;
+  --cv-text-subtle: #554448;
+  --cv-text-muted: #947f84;
+  --cv-brand: #a8566e;
+  --cv-brand-fg: #ffffff;
+  --cv-brand-2: #4f7fb5;
+}
+
+.dark[data-palette="rose"] {
+  --background: #161012;
+  --foreground: #eae6e7;
+  --card: #20191b;
+  --muted: #2a2022;
+  --muted-foreground: #ae9ea2;
+  --border: #392b2f;
+  --sidebar: #20191b;
+  --cv-surface: #20191b;
+  --cv-surface-raised: #2a2022;
+  --cv-surface-overlay: #392b2f;
+  --cv-border-subtle: #2e2326;
+  --cv-text-subtle: #c7bcbf;
+  --cv-text-muted: #907f83;
+  --cv-brand: #e09aae;
+  --cv-brand-fg: #1c1214;
+  --cv-brand-2: #84ade0;
+}
+
+[data-palette="sand"] {
+  --background: #fbfaf9;
+  --foreground: #1f1b14;
+  --card: #ffffff;
+  --muted: #f6f4f0;
+  --muted-foreground: #7b7060;
+  --border: #eae5de;
+  --sidebar: #f8f6f4;
+  --cv-surface: #f6f4f0;
+  --cv-surface-raised: #efebe6;
+  --cv-surface-overlay: #e4ded5;
+  --cv-border-subtle: #f0ede8;
+  --cv-text-subtle: #574f42;
+  --cv-text-muted: #978c7d;
+  --cv-brand: #8a6a3a;
+  --cv-brand-fg: #ffffff;
+  --cv-brand-2: #b5657a;
+  --chart-5: #4f7fb5;
+}
+
+.dark[data-palette="sand"] {
+  --background: #161411;
+  --foreground: #eae8e6;
+  --card: #201d19;
+  --muted: #292621;
+  --muted-foreground: #ada79f;
+  --border: #38332c;
+  --sidebar: #201d19;
+  --cv-surface: #201d19;
+  --cv-surface-raised: #292621;
+  --cv-surface-overlay: #38332c;
+  --cv-border-subtle: #2e2a24;
+  --cv-text-subtle: #c7c3bd;
+  --cv-text-muted: #8f897f;
+  --cv-brand: #d6b87e;
+  --cv-brand-fg: #1c1812;
+  --cv-brand-2: #d493a3;
+  --chart-5: #84ade0;
+}
+
+[data-palette="graphite"] {
+  --background: #fafafa;
+  --foreground: #19191a;
+  --card: #ffffff;
+  --muted: #f3f3f3;
+  --muted-foreground: #6c6d6f;
+  --border: #e3e4e5;
+  --sidebar: #f6f6f6;
+  --cv-surface: #f3f3f3;
+  --cv-surface-raised: #eaeaeb;
+  --cv-surface-overlay: #dcdcde;
+  --cv-border-subtle: #ebecec;
+  --cv-text-subtle: #4b4c4e;
+  --cv-text-muted: #88898b;
+  --cv-brand: #2b2f36;
+  --cv-brand-fg: #ffffff;
+  --cv-brand-2: #b5657a;
+}
+
+.dark[data-palette="graphite"] {
+  --background: #121314;
+  --foreground: #e7e8e9;
+  --card: #1b1c1e;
+  --muted: #232427;
+  --muted-foreground: #a3a5a8;
+  --border: #303134;
+  --sidebar: #1b1c1e;
+  --cv-surface: #1b1c1e;
+  --cv-surface-raised: #232427;
+  --cv-surface-overlay: #303134;
+  --cv-border-subtle: #27282b;
+  --cv-text-subtle: #c0c1c4;
+  --cv-text-muted: #84868a;
+  --cv-brand: #d5d9e0;
+  --cv-brand-fg: #151619;
+  --cv-brand-2: #d493a3;
+}
+
+/* Terracotta — the app's original look: warm neutrals in light mode, cool
+   slate in dark, and the brighter original chart series. */
+[data-palette="terracotta"] {
+  --background: #fbfaf9;
+  --foreground: #1c1b19;
+  --card: #ffffff;
+  --muted: #f2f0ed;
+  --muted-foreground: #6f6a63;
+  --border: #e3dfda;
+  --sidebar: #f7f5f3;
+  --cv-surface: #f2f0ed;
+  --cv-surface-raised: #eae7e2;
+  --cv-surface-overlay: #ddd8d1;
+  --cv-border-subtle: #e9e5e0;
+  --cv-text-subtle: #4a4640;
+  --cv-text-muted: #8a847c;
+  --cv-brand: #c05f3d;
+  --cv-brand-fg: #ffffff;
+  --cv-brand-2: #4f6ae0;
+  --chart-3: #2f9e63;
+  --chart-4: #9257d4;
+  --chart-5: #b8892a;
+}
+
+.dark[data-palette="terracotta"] {
+  --background: #0f1115;
+  --foreground: #e6e8ec;
+  --card: #181b21;
+  --muted: #1f232b;
+  --muted-foreground: #9aa2b1;
+  --border: #2a2f3a;
+  --sidebar: #181b21;
+  --cv-surface: #181b21;
+  --cv-surface-raised: #1f232b;
+  --cv-surface-overlay: #2a2f3a;
+  --cv-border-subtle: #23272f;
+  --cv-text-subtle: #b8bfcb;
+  --cv-text-muted: #7d8593;
+  --cv-brand: #d97757;
+  --cv-brand-fg: #1a1210;
+  --cv-brand-2: #6c8cff;
+  --chart-3: #4fb477;
+  --chart-4: #b07cff;
+  --chart-5: #d4a24a;
 }
 
 @layer base {

@@ -19,6 +19,7 @@ import { OptionSelect } from "@/components/common/option-select";
 import { ScrollToTop } from "@/components/common/scroll-to-top";
 import { SearchInput } from "@/components/common/search-input";
 import { SessionCardSkeleton } from "@/components/common/skeleton";
+import { PalettePicker } from "@/components/common/palette-picker";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { SessionCard, type SessionMeta } from "@/components/home/session-card";
 import { LogsViewer, type LogFile } from "@/components/home/logs-viewer";
@@ -214,6 +215,7 @@ function Home() {
               />
               <TooltipContent>Refresh</TooltipContent>
             </Tooltip>
+            <PalettePicker />
             <ThemeToggle />
           </div>
         </div>

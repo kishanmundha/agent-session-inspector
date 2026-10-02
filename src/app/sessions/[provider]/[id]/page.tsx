@@ -18,6 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { CopyButton } from "@/components/common/copy-button";
 import { ScrollToTop } from "@/components/common/scroll-to-top";
 import { Skeleton } from "@/components/common/skeleton";
+import { PalettePicker } from "@/components/common/palette-picker";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { EventsTimeline } from "@/components/session/EventsTimeline";
 import { SessionHeader } from "@/components/session/session-header";
@@ -154,6 +155,7 @@ function Session({
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
             {title}
           </span>
+          <PalettePicker className="shrink-0" />
           <ThemeToggle className="shrink-0" />
         </div>
       </div>
