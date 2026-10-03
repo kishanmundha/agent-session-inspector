@@ -44,6 +44,16 @@ project filters Analytics, Usage and Sessions together. Outside a repository,
 the working directory is the project; the dated scratch folders the Codex app
 creates for project-less chats count as one project.
 
+**Activity.** One day at a time: how many sessions were working at once in each
+15-minute slot, the agent time and cost of each session, and the day's split by
+project, model and agent.
+
+**Edits per turn.** A session's Edits tab lists each prompt with the files the
+agent wrote, edited or patched in response, linked to the event in the timeline.
+
+**Skills and MCP tools.** The Analytics tab counts which skills were loaded and
+which MCP servers and tools were called, for the selected range.
+
 > Screenshots use synthetic demo data. To reproduce them locally, see
 > [Demo data](#demo-data).
 

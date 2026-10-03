@@ -117,6 +117,24 @@ function toolNameOf(data: Record<string, unknown>): string | null {
   return null;
 }
 
+/** The skill a tool call loaded, when the call is the agent's skill tool. */
+function skillOf(name: string, data: Record<string, unknown>): string | null {
+  if (!/^skill$/i.test(name)) return null;
+  const args = data.arguments as Record<string, unknown> | undefined;
+  const skill = args?.skill ?? args?.name;
+  return typeof skill === "string" && skill ? skill : null;
+}
+
+/**
+ * `server__tool` for a call to an MCP server. Claude Code names these
+ * `mcp__server__tool`; other agents are recognized by the event type.
+ */
+function mcpToolOf(type: string, name: string): string | null {
+  if (name.startsWith("mcp__")) return name.slice("mcp__".length);
+  if (type !== "external_tool.requested") return null;
+  return name.includes("__") ? name : `other__${name}`;
+}
+
 /** A longer gap between events is time away from the session, not time in it. */
 const IDLE_GAP_MS = 5 * 60_000;
 
@@ -154,6 +172,16 @@ export function summarizeActivity(events: AgentEvent[]): ActivitySlot[] {
         slot.toolCalls++;
         slot.tools ??= {};
         slot.tools[name] = (slot.tools[name] ?? 0) + 1;
+        const skill = skillOf(name, e.data);
+        if (skill) {
+          slot.skills ??= {};
+          slot.skills[skill] = (slot.skills[skill] ?? 0) + 1;
+        }
+        const mcp = mcpToolOf(e.type, name);
+        if (mcp) {
+          slot.mcp ??= {};
+          slot.mcp[mcp] = (slot.mcp[mcp] ?? 0) + 1;
+        }
         break;
       }
     }

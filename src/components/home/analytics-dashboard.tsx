@@ -48,6 +48,13 @@ const TOP_OPTIONS: { value: TopKey; label: string }[] = [
   { value: "costUSD", label: "Cost" },
 ];
 
+type McpKey = "servers" | "tools";
+
+const MCP_OPTIONS: { value: McpKey; label: string }[] = [
+  { value: "servers", label: "Servers" },
+  { value: "tools", label: "Tools" },
+];
+
 type ProjectKey = "messages" | "costUSD";
 
 const PROJECT_OPTIONS: { value: ProjectKey; label: string }[] = [
@@ -96,6 +103,7 @@ export function AnalyticsDashboard({
   const [hourMetric, setHourMetric] = useState<Metric>("messages");
   const [topKey, setTopKey] = useState<TopKey>("messages");
   const [projectKey, setProjectKey] = useState<ProjectKey>("messages");
+  const [mcpKey, setMcpKey] = useState<McpKey>("servers");
 
   const filter: AnalyticsFilter = useMemo(
     () => ({
@@ -176,6 +184,14 @@ export function AnalyticsDashboard({
   const { totals, messagesPerSession } = data;
   const topProject = data.projects[0];
   const activeMinutes = (ms: number) => ms / 60_000;
+  const skillCalls = data.skills.reduce((sum, s) => sum + s.value, 0);
+  const mcpCalls = data.mcpServers.reduce((sum, s) => sum + s.value, 0);
+  const mcpItems =
+    mcpKey === "servers"
+      ? data.mcpServers
+      : data.mcpServers.flatMap((server) =>
+          server.tools.map((tool) => ({ name: `${server.name} › ${tool.name}`, value: tool.value })),
+        );
   const perMinute = (count: number, ms: number) =>
     ms > 0 ? (count / activeMinutes(ms)).toFixed(1) : "—";
 
@@ -386,6 +402,41 @@ export function AnalyticsDashboard({
                   <WeeklyBars weeks={data.weeks} />
                 </>
               )}
+            </Panel>
+
+            <Panel
+              title="Skills"
+              note={`${skillCalls.toLocaleString()} call${skillCalls === 1 ? "" : "s"} · ${data.skills.length} skill${data.skills.length === 1 ? "" : "s"}`}
+            >
+              <BarList
+                items={data.skills}
+                limit={8}
+                emptyLabel="No skill was loaded in this range"
+              />
+              {data.skills.length > 0 && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Most used:{" "}
+                  <span className="font-mono text-foreground">{data.skills[0].name}</span>, in{" "}
+                  {data.skills[0].sessions} session{data.skills[0].sessions === 1 ? "" : "s"}.
+                </p>
+              )}
+            </Panel>
+
+            <Panel
+              title="MCP tools"
+              note={`${mcpCalls.toLocaleString()} call${mcpCalls === 1 ? "" : "s"} · ${data.mcpServers.length} server${data.mcpServers.length === 1 ? "" : "s"}`}
+              action={
+                data.mcpServers.length > 0 ? (
+                  <Segmented
+                    label="Group MCP calls by"
+                    value={mcpKey}
+                    onChange={setMcpKey}
+                    options={MCP_OPTIONS}
+                  />
+                ) : undefined
+              }
+            >
+              <BarList items={mcpItems} limit={8} emptyLabel="No MCP tool was called in this range" />
             </Panel>
           </div>
 

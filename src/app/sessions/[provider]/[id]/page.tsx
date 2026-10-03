@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Bookmark,
   ClipboardList,
+  FilePen,
   FileText,
   FlaskConical,
   Lightbulb,
@@ -22,6 +23,7 @@ import { PalettePicker } from "@/components/common/palette-picker";
 import { SearchTrigger } from "@/components/common/command-palette";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { EventsTimeline } from "@/components/session/EventsTimeline";
+import { SessionEdits } from "@/components/session/session-edits";
 import { SessionHeader } from "@/components/session/session-header";
 import { ShortcutsTrigger, SidebarTrigger } from "@/components/session/session-shell";
 import { TokenOptimizer } from "@/components/session/token-optimizer";
@@ -30,6 +32,7 @@ import {
   PathList,
 } from "@/components/session/checkpoints-list";
 import type { EventFocusRequest, SessionData } from "@/components/session/types";
+import { editsByTurn } from "@/lib/edits";
 import { firstLine } from "@/lib/format";
 import { isRunning } from "@/lib/session-state";
 import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
@@ -38,6 +41,7 @@ const SESSION_TABS = [
   "events",
   "checkpoints",
   "files",
+  "edits",
   "research",
   "workspace",
   "optimizer",
@@ -89,7 +93,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
   }
 
   // A link copied from an event opens the timeline scrolled to that event.
-  const [targetEventId] = useQueryParam("event", "");
+  const [targetEventId, setTargetEventId] = useQueryParam("event", "");
 
   // Bumped by the retry button, and by the poll below when the transcript has
   // grown, to re-run the fetch effect.
@@ -168,6 +172,11 @@ function Session({ provider, id }: { provider: string; id: string }) {
     return Array.from(counts, ([name, value]) => ({ name, value }));
   }, [data]);
 
+  const editCount = useMemo(
+    () => editsByTurn(data?.events ?? []).reduce((sum, turn) => sum + turn.edits, 0),
+    [data],
+  );
+
   // Real working time: the span between the first and last recorded event.
   const activeMs = useMemo(() => {
     const events = data?.events ?? [];
@@ -184,6 +193,25 @@ function Session({ provider, id }: { provider: string; id: string }) {
     setActiveTab("events");
     setEventFocusRequest({ nonce: Date.now(), ...focus });
   }
+
+  // An edit opens the timeline scrolled to the call that made it. The nonce
+  // makes opening the same event twice scroll to it both times.
+  const [opened, setOpened] = useState<{ eventId: string; nonce: number } | null>(null);
+  function openEvent(eventId: string) {
+    setTargetEventId(eventId);
+    setActiveTab("events");
+    setOpened({ eventId, nonce: Date.now() });
+  }
+  useEffect(() => {
+    if (!opened || tabParam !== "events") return;
+    // After the next paint, once the timeline is on screen with the event in it.
+    const frame = requestAnimationFrame(() =>
+      document
+        .querySelector(`[data-event-id="${CSS.escape(opened.eventId)}"]`)
+        ?.scrollIntoView({ block: "center" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [opened, tabParam]);
 
   function retry() {
     setLoading(true);
@@ -297,6 +325,11 @@ function Session({ provider, id }: { provider: string; id: string }) {
                     Files
                     <TabCount value={data.files.length} />
                   </TabsTrigger>
+                  <TabsTrigger value="edits" className="px-3">
+                    <FilePen className="size-4" aria-hidden />
+                    Edits
+                    <TabCount value={editCount} />
+                  </TabsTrigger>
                   {data.research.length > 0 && (
                     <TabsTrigger value="research" className="px-3">
                       <FlaskConical className="size-4" aria-hidden />
@@ -344,6 +377,10 @@ function Session({ provider, id }: { provider: string; id: string }) {
 
               <TabsContent value="files" className="pt-2">
                 <PathList paths={data.files} kind="file" />
+              </TabsContent>
+
+              <TabsContent value="edits" className="pt-2">
+                <SessionEdits events={data.events} cwd={data.meta.cwd} onOpenEvent={openEvent} />
               </TabsContent>
 
               <TabsContent value="research" className="pt-2">

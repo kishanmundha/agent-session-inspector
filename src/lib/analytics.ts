@@ -74,6 +74,20 @@ export interface AgentRow extends Counts {
   topTools: string[];
 }
 
+export interface SkillRow {
+  name: string;
+  /** Times the skill was loaded. */
+  value: number;
+  sessions: number;
+}
+
+export interface McpServerRow {
+  name: string;
+  /** Calls to any of the server's tools. */
+  value: number;
+  tools: { name: string; value: number }[];
+}
+
 export interface Analytics {
   totals: Counts & { projects: number; activeDays: number };
   messagesPerSession: { mean: number; median: number; p90: number };
@@ -86,6 +100,8 @@ export interface Analytics {
   sessions: SessionRow[];
   projects: ProjectRow[];
   tools: { name: string; value: number }[];
+  skills: SkillRow[];
+  mcpServers: McpServerRow[];
   agents: AgentRow[];
   /** Models left out of every cost figure because they have no price. */
   unpricedModels: string[];
@@ -142,6 +158,8 @@ export function computeAnalytics(
   const sessions: SessionRow[] = [];
   const projects = new Map<string, ProjectRow>();
   const tools = new Map<string, number>();
+  const skills = new Map<string, SkillRow>();
+  const mcp = new Map<string, Map<string, number>>();
   const agents = new Map<ProviderId, AgentRow & { tools: Map<string, number> }>();
   let earliest = today.getTime();
 
@@ -169,6 +187,7 @@ export function computeAnalytics(
     // A session counts once per day and once per weekday-hour it touched.
     const seenDays = new Set<string>();
     const seenHours = new Set<number>();
+    const seenSkills = new Set<string>();
     let inRange = false;
 
     for (const slot of session.activity) {
@@ -208,6 +227,24 @@ export function computeAnalytics(
       for (const [name, count] of Object.entries(slot.tools ?? {})) {
         tools.set(name, (tools.get(name) ?? 0) + count);
         agent.tools.set(name, (agent.tools.get(name) ?? 0) + count);
+      }
+      for (const [name, count] of Object.entries(slot.skills ?? {})) {
+        let skill = skills.get(name);
+        if (!skill) skills.set(name, (skill = { name, value: 0, sessions: 0 }));
+        skill.value += count;
+        if (!seenSkills.has(name)) {
+          seenSkills.add(name);
+          skill.sessions++;
+        }
+      }
+      for (const [key, count] of Object.entries(slot.mcp ?? {})) {
+        // Keys are `server__tool`; a server name never contains the separator.
+        const split = key.indexOf("__");
+        const server = key.slice(0, split);
+        const tool = key.slice(split + 2);
+        let serverTools = mcp.get(server);
+        if (!serverTools) mcp.set(server, (serverTools = new Map()));
+        serverTools.set(tool, (serverTools.get(tool) ?? 0) + count);
       }
     }
 
@@ -276,6 +313,17 @@ export function computeAnalytics(
     sessions,
     projects: [...projects.values()].sort((a, b) => b.messages - a.messages),
     tools: [...tools.entries()].sort(byValue).map(([name, value]) => ({ name, value })),
+    skills: [...skills.values()].sort((a, b) => b.value - a.value),
+    mcpServers: [...mcp.entries()]
+      .map(([name, serverTools]) => {
+        const list = [...serverTools.entries()].sort(byValue);
+        return {
+          name,
+          value: list.reduce((sum, [, count]) => sum + count, 0),
+          tools: list.map(([tool, value]) => ({ name: tool, value })),
+        };
+      })
+      .sort((a, b) => b.value - a.value),
     agents: [...agents.values()]
       .filter((a) => a.sessions > 0)
       .sort((a, b) => b.messages - a.messages)

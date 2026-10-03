@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BarChart3,
   Bot,
+  CalendarClock,
   FileText,
   FolderGit2,
   HeartPulse,
@@ -31,6 +32,7 @@ import { ProjectsTable } from "@/components/home/projects-table";
 import { AnalyticsDashboard } from "@/components/home/analytics-dashboard";
 import { UsageDashboard } from "@/components/home/usage-dashboard";
 import { QualityDashboard } from "@/components/home/quality-dashboard";
+import { ActivityDashboard } from "@/components/home/activity-dashboard";
 import { AboutDialog } from "@/components/home/about-dialog";
 import { APP_INFO } from "@/lib/app-info";
 import { providerStyle } from "@/lib/provider-meta";
@@ -39,7 +41,15 @@ import { ALL_PROJECTS, projectOf, summarizeProjects } from "@/lib/projects";
 import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
 
-const HOME_TABS = ["analytics", "usage", "quality", "projects", "sessions", "logs"] as const;
+const HOME_TABS = [
+  "analytics",
+  "usage",
+  "activity",
+  "quality",
+  "projects",
+  "sessions",
+  "logs",
+] as const;
 
 type SortKey = "recent" | "oldest" | "cost" | "tokens" | "events" | "health" | "name";
 
@@ -290,6 +300,10 @@ function Home() {
               <Wallet className="size-4" aria-hidden />
               Usage
             </TabsTrigger>
+            <TabsTrigger value="activity" className="px-3">
+              <CalendarClock className="size-4" aria-hidden />
+              Activity
+            </TabsTrigger>
             <TabsTrigger value="quality" className="px-3">
               <HeartPulse className="size-4" aria-hidden />
               Quality
@@ -328,6 +342,15 @@ function Home() {
 
           <TabsContent value="usage">
             <UsageDashboard
+              reloadToken={reloadToken}
+              project={project}
+              onProjectChange={setProject}
+              projectOptions={projectOptions}
+            />
+          </TabsContent>
+
+          <TabsContent value="activity">
+            <ActivityDashboard
               reloadToken={reloadToken}
               project={project}
               onProjectChange={setProject}

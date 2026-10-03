@@ -134,6 +134,10 @@ export interface ActivitySlot {
   activeMs: number;
   /** Tool calls by tool name; absent when the slot made none. */
   tools?: Record<string, number>;
+  /** Skill invocations by skill name; absent when the slot made none. */
+  skills?: Record<string, number>;
+  /** MCP tool calls keyed `server__tool`; absent when the slot made none. */
+  mcp?: Record<string, number>;
   /**
    * Estimated list-price cost of the slot's usage. Never cached: the analytics
    * endpoint prices it on each read, so a price change applies at once.
