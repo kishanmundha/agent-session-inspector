@@ -325,6 +325,10 @@ export function parseClaudeTranscript(
   let firstTimestamp = "";
   let lastTimestamp = "";
   let seq = 0;
+  // A fork starts as a copy of its parent's records, which keep the parent's
+  // sessionId. A file with no record of its own is not a fork, just renamed.
+  const hasOwnRecords = records.some((rec) => rec.sessionId === id);
+  let inherited = false;
 
   const push = (
     timestamp: string,
@@ -335,7 +339,7 @@ export function parseClaudeTranscript(
   ) => {
     events.push({
       type,
-      data,
+      data: inherited ? { ...data, inherited: true } : data,
       id: uuid ? `${uuid}:${seq++}` : `claude-${seq++}`,
       timestamp,
       parentId: parentUuid ?? null,
@@ -348,6 +352,9 @@ export function parseClaudeTranscript(
       if (!firstTimestamp) firstTimestamp = rec.timestamp;
       lastTimestamp = rec.timestamp;
     }
+    inherited = hasOwnRecords && !!rec.sessionId && rec.sessionId !== id;
+    // Copied records run parent-first, so the last one names the direct parent.
+    if (inherited) meta.forkedFrom = rec.sessionId;
     if (rec.cwd) meta.cwd = rec.cwd;
     if (rec.gitBranch) meta.branch = rec.gitBranch;
     if (rec.version) meta.client_name = rec.version;
@@ -619,6 +626,7 @@ export function parseClaudeTranscript(
         copilotVersion: meta.client_name,
         context: { cwd: meta.cwd, branch: meta.branch },
         entrypoint: meta.host_type,
+        forkedFrom: meta.forkedFrom,
       },
       id: `${id}:start`,
       timestamp: firstTimestamp,

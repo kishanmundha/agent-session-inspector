@@ -7,7 +7,7 @@ import type {
   TokenHint,
 } from "./types";
 import { ACTIVITY_SLOT_MS } from "./types";
-import { bucketUsage } from "./pricing";
+import { bucketUsage, isInherited } from "./pricing";
 import { assessHealth } from "./health";
 
 /**
@@ -65,9 +65,12 @@ export function computeSessionStats(events: AgentEvent[]): SessionStats {
     }
     // Per-message usage; adapters only set these on the record that owns them,
     // so streamed messages split across several records are not double counted.
-    messageInput += num(e.data.inputTokens);
-    messageOutput += num(e.data.outputTokens);
-    messageCacheRead += num(e.data.cacheReadTokens);
+    // History a fork inherited was the parent session's usage, not this one's.
+    if (!isInherited(e)) {
+      messageInput += num(e.data.inputTokens);
+      messageOutput += num(e.data.outputTokens);
+      messageCacheRead += num(e.data.cacheReadTokens);
+    }
 
     const totals = totalsOf(e);
     if (totals) latestTotals = totals;
@@ -95,6 +98,7 @@ export function computeSessionStats(events: AgentEvent[]): SessionStats {
 /** Cheap stats for the session list, without materializing every event. */
 export function quickStatsFromEvents(events: AgentEvent[]) {
   const stats = computeSessionStats(events);
+  const inheritedUsage = bucketUsage(events, true);
   return {
     eventCount: events.length,
     toolCallCount: stats.totalToolCalls,
@@ -102,6 +106,7 @@ export function quickStatsFromEvents(events: AgentEvent[]) {
     totalInputTokens: stats.totalInputTokens,
     totalOutputTokens: stats.totalOutputTokens,
     usage: bucketUsage(events),
+    inheritedUsage: inheritedUsage.length > 0 ? inheritedUsage : undefined,
     activity: summarizeActivity(events),
     health: assessHealth(events),
   };
@@ -152,6 +157,8 @@ export function summarizeActivity(events: AgentEvent[]): ActivitySlot[] {
   let previous = NaN;
 
   for (const e of events) {
+    // A fork's inherited history is already in its parent's activity.
+    if (isInherited(e)) continue;
     const at = Date.parse(e.timestamp);
     if (Number.isNaN(at)) continue;
     const t = Math.floor(at / ACTIVITY_SLOT_MS) * ACTIVITY_SLOT_MS;

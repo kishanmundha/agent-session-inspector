@@ -204,14 +204,16 @@ export function SessionHeader({
                 sub="in + out + cache"
                 accent
               />
-              {cost && cost.byModel.some((m) => m.costUSD !== null) && (
+              {cost && (cost.inherited || cost.byModel.some((m) => m.costUSD !== null)) && (
                 <StatCard
                   label="Est. cost"
                   value={`${formatCost(cost.totalUSD)}${cost.unpricedModels.length > 0 ? "+" : ""}`}
                   sub={
                     cost.unpricedModels.length > 0
                       ? `excludes ${cost.unpricedModels.join(", ")}`
-                      : "at API list prices"
+                      : cost.inherited
+                        ? `+ ${formatCost(cost.inherited.totalUSD)} inherited`
+                        : "at API list prices"
                   }
                   onClick={() => setCostOpen(true)}
                 />

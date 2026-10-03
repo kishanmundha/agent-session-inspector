@@ -65,6 +65,81 @@ function overrideTemplate(prices: CostSummary["prices"]) {
   return `{\n${models.join(",\n")}\n}`;
 }
 
+/** One receipt: a row per rate paid, grouped by model, with its total. */
+function CostTable({ cost, totalLabel }: { cost: CostSummary; totalLabel: string }) {
+  const multiModel = cost.byModel.length > 1;
+  const partial = cost.unpricedModels.length > 0;
+  return (
+    <div className="overflow-hidden rounded-lg border border-border">
+      <Table className="text-xs">
+        <TableHeader>
+          <TableRow className="bg-muted/60 hover:bg-muted/60">
+            <TableHead className="h-8 px-3 text-muted-foreground">Token type</TableHead>
+            <TableHead className="h-8 px-3 text-right text-muted-foreground">Tokens</TableHead>
+            <TableHead className="h-8 px-3 text-right text-muted-foreground">
+              Rate / 1M
+            </TableHead>
+            <TableHead className="h-8 px-3 text-right text-muted-foreground">Cost</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="tabular-nums">
+          {cost.byModel.map((model) => (
+            <Fragment key={model.model}>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead
+                  colSpan={3}
+                  scope="rowgroup"
+                  className="h-auto px-3 py-1.5 font-mono font-semibold"
+                >
+                  {model.model}
+                </TableHead>
+                <TableCell className="px-3 py-1.5 text-right font-mono font-semibold text-foreground">
+                  {multiModel && model.costUSD !== null && formatCost(model.costUSD)}
+                </TableCell>
+              </TableRow>
+              {cost.lines
+                .filter((line) => line.model === model.model)
+                .map((line) => (
+                  <TableRow key={`${line.kind}-${line.rate}`} className="border-border/60">
+                    <TableCell className="px-3 py-1.5 text-foreground">
+                      {CLASS_LABEL[line.kind]}
+                    </TableCell>
+                    <TableCell className="px-3 py-1.5 text-right font-mono">
+                      {line.tokens.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="px-3 py-1.5 text-right font-mono">
+                      {line.rate === null ? "—" : formatRate(line.rate)}
+                    </TableCell>
+                    <TableCell className="px-3 py-1.5 text-right font-mono text-foreground">
+                      {line.usd === null ? (
+                        <span className="font-sans text-muted-foreground">
+                          no price
+                        </span>
+                      ) : (
+                        formatCost(line.usd)
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+            </Fragment>
+          ))}
+        </TableBody>
+        <TableFooter className="bg-muted/60">
+          <TableRow className="hover:bg-transparent">
+            <TableHead colSpan={3} scope="row" className="h-auto px-3 py-2 font-semibold">
+              {totalLabel}
+            </TableHead>
+            <TableCell className="px-3 py-2 text-right font-mono font-bold tabular-nums text-foreground">
+              {formatCost(cost.totalUSD)}
+              {partial && "+"}
+            </TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>
+    </div>
+  );
+}
+
 /** The arithmetic behind a session's estimated cost, one row per rate paid. */
 export function CostDialog({
   cost,
@@ -75,7 +150,6 @@ export function CostDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const multiModel = cost.byModel.length > 1;
   const partial = cost.unpricedModels.length > 0;
   const template = overrideTemplate(cost.prices);
   // Starts open when a price is missing: that is when it is needed.
@@ -94,73 +168,7 @@ export function CostDialog({
           </DialogDescription>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-border">
-          <Table className="text-xs">
-            <TableHeader>
-              <TableRow className="bg-muted/60 hover:bg-muted/60">
-                <TableHead className="h-8 px-3 text-muted-foreground">Token type</TableHead>
-                <TableHead className="h-8 px-3 text-right text-muted-foreground">Tokens</TableHead>
-                <TableHead className="h-8 px-3 text-right text-muted-foreground">
-                  Rate / 1M
-                </TableHead>
-                <TableHead className="h-8 px-3 text-right text-muted-foreground">Cost</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="tabular-nums">
-              {cost.byModel.map((model) => (
-                <Fragment key={model.model}>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead
-                      colSpan={3}
-                      scope="rowgroup"
-                      className="h-auto px-3 py-1.5 font-mono font-semibold"
-                    >
-                      {model.model}
-                    </TableHead>
-                    <TableCell className="px-3 py-1.5 text-right font-mono font-semibold text-foreground">
-                      {multiModel && model.costUSD !== null && formatCost(model.costUSD)}
-                    </TableCell>
-                  </TableRow>
-                  {cost.lines
-                    .filter((line) => line.model === model.model)
-                    .map((line) => (
-                      <TableRow key={`${line.kind}-${line.rate}`} className="border-border/60">
-                        <TableCell className="px-3 py-1.5 text-foreground">
-                          {CLASS_LABEL[line.kind]}
-                        </TableCell>
-                        <TableCell className="px-3 py-1.5 text-right font-mono">
-                          {line.tokens.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="px-3 py-1.5 text-right font-mono">
-                          {line.rate === null ? "—" : formatRate(line.rate)}
-                        </TableCell>
-                        <TableCell className="px-3 py-1.5 text-right font-mono text-foreground">
-                          {line.usd === null ? (
-                            <span className="font-sans text-muted-foreground">
-                              no price
-                            </span>
-                          ) : (
-                            formatCost(line.usd)
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </Fragment>
-              ))}
-            </TableBody>
-            <TableFooter className="bg-muted/60">
-              <TableRow className="hover:bg-transparent">
-                <TableHead colSpan={3} scope="row" className="h-auto px-3 py-2 font-semibold">
-                  Total
-                </TableHead>
-                <TableCell className="px-3 py-2 text-right font-mono font-bold tabular-nums text-foreground">
-                  {formatCost(cost.totalUSD)}
-                  {partial && "+"}
-                </TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </div>
+        <CostTable cost={cost} totalLabel={cost.inherited ? "This session" : "Total"} />
 
         <p className="text-xs text-muted-foreground">
           Each row is tokens ÷ 1,000,000 × rate, using the list price on the day
@@ -173,6 +181,24 @@ export function CostDialog({
             </>
           )}
         </p>
+
+        {cost.inherited && (
+          <div className="space-y-2 border-t border-border pt-3">
+            <div className="space-y-1">
+              <h3 className="text-sm font-medium text-foreground">
+                Inherited from the forked session
+              </h3>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                This session is a fork, so it opens with a copy of its
+                parent&rsquo;s history. Those requests were made, and are
+                counted, in the parent session; they are listed here for
+                reference and are not part of this session&rsquo;s cost or of
+                any usage total.
+              </p>
+            </div>
+            <CostTable cost={cost.inherited} totalLabel="Inherited" />
+          </div>
+        )}
 
         <dl className="space-y-1.5 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
           {GLOSSARY.map(([term, meaning]) => (

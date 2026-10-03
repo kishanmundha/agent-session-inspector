@@ -187,6 +187,8 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                     <TooltipContent>
                       Estimated cost at API list prices
                       {unpriced.length > 0 && ` · excludes ${unpriced.join(", ")}`}
+                      {s.inheritedCostUSD != null &&
+                        ` · plus ${formatCost(s.inheritedCostUSD)} inherited from the forked session`}
                     </TooltipContent>
                   </Tooltip>
                 )}

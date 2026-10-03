@@ -154,6 +154,11 @@ function billedUsageOf(event: AgentEvent): BilledUsage[] {
   return (Array.isArray(raw) ? raw : [raw]).filter((u) => tokenCount(u) > 0);
 }
 
+/** Copied in by a fork: the parent session was billed for it, not this one. */
+export function isInherited(event: AgentEvent): boolean {
+  return event.data.inherited === true;
+}
+
 const UNKNOWN_MODEL = "unknown";
 
 class CostAccumulator {
@@ -231,13 +236,16 @@ class CostAccumulator {
 
 /**
  * Prices a whole session and stamps `costUSD` on each event that carries
- * usage, so the timeline can show where the money went.
+ * usage, so the timeline can show where the money went. Usage a fork inherited
+ * is priced apart, under `inherited`, and left out of the session's total.
  */
 export function priceEvents(events: AgentEvent[]): CostSummary {
-  const acc = new CostAccumulator();
+  const own = new CostAccumulator();
+  let inherited: CostAccumulator | null = null;
   for (const event of events) {
     const usages = billedUsageOf(event);
     if (usages.length === 0) continue;
+    const acc = isInherited(event) ? (inherited ??= new CostAccumulator()) : own;
     let eventCost: number | null = null;
     for (const usage of usages) {
       const cost = acc.add(usage, event.timestamp);
@@ -245,18 +253,22 @@ export function priceEvents(events: AgentEvent[]): CostSummary {
     }
     if (eventCost !== null) event.data.costUSD = eventCost;
   }
-  return acc.summary();
+  const summary = own.summary();
+  if (inherited) summary.inherited = inherited.summary();
+  return summary;
 }
 
 /**
  * Collapses a session's usage to one record per model and activity slot. That
  * is small enough to cache with the session list yet still priceable at read
  * time, including across a price change, and fine enough to chart cost by day
- * and hour.
+ * and hour. `inherited` picks the usage a fork copied from its parent instead
+ * of the session's own.
  */
-export function bucketUsage(events: AgentEvent[]): UsageBucket[] {
+export function bucketUsage(events: AgentEvent[], inherited = false): UsageBucket[] {
   const buckets = new Map<string, UsageBucket>();
   for (const event of events) {
+    if (isInherited(event) !== inherited) continue;
     const day = event.timestamp?.slice(0, 10) ?? "";
     const at = Date.parse(event.timestamp);
     const t = Number.isNaN(at) ? undefined : Math.floor(at / ACTIVITY_SLOT_MS) * ACTIVITY_SLOT_MS;

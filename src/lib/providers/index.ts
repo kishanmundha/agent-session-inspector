@@ -135,7 +135,10 @@ function forList(session: SessionMeta, project: ProjectFields): SessionMeta {
     health: settleHealth(session.health, isRunning(session.updated_at)),
   };
   delete meta.usage;
+  delete meta.inheritedUsage;
   delete meta.activity;
+  const inherited = priceBuckets(session.inheritedUsage);
+  if (inherited) meta.inheritedCostUSD = inherited.totalUSD;
   const cost = priceBuckets(session.usage);
   if (!cost) return meta;
   return {

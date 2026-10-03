@@ -68,6 +68,15 @@ export interface SessionMeta {
   estimatedCostUSD?: number;
   /** Models that used tokens but have no price, so the estimate is a floor. */
   unpricedModels?: string[];
+  /** The session this one was forked from, when the transcript says so. */
+  forkedFrom?: string;
+  /**
+   * Usage of the history a fork copied from its parent. It was billed to the
+   * parent, so it is kept out of `usage` and of every cross-session total.
+   */
+  inheritedUsage?: UsageBucket[];
+  /** `inheritedUsage` at list prices; absent when the session is not a fork. */
+  inheritedCostUSD?: number;
   /** When the session was busy, kept by adapters for cross-session analytics. */
   activity?: ActivitySlot[];
   /** How smoothly the session ran; absent when the agent never did anything. */
@@ -279,12 +288,19 @@ export interface CostSummary {
   /** Where user price overrides are read from, with the home dir as `~`. */
   overridePath: string;
   unpricedModels: string[];
+  /**
+   * What the history copied in by a fork cost in the session it came from.
+   * Not part of `totalUSD`; absent when the session inherited no usage.
+   */
+  inherited?: CostSummary;
 }
 
 /**
  * One timeline entry. `type` is always `category.subCategory`; the shared
  * vocabulary is documented in `EVENT_TYPES` below, and `data` carries
  * whatever the provider recorded (normalized where it is worth normalizing).
+ * `data.inherited` marks an event a fork copied from its parent session: it
+ * is shown on the timeline but its usage belongs to the parent.
  */
 export interface AgentEvent {
   type: string;
