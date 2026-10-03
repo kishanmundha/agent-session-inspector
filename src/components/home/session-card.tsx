@@ -20,6 +20,7 @@ import {
   timeAgo,
 } from "@/lib/format";
 import { providerStyle } from "@/lib/provider-meta";
+import { isRunning } from "@/lib/session-state";
 import { cn } from "@/lib/utils";
 import type { SessionMeta } from "@/components/session/types";
 
@@ -96,9 +97,16 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
               <Tooltip>
                 <TooltipTrigger
                   render={
-                    <span className="whitespace-nowrap text-xs text-muted-foreground">
-                      {timeAgo(s.updated_at)}
-                    </span>
+                    isRunning(s.updated_at) ? (
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
+                        running
+                      </span>
+                    ) : (
+                      <span className="whitespace-nowrap text-xs text-muted-foreground">
+                        {timeAgo(s.updated_at)}
+                      </span>
+                    )
                   }
                 />
                 <TooltipContent>

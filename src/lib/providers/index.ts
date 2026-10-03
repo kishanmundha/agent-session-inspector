@@ -238,6 +238,18 @@ export function getSession(providerId: string, id: string): SessionDetail | null
   };
 }
 
+/**
+ * What changes when a transcript grows, without parsing it again: the session
+ * page polls this to learn when a running session has something new.
+ */
+export function probeSession(providerId: string, id: string): { revision: string } | null {
+  const provider = getProvider(providerId);
+  if (!provider) return null;
+  const meta = provider.listSessions().find((s) => s.id === id);
+  if (!meta) return null;
+  return { revision: `${meta.updated_at ?? ""}:${meta.eventCount ?? 0}` };
+}
+
 export function listLogs(providerId?: string): (LogFile & { provider: ProviderId })[] {
   const providers = providerId
     ? [getProvider(providerId)].filter((p): p is SessionProvider => Boolean(p))

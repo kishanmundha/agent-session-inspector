@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { Fragment, useState, useMemo, useEffect, useRef } from "react";
 import {
+  ArrowDownNarrowWide,
+  ArrowUpNarrowWide,
   Braces,
   ChevronDown,
   ChevronRight,
@@ -9,7 +11,9 @@ import {
   ChevronsUpDown,
   Filter,
   Info,
+  Link2,
   ListFilter,
+  Radio,
   SearchX,
   SlidersHorizontal,
   X,
@@ -20,7 +24,9 @@ import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
 import { SearchInput } from "@/components/common/search-input";
+import { Segmented } from "@/components/common/segmented";
 import { formatCost } from "@/lib/format";
+import { useHotkeys } from "@/lib/use-hotkeys";
 import { cn } from "@/lib/utils";
 
 import type { AgentEvent } from "./types";
@@ -33,6 +39,13 @@ interface Props {
     subKeys?: string[];
     search?: string;
   } | null;
+  /** Event a copied link points at: scrolled to, opened and outlined. */
+  targetEventId?: string;
+  /** Following the session: the newest events stay in view as they arrive. */
+  live?: boolean;
+  onLiveChange?: (live: boolean) => void;
+  /** The agent is still writing to this session. */
+  running?: boolean;
 }
 
 // Per event type: display label plus light/dark-aware colour classes.
@@ -1499,11 +1512,54 @@ function firstArg(input?: Record<string, unknown>) {
   return keys.length ? shorten(JSON.stringify(input), 90) : "(no args)";
 }
 
+/** Lines in a block of text; a trailing newline does not start another one. */
+const lineCount = (text: unknown) =>
+  typeof text === "string" && text.length > 0
+    ? text.replace(/\n$/, "").split("\n").length
+    : 0;
+
+/**
+ * Lines a file-writing tool call adds and removes, read from its arguments.
+ * Covers the write/edit tools of all three CLIs; null for anything else.
+ */
+function lineDelta(input?: Record<string, unknown>): { added: number; removed: number } | null {
+  if (!input) return null;
+  const patch = [input.input, input.patch, input.command].find(
+    (v): v is string => typeof v === "string" && v.includes("*** Begin Patch"),
+  );
+  if (patch) {
+    let added = 0;
+    let removed = 0;
+    for (const line of patch.split("\n")) {
+      if (line.startsWith("+") && !line.startsWith("+++")) added += 1;
+      else if (line.startsWith("-") && !line.startsWith("---")) removed += 1;
+    }
+    return { added, removed };
+  }
+  const edits = Array.isArray(input.edits) ? (input.edits as Record<string, unknown>[]) : [input];
+  let added = 0;
+  let removed = 0;
+  let found = false;
+  for (const edit of edits) {
+    const next = edit.new_string ?? edit.new_str ?? edit.content ?? edit.file_text;
+    const prev = edit.old_string ?? edit.old_str;
+    if (typeof next !== "string" && typeof prev !== "string") continue;
+    found = true;
+    added += lineCount(next);
+    removed += lineCount(prev);
+  }
+  return found ? { added, removed } : null;
+}
+
 /**
  * One-line description of an event, so the timeline can stay collapsed by
  * default and still be readable at a glance.
  */
-function eventSummary(event: AgentEvent): { label: string; preview: string } {
+function eventSummary(event: AgentEvent): {
+  label: string;
+  preview: string;
+  delta?: { added: number; removed: number } | null;
+} {
   const d = event.data;
   const fallback = EVENT_CONFIG[event.type]?.label ?? splitEventType(event.type).subCategory;
 
@@ -1536,6 +1592,7 @@ function eventSummary(event: AgentEvent): { label: string; preview: string } {
       return {
         label: (d.toolName as string) || "Tool",
         preview: firstArg(d.arguments as Record<string, unknown> | undefined),
+        delta: lineDelta(d.arguments as Record<string, unknown> | undefined),
       };
     case "tool.execution_complete":
       return {
@@ -1789,9 +1846,21 @@ function EventCard({
   event,
   prevTimestamp,
   expandAll,
+  parallel = false,
+  target = false,
+  merged = false,
+  result,
 }: {
   event: AgentEvent;
   prevTimestamp?: string;
+  /** One of several tool calls the model issued together. */
+  parallel?: boolean;
+  /** The event a copied link points at. */
+  target?: boolean;
+  /** A tool call shown as one row with its outcome, as the compact view does. */
+  merged?: boolean;
+  /** The event that completed this call; absent while it runs or if it never returned. */
+  result?: AgentEvent;
   /** Bumped by the toolbar; `open` forces every row open, `closed` closes them. */
   expandAll: { nonce: number; mode: "open" | "closed" } | null;
 }) {
@@ -1803,7 +1872,7 @@ function EventCard({
   // Local open state, re-seeded whenever the toolbar issues a new expand/collapse.
   const [openState, setOpenState] = useState({
     nonce: 0,
-    open: DEFAULT_OPEN_TYPES.has(event.type),
+    open: DEFAULT_OPEN_TYPES.has(event.type) || target,
   });
   const open =
     expandAll && expandAll.nonce !== openState.nonce
@@ -1821,6 +1890,18 @@ function EventCard({
   const helpText = EVENT_TYPE_HELP[event.type] ?? `Event in "${typeParts.category}" category with "${typeParts.subCategory}" sub-category.`;
 
   function renderContent() {
+    if (merged) {
+      return (
+        <ToolExecutionCard
+          data={
+            result
+              ? { ...event.data, result: result.data.result, success: result.data.success }
+              : event.data
+          }
+          type={result ? "tool.execution_complete" : "tool.execution_start"}
+        />
+      );
+    }
     switch (event.type) {
       case "user.message":
         return <UserMessageCard data={event.data} />;
@@ -1930,13 +2011,18 @@ function EventCard({
   }
 
   const content = renderContent();
-  const rawJson = JSON.stringify(event, null, 2);
+  const rawJson = JSON.stringify(merged && result ? [event, result] : event, null, 2);
+  const failed = result?.data.success === false;
+  const took = result ? durationMs(event.timestamp, result.timestamp) : null;
   // Every row is expandable: even without a rendered detail there is always the
   // raw event and the row actions to show.
   const hasDetail = Boolean(content);
 
   return (
-    <div className="relative border-l-2 border-border pb-1.5 pl-6 last:border-l-transparent">
+    <div
+      data-event-id={event.id}
+      className="relative scroll-mt-40 border-l-2 border-border pb-1.5 pl-6 last:border-l-transparent"
+    >
       {/* Small dot centred on the rail. */}
       <span
         className={`absolute -left-[5px] top-3 size-2 rounded-full border border-background ${visual.dotCls}`}
@@ -1945,9 +2031,16 @@ function EventCard({
 
       {/* Header and detail share one container, so an expanded event reads as a
           single object rather than two stacked cards. */}
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div
+        className={cn(
+          "overflow-hidden rounded-lg border border-border bg-card",
+          parallel && "border-l-2 border-l-amber-400 dark:border-l-amber-600",
+          target && "ring-2 ring-brand/60",
+        )}
+      >
         <button
           type="button"
+          data-event-row
           onClick={() => setOpen(!open)}
           aria-expanded={open}
           className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
@@ -1968,6 +2061,44 @@ function EventCard({
           <span className="min-w-0 flex-1 truncate text-xs text-foreground/90">
             {summary.preview}
           </span>
+
+          {summary.delta && (
+            <span
+              className="shrink-0 font-mono text-[11px] tabular-nums"
+              title="Lines written and replaced by this call"
+            >
+              <span className="text-emerald-700 dark:text-emerald-400">+{summary.delta.added}</span>
+              {summary.delta.removed > 0 && (
+                <span className="ml-1 text-red-700 dark:text-red-400">−{summary.delta.removed}</span>
+              )}
+            </span>
+          )}
+
+          {merged && (
+            <span
+              className={cn(
+                "shrink-0 rounded-sm px-1.5 py-0.5 font-mono text-[11px] tabular-nums",
+                failed
+                  ? "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-400"
+                  : "bg-muted text-muted-foreground",
+              )}
+              title={
+                !result
+                  ? "No result was recorded for this call"
+                  : failed
+                    ? "The call failed"
+                    : "Time from the call to its result"
+              }
+            >
+              {!result
+                ? "no result"
+                : failed
+                  ? "failed"
+                  : took !== null && took >= 1000
+                    ? `${(took / 1000).toFixed(1)}s`
+                    : "done"}
+            </span>
+          )}
 
           {tokenBadge && (
             <span
@@ -2018,7 +2149,7 @@ function EventCard({
                 scanning path of the collapsed rows. */}
             <div className="flex items-center gap-1 border-t border-border bg-muted/30 px-2 py-1.5">
               <span className="mr-auto truncate pl-1 font-mono text-[11px] text-muted-foreground">
-                {event.type}
+                {merged && result ? `${event.type} + ${result.type}` : event.type}
               </span>
               <Button
                 variant="ghost"
@@ -2040,6 +2171,18 @@ function EventCard({
                 <Braces className="size-3.5" aria-hidden />
                 {showRaw ? "Hide raw" : "Raw"}
               </Button>
+              <CopyButton
+                value={() => {
+                  const url = new URL(window.location.href);
+                  url.search = "";
+                  url.searchParams.set("event", event.id);
+                  return url.toString();
+                }}
+                label="Copy a link to this event"
+                icon={Link2}
+              >
+                Link
+              </CopyButton>
               <CopyButton value={rawJson} label="Copy raw JSON">
                 Copy
               </CopyButton>
@@ -2083,12 +2226,43 @@ const INJECTED_CONTEXT_TYPES = new Set([
   "session.world_state",
 ]);
 
+/** A model asking for a tool; several in a row with no result between ran together. */
+const CALL_START_TYPES = new Set(["tool.execution_start", "external_tool.requested"]);
+const CALL_END_TYPES = new Set(["tool.execution_complete", "external_tool.completed"]);
+
+/** What the compact view keeps besides tool calls: the conversation itself. */
+const CONVERSATION_TYPES = new Set(["user.message", "assistant.thinking", "assistant.message"]);
+
+type ViewMode = "normal" | "compact" | "focused";
+const VIEW_MODES: ViewMode[] = ["normal", "compact", "focused"];
+
+/** Moves keyboard focus to the event row `step` away, starting from the first one on screen. */
+function focusEventRow(step: number) {
+  const rows = Array.from(document.querySelectorAll<HTMLElement>("[data-event-row]"));
+  const current = rows.indexOf(document.activeElement as HTMLElement);
+  const index =
+    current === -1
+      ? Math.max(0, rows.findIndex((row) => row.getBoundingClientRect().top > 160))
+      : Math.min(rows.length - 1, Math.max(0, current + step));
+  rows[index]?.focus({ preventScroll: true });
+  rows[index]?.scrollIntoView({ block: "center" });
+}
+
 function getTypeChipClass(type: string) {
   const { category } = splitEventType(type);
   return getCategoryChipClass(category);
 }
 
-export function EventsTimeline({ events, focusRequest }: Props) {
+export function EventsTimeline({
+  events,
+  focusRequest,
+  targetEventId,
+  live = false,
+  onLiveChange,
+  running = false,
+}: Props) {
+  const [mode, setMode] = useState<ViewMode>("normal");
+  const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSubKeys, setSelectedSubKeys] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -2132,13 +2306,100 @@ export function EventsTimeline({ events, focusRequest }: Props) {
     });
   }, [events]);
 
+  // The focused transcript: each prompt and the answer the turn ended on,
+  // without the reasoning and tool calls in between.
+  const focusedIds = useMemo(() => {
+    const ids = new Set<string>();
+    let answer: string | null = null;
+    const closeTurn = () => {
+      if (answer) ids.add(answer);
+      answer = null;
+    };
+    for (const event of events) {
+      if (event.type === "user.message") {
+        closeTurn();
+        ids.add(event.id);
+      } else if (event.type === "assistant.message" && String(event.data.content ?? "").trim()) {
+        answer = event.id;
+      }
+    }
+    closeTurn();
+    return ids;
+  }, [events]);
+
+  // Each tool call matched to the event that completed it, so the compact view
+  // can show the pair as one row. Matched by call id, else by tool name.
+  const callResults = useMemo(() => {
+    const results = new Map<string, AgentEvent>();
+    const consumed = new Set<string>();
+    const open: AgentEvent[] = [];
+    for (const event of events) {
+      if (CALL_START_TYPES.has(event.type)) {
+        open.push(event);
+      } else if (CALL_END_TYPES.has(event.type)) {
+        const callId = event.data.toolCallId;
+        const index = open.findIndex((start) =>
+          callId
+            ? start.data.toolCallId === callId
+            : !start.data.toolCallId && start.data.toolName === event.data.toolName,
+        );
+        if (index === -1) continue;
+        results.set(open[index].id, event);
+        consumed.add(event.id);
+        open.splice(index, 1);
+      }
+    }
+    return { results, consumed };
+  }, [events]);
+
+  // Tool calls the model issued in one go, keyed by event id to the group's size.
+  const parallelGroups = useMemo(() => {
+    const groups = new Map<string, { key: string; size: number }>();
+    let run: AgentEvent[] = [];
+    const closeRun = () => {
+      if (run.length > 1) {
+        const group = { key: run[0].id, size: run.length };
+        for (const event of run) groups.set(event.id, group);
+      }
+      run = [];
+    };
+    for (const event of events) {
+      if (CALL_START_TYPES.has(event.type)) run.push(event);
+      else closeRun();
+    }
+    closeRun();
+    return groups;
+  }, [events]);
+
   // Injected context — system prompts and auto-attached blocks — is bulky and
   // rarely what you are reading the timeline for, so it hides as one group.
+  // What the chosen view keeps, before any filter. The filter chips are built
+  // from this, so they only ever offer what the view can show.
+  const inView = useMemo(() => {
+    if (mode === "normal") return typedEvents;
+    return typedEvents.filter((event) => {
+      if (mode === "focused") return focusedIds.has(event.id);
+      if (callResults.consumed.has(event.id)) return false;
+      return (
+        CALL_START_TYPES.has(event.type) ||
+        // A result whose call is missing still has to show up somewhere.
+        CALL_END_TYPES.has(event.type) ||
+        (CONVERSATION_TYPES.has(event.type) &&
+          (event.type !== "assistant.message" || String(event.data.content ?? "").trim()))
+      );
+    });
+  }, [typedEvents, mode, focusedIds, callResults]);
+
+  const hasContext = useMemo(
+    () => inView.some((event) => INJECTED_CONTEXT_TYPES.has(event.type)),
+    [inView],
+  );
+
   const visibleBySystem = useMemo(() => {
-    return typedEvents.filter(
+    return inView.filter(
       (event) => showSystem || !INJECTED_CONTEXT_TYPES.has(event.type),
     );
-  }, [typedEvents, showSystem]);
+  }, [inView, showSystem]);
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<string, { count: number; typeCounts: Map<string, number> }>();
@@ -2157,9 +2418,16 @@ export function EventsTimeline({ events, focusRequest }: Props) {
       .sort((a, b) => b.count - a.count || a.category.localeCompare(b.category));
   }, [visibleBySystem]);
 
+  // A category picked in one view may not exist in another; it is ignored there
+  // rather than left to filter everything out, and applies again on return.
+  const activeCategories = useMemo(
+    () => selectedCategories.filter((c) => categoryCounts.some((item) => item.category === c)),
+    [selectedCategories, categoryCounts],
+  );
+
   const subCategoryCounts = useMemo(() => {
-    if (selectedCategories.length === 0) return [];
-    const selectedSet = new Set(selectedCategories);
+    if (activeCategories.length === 0) return [];
+    const selectedSet = new Set(activeCategories);
     const counts = new Map<string, { category: string; subCategory: string; count: number }>();
     for (const event of visibleBySystem) {
       if (!selectedSet.has(event.category)) continue;
@@ -2168,10 +2436,10 @@ export function EventsTimeline({ events, focusRequest }: Props) {
       else counts.set(event.subKey, { category: event.category, subCategory: event.subCategory, count: 1 });
     }
     return Array.from(counts.values()).sort((a, b) => b.count - a.count || a.subCategory.localeCompare(b.subCategory));
-  }, [visibleBySystem, selectedCategories]);
+  }, [visibleBySystem, activeCategories]);
 
   useEffect(() => {
-    if (selectedCategories.length === 0 && selectedSubKeys.length > 0) {
+    if (activeCategories.length === 0 && selectedSubKeys.length > 0) {
       setSelectedSubKeys([]);
       return;
     }
@@ -2180,7 +2448,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
     if (next.length !== selectedSubKeys.length) {
       setSelectedSubKeys(next);
     }
-  }, [selectedCategories, selectedSubKeys, subCategoryCounts]);
+  }, [activeCategories, selectedSubKeys, subCategoryCounts]);
 
   useEffect(() => {
     if (!focusRequest) return;
@@ -2191,41 +2459,82 @@ export function EventsTimeline({ events, focusRequest }: Props) {
       (focusRequest.categories ?? []).includes("system")
       || (focusRequest.subKeys ?? []).includes("system.message");
     if (wantsSystem) setShowSystem(true);
+    // What a hint or a search points at is usually not part of the focused view.
+    setMode("normal");
     // Reveal the chips so it is obvious which filters the hint applied.
     setFiltersOpen(true);
   }, [focusRequest]);
 
   const filtered = useMemo(() => {
-    const categorySet = new Set(selectedCategories);
+    const categorySet = new Set(activeCategories);
     const subKeySet = new Set(selectedSubKeys);
     // Every word has to appear in the event, as in the cross-session search.
     const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
-    return visibleBySystem.filter((event) => {
+    const matched = visibleBySystem.filter((event) => {
       if (categorySet.size > 0 && !categorySet.has(event.category)) return false;
       if (subKeySet.size > 0 && !subKeySet.has(event.subKey)) return false;
       if (onlyTokenEvents && !eventHasTokenUsage(event)) return false;
       if (terms.length > 0) {
-        const text = JSON.stringify(event).toLowerCase();
+        // A merged row answers for its result too.
+        const result = mode === "compact" ? callResults.results.get(event.id) : undefined;
+        const text = (JSON.stringify(event) + (result ? JSON.stringify(result) : "")).toLowerCase();
         return terms.every((term) => text.includes(term));
       }
       return true;
     });
-  }, [visibleBySystem, selectedCategories, selectedSubKeys, onlyTokenEvents, search]);
+    return order === "desc" ? matched.reverse() : matched;
+  }, [visibleBySystem, activeCategories, selectedSubKeys, onlyTokenEvents, search, mode, callResults, order]);
 
   // Render in pages: huge sessions (thousands of events) would otherwise mount
   // every card up front and make the tab feel frozen. Tagging the page state
   // with the filter signature resets it back to page one whenever the filters
   // change, without an effect.
-  const filterKey = `${selectedCategories.join()}|${selectedSubKeys.join()}|${search}|${showSystem}|${onlyTokenEvents}`;
+  const filterKey = `${activeCategories.join()}|${selectedSubKeys.join()}|${search}|${showSystem}|${onlyTokenEvents}|${mode}|${order}`;
   const [page, setPage] = useState({ key: filterKey, count: PAGE_SIZE });
-  const visibleCount = page.key === filterKey ? page.count : PAGE_SIZE;
+  // A linked event has to be on the page, however far down it sits.
+  const targetIndex = targetEventId
+    ? filtered.findIndex((event) => event.id === targetEventId)
+    : -1;
+  const visibleCount = Math.max(
+    page.key === filterKey ? page.count : PAGE_SIZE,
+    targetIndex + 1,
+  );
 
   const showMore = (count: number) => setPage({ key: filterKey, count });
 
+  // Following an oldest-first timeline means watching its end, so the page
+  // window is anchored there and earlier events load upwards.
+  const tail = live && order === "asc";
   const shown = useMemo(
-    () => filtered.slice(0, visibleCount),
-    [filtered, visibleCount],
+    () => (tail ? filtered.slice(-visibleCount) : filtered.slice(0, visibleCount)),
+    [filtered, visibleCount, tail],
   );
+
+  useEffect(() => {
+    if (!tail) return;
+    // After the next paint, once the new rows have their final height.
+    const frame = requestAnimationFrame(() =>
+      window.scrollTo({ top: document.documentElement.scrollHeight }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [tail, events.length]);
+
+  useEffect(() => {
+    if (!targetEventId) return;
+    document
+      .querySelector(`[data-event-id="${CSS.escape(targetEventId)}"]`)
+      ?.scrollIntoView({ block: "center" });
+  }, [targetEventId]);
+
+  useHotkeys({
+    f: () => setMode((m) => VIEW_MODES[(VIEW_MODES.indexOf(m) + 1) % VIEW_MODES.length]),
+    o: () => setOrder((o) => (o === "asc" ? "desc" : "asc")),
+    l: onLiveChange && (() => onLiveChange(!live)),
+    e: () => setExpandAll({ nonce: Date.now(), mode: "open" }),
+    E: () => setExpandAll({ nonce: Date.now(), mode: "closed" }),
+    j: () => focusEventRow(1),
+    k: () => focusEventRow(-1),
+  });
 
   const groups = useMemo(() => {
     const g: { date: string; events: AgentEvent[] }[] = [];
@@ -2238,12 +2547,13 @@ export function EventsTimeline({ events, focusRequest }: Props) {
     return g;
   }, [shown]);
 
-  const activeFilterCount =
-    selectedCategories.length +
+  // Everything set inside the filter panel, shown on its button.
+  const panelFilterCount =
+    activeCategories.length +
     selectedSubKeys.length +
-    (search ? 1 : 0) +
     (onlyTokenEvents ? 1 : 0) +
-    (showSystem ? 0 : 1);
+    (hasContext && !showSystem ? 1 : 0);
+  const activeFilterCount = panelFilterCount + (search ? 1 : 0);
 
   function clearFilters() {
     setSelectedCategories([]);
@@ -2251,7 +2561,35 @@ export function EventsTimeline({ events, focusRequest }: Props) {
     setSearch("");
     setOnlyTokenEvents(false);
     setShowSystem(true);
+    setMode("normal");
   }
+
+  const hiddenCount = filtered.length - shown.length;
+  const loadMore = hiddenCount > 0 && (
+    <div className="flex flex-col items-center gap-2 py-6">
+      <p className="text-xs text-muted-foreground">
+        Showing {tail ? "the last " : ""}
+        {shown.length.toLocaleString()} of {filtered.length.toLocaleString()} matching events
+      </p>
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => showMore(visibleCount + PAGE_SIZE)}
+        >
+          Load {Math.min(PAGE_SIZE, hiddenCount)} {tail ? "earlier" : "more"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => showMore(filtered.length)}
+          className="text-muted-foreground"
+        >
+          Show all
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex flex-col">
@@ -2274,21 +2612,33 @@ export function EventsTimeline({ events, focusRequest }: Props) {
             className="w-full sm:w-56"
           />
 
+          <Segmented
+            label="Transcript view"
+            size="default"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "normal", label: "Normal" },
+              { value: "compact", label: "Compact" },
+              { value: "focused", label: "Focused" },
+            ]}
+          />
+
           <Button
             variant="outline"
             onClick={() => setFiltersOpen((v) => !v)}
             aria-expanded={filtersOpen}
             className={cn(
-              selectedCategories.length + selectedSubKeys.length > 0
+              panelFilterCount > 0
                 ? "border-foreground/25 bg-muted"
                 : "text-muted-foreground",
             )}
           >
             <SlidersHorizontal className="size-3.5" aria-hidden />
             Filters
-            {selectedCategories.length + selectedSubKeys.length > 0 && (
+            {panelFilterCount > 0 && (
               <span className="rounded-sm bg-foreground/10 px-1 tabular-nums">
-                {selectedCategories.length + selectedSubKeys.length}
+                {panelFilterCount}
               </span>
             )}
             <ChevronDown
@@ -2300,21 +2650,6 @@ export function EventsTimeline({ events, focusRequest }: Props) {
             />
           </Button>
 
-          <ToolbarToggle
-            active={!showSystem}
-            onClick={() => setShowSystem(!showSystem)}
-            icon={Filter}
-            label="Hide context"
-            title="Hide system prompts, auto-attached context and world-state snapshots"
-          />
-          <ToolbarToggle
-            active={onlyTokenEvents}
-            onClick={() => setOnlyTokenEvents(!onlyTokenEvents)}
-            icon={ListFilter}
-            label="Token events"
-            title="Show only events that report token usage"
-          />
-
           {activeFilterCount > 0 && (
             <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
               <X className="size-3.5" aria-hidden />
@@ -2323,6 +2658,43 @@ export function EventsTimeline({ events, focusRequest }: Props) {
           )}
 
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            {onLiveChange && (
+              <ToolbarToggle
+                active={live}
+                onClick={() => onLiveChange(!live)}
+                icon={Radio}
+                label="Follow live"
+                title={
+                  running
+                    ? "Follow the session: keep the newest events in view (l)"
+                    : "Watch for new events and keep the newest in view (l)"
+                }
+                pulse={running}
+                iconOnly
+              />
+            )}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setOrder(order === "asc" ? "desc" : "asc")}
+                    aria-label={order === "asc" ? "Show newest first" : "Show oldest first"}
+                    className="text-muted-foreground"
+                  >
+                    {order === "asc" ? (
+                      <ArrowDownNarrowWide className="size-3.5" aria-hidden />
+                    ) : (
+                      <ArrowUpNarrowWide className="size-3.5" aria-hidden />
+                    )}
+                  </Button>
+                }
+              />
+              <TooltipContent>
+                {order === "asc" ? "Oldest first" : "Newest first"} (o)
+              </TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -2370,8 +2742,26 @@ export function EventsTimeline({ events, focusRequest }: Props) {
         {filtersOpen && (
           <div className="mt-2.5 space-y-2 border-t border-border pt-2.5">
             <div className="flex flex-wrap items-center gap-1.5">
+              {hasContext && (
+                <ToolbarToggle
+                  active={!showSystem}
+                  onClick={() => setShowSystem(!showSystem)}
+                  icon={Filter}
+                  label="Hide context"
+                  title="Hide system prompts, auto-attached context and world-state snapshots"
+                />
+              )}
+              <ToolbarToggle
+                active={onlyTokenEvents}
+                onClick={() => setOnlyTokenEvents(!onlyTokenEvents)}
+                icon={ListFilter}
+                label="Token events"
+                title="Show only events that report token usage"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
               {categoryCounts.map(({ category, count, representativeType }) => {
-                const isActive = selectedCategories.includes(category);
+                const isActive = activeCategories.includes(category);
                 return (
                   <button
                     key={category}
@@ -2402,7 +2792,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
               })}
             </div>
 
-            {selectedCategories.length > 0 && subCategoryCounts.length > 0 && (
+            {activeCategories.length > 0 && subCategoryCounts.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
                   Sub-type
@@ -2432,7 +2822,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
                           : "opacity-70 hover:opacity-100",
                       )}
                     >
-                      {selectedCategories.length > 1 && (
+                      {activeCategories.length > 1 && (
                         <span className="opacity-70">{category}:</span>
                       )}
                       <span>{subCategory}</span>
@@ -2448,6 +2838,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
 
       {/* Timeline */}
       <div className="pr-2">
+        {tail && loadMore}
         {groups.map((group) => (
           <div key={group.date}>
             <div className="my-4 flex items-center gap-3">
@@ -2457,42 +2848,35 @@ export function EventsTimeline({ events, focusRequest }: Props) {
               </span>
               <div className="h-px flex-1 bg-border" />
             </div>
-            {group.events.map((event, i) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                prevTimestamp={i > 0 ? group.events[i - 1].timestamp : undefined}
-                expandAll={expandAll}
-              />
-            ))}
+            {group.events.map((event, i) => {
+              const parallel = parallelGroups.get(event.id);
+              // The event that came before this one in time, whichever way the list runs.
+              const earlier = group.events[order === "asc" ? i - 1 : i + 1];
+              const opensGroup =
+                parallel && parallelGroups.get(group.events[i - 1]?.id) !== parallel;
+              return (
+                <Fragment key={event.id}>
+                  {opensGroup && (
+                    <div className="border-l-2 border-border pb-1 pl-6 font-mono text-[11px] text-amber-700 dark:text-amber-400">
+                      parallel · {parallel.size} calls
+                    </div>
+                  )}
+                  <EventCard
+                    event={event}
+                    prevTimestamp={earlier?.timestamp}
+                    expandAll={expandAll}
+                    parallel={Boolean(parallel)}
+                    target={event.id === targetEventId}
+                    merged={mode === "compact" && CALL_START_TYPES.has(event.type)}
+                    result={mode === "compact" ? callResults.results.get(event.id) : undefined}
+                  />
+                </Fragment>
+              );
+            })}
           </div>
         ))}
 
-        {visibleCount < filtered.length && (
-          <div className="flex flex-col items-center gap-2 py-6">
-            <p className="text-xs text-muted-foreground">
-              Showing {shown.length.toLocaleString()} of{" "}
-              {filtered.length.toLocaleString()} matching events
-            </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => showMore(visibleCount + PAGE_SIZE)}
-              >
-                Load {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => showMore(filtered.length)}
-                className="text-muted-foreground"
-              >
-                Show all
-              </Button>
-            </div>
-          </div>
-        )}
+        {!tail && loadMore}
 
         {filtered.length === 0 && (
           <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-14 text-center">
@@ -2522,12 +2906,18 @@ function ToolbarToggle({
   icon: Icon,
   label,
   title,
+  pulse = false,
+  iconOnly = false,
 }: {
   active: boolean;
   onClick: () => void;
   icon: typeof Filter;
   label: string;
   title: string;
+  /** Adds a live dot, for a control whose subject is changing right now. */
+  pulse?: boolean;
+  /** Drops the text; the label stays as the accessible name. */
+  iconOnly?: boolean;
 }) {
   return (
     <Tooltip>
@@ -2537,10 +2927,23 @@ function ToolbarToggle({
             variant="outline"
             pressed={active}
             onPressedChange={onClick}
-            className="gap-1.5 text-muted-foreground aria-pressed:border-foreground/25 aria-pressed:text-foreground"
+            aria-label={iconOnly ? label : undefined}
+            className={cn(
+              "relative gap-1.5 text-muted-foreground aria-pressed:border-foreground/25 aria-pressed:text-foreground",
+              iconOnly && "px-0 aria-pressed:border-emerald-500/60 aria-pressed:text-emerald-600 dark:aria-pressed:text-emerald-400",
+            )}
           >
             <Icon className="size-3.5" aria-hidden />
-            {label}
+            {!iconOnly && label}
+            {pulse && (
+              <span
+                className={cn(
+                  "size-1.5 animate-pulse rounded-full bg-emerald-500",
+                  iconOnly && "absolute top-1 right-1",
+                )}
+                aria-hidden
+              />
+            )}
           </Toggle>
         }
       />

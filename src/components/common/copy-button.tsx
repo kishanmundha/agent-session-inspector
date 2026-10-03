@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, type LucideIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -12,13 +12,17 @@ export function CopyButton({
   value,
   label = "Copy",
   size = "xs",
+  icon: IdleIcon = Copy,
   className,
   children,
 }: {
-  value: string;
+  /** A function is called at click time, for values only known in the browser. */
+  value: string | (() => string);
   label?: string;
   /** Match the neighbouring controls: `sm` beside `sm` buttons and inputs. */
   size?: "xs" | "sm";
+  /** Shown at rest, when the button copies something more specific than "this". */
+  icon?: LucideIcon;
   className?: string;
   children?: React.ReactNode;
 }) {
@@ -29,7 +33,7 @@ export function CopyButton({
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(value);
+      await navigator.clipboard.writeText(typeof value === "function" ? value() : value);
       setStatus("copied");
     } catch {
       setStatus("failed");
@@ -38,7 +42,7 @@ export function CopyButton({
     timer.current = window.setTimeout(() => setStatus("idle"), 1600);
   }
 
-  const Icon = status === "copied" ? Check : status === "failed" ? X : Copy;
+  const Icon = status === "copied" ? Check : status === "failed" ? X : IdleIcon;
 
   return (
     <Tooltip>

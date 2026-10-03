@@ -8,6 +8,7 @@ import {
   Database,
   FolderGit2,
   GitBranch,
+  Terminal,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -22,6 +23,7 @@ import {
   timeAgo,
 } from "@/lib/format";
 import { providerStyle } from "@/lib/provider-meta";
+import { resumeCommand } from "@/lib/session-state";
 import { cn } from "@/lib/utils";
 import type { CostSummary, SessionMeta, SessionStats } from "./types";
 
@@ -36,12 +38,15 @@ export function SessionHeader({
   stats,
   cost,
   activeMs,
+  running = false,
 }: {
   meta: SessionMeta;
   stats?: SessionStats;
   cost?: CostSummary;
   /** First-to-last event span. Real working time, unlike created→updated. */
   activeMs?: number | null;
+  /** The agent wrote to the transcript in the last few minutes. */
+  running?: boolean;
 }) {
   const rawName = firstLine(meta.name);
   const title = meta.title ?? rawName;
@@ -77,10 +82,24 @@ export function SessionHeader({
                 {meta.id}
               </span>
               <CopyButton value={meta.id} label="Copy session id" />
+              <CopyButton
+                value={resumeCommand(meta)}
+                label="Copy the command that resumes this session in a terminal"
+                icon={Terminal}
+                className="ml-1"
+              >
+                Resume
+              </CopyButton>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:shrink-0 sm:justify-end">
+            {running && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
+                Running
+              </span>
+            )}
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",

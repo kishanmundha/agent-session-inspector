@@ -1,12 +1,15 @@
-import { NextResponse } from "next/server";
-import { getSession } from "@/lib/providers";
+import { NextRequest, NextResponse } from "next/server";
+import { getSession, probeSession } from "@/lib/providers";
 
 export async function GET(
-  _req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ provider: string; id: string }> },
 ) {
   const { provider, id } = await params;
-  const session = getSession(provider, id);
+  // `?probe=1` answers "has it changed?" without shipping the whole transcript.
+  const session = req.nextUrl.searchParams.has("probe")
+    ? probeSession(provider, id)
+    : getSession(provider, id);
   if (!session) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }

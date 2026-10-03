@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, use, useEffect, useMemo, useState } from "react";
+import { Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -23,6 +23,7 @@ import { SearchTrigger } from "@/components/common/command-palette";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { EventsTimeline } from "@/components/session/EventsTimeline";
 import { SessionHeader } from "@/components/session/session-header";
+import { ShortcutsTrigger, SidebarTrigger } from "@/components/session/session-shell";
 import { TokenOptimizer } from "@/components/session/token-optimizer";
 import {
   CheckpointsList,
@@ -30,6 +31,7 @@ import {
 } from "@/components/session/checkpoints-list";
 import type { EventFocusRequest, SessionData } from "@/components/session/types";
 import { firstLine } from "@/lib/format";
+import { isRunning } from "@/lib/session-state";
 import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
 
 const SESSION_TABS = [
@@ -40,6 +42,9 @@ const SESSION_TABS = [
   "workspace",
   "optimizer",
 ] as const;
+
+/** How often a running or followed session is checked for new events. */
+const POLL_MS = 3000;
 
 function TabCount({ value }: { value: number }) {
   return (
@@ -52,20 +57,17 @@ function TabCount({ value }: { value: number }) {
 export default function SessionPage(props: {
   params: Promise<{ provider: string; id: string }>;
 }) {
-  // useTabParam reads the URL, which needs a Suspense boundary.
+  const { provider, id } = use(props.params);
+  // useTabParam reads the URL, which needs a Suspense boundary. The key starts
+  // each session from a clean slate when the sidebar switches between them.
   return (
     <Suspense>
-      <Session {...props} />
+      <Session key={`${provider}/${id}`} provider={provider} id={id} />
     </Suspense>
   );
 }
 
-function Session({
-  params,
-}: {
-  params: Promise<{ provider: string; id: string }>;
-}) {
-  const { provider, id } = use(params);
+function Session({ provider, id }: { provider: string; id: string }) {
   const [tabParam, setActiveTab] = useTabParam(SESSION_TABS, "events");
   const [data, setData] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,20 +88,35 @@ function Session({
     setEventFocusRequest(null);
   }
 
-  // Bumped by the retry button to re-run the fetch effect below.
+  // A link copied from an event opens the timeline scrolled to that event.
+  const [targetEventId] = useQueryParam("event", "");
+
+  // Bumped by the retry button, and by the poll below when the transcript has
+  // grown, to re-run the fetch effect.
   const [reloadToken, setReloadToken] = useState(0);
+  // What the transcript looked like when it was last fetched.
+  const revision = useRef<string | null>(null);
+  const loaded = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
+        // Probed first, so a change that lands mid-fetch is caught by the next poll.
+        const probe = await fetch(`/api/sessions/${provider}/${id}?probe=1`);
+        const seen = probe.ok ? ((await probe.json()).revision as string) : null;
         const res = await fetch(`/api/sessions/${provider}/${id}`);
         if (!res.ok) throw new Error("Request failed");
         const json: SessionData = await res.json();
         if (!json?.meta) throw new Error("Not found");
-        if (!cancelled) setData(json);
-      } catch {
         if (!cancelled) {
+          revision.current = seen;
+          loaded.current = true;
+          setData(json);
+        }
+      } catch {
+        // A failed background refresh leaves the transcript already on screen.
+        if (!cancelled && !loaded.current) {
           setError("This session could not be loaded. It may have been removed.");
         }
       } finally {
@@ -110,6 +127,37 @@ function Session({
       cancelled = true;
     };
   }, [provider, id, reloadToken]);
+
+  // Following keeps the newest events in view; a session that is still being
+  // written refreshes in place either way.
+  const [live, setLive] = useState(false);
+  const running = isRunning(data?.meta.updated_at);
+  const [, setStale] = useState(0);
+  const polling = data !== null && (live || running);
+  const updatedAt = data?.meta.updated_at;
+
+  useEffect(() => {
+    if (!polling) return;
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const res = await fetch(`/api/sessions/${provider}/${id}?probe=1`);
+        if (!res.ok || cancelled) return;
+        const next = (await res.json()).revision as string;
+        if (cancelled) return;
+        if (next !== revision.current) setReloadToken((t) => t + 1);
+        // Nothing new for a while: re-render so "running" can lapse.
+        else if (!isRunning(updatedAt)) setStale((n) => n + 1);
+      } catch {
+        /* the next tick retries */
+      }
+    }, POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [polling, provider, id, updatedAt]);
 
   // Distribution of raw event types, for the optimizer's breakdown chart.
   const eventTypeCounts = useMemo(() => {
@@ -154,6 +202,7 @@ function Session({
       {/* Sticky bar: back, current session, tab navigation. */}
       <div className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
         <div className="mx-auto flex h-[var(--cv-topbar-h)] max-w-6xl items-center gap-3 px-4 sm:px-6">
+          <SidebarTrigger className="-ml-2 shrink-0" />
           <Button
             variant="ghost"
             nativeButton={false}
@@ -170,6 +219,7 @@ function Session({
             {title}
           </span>
           <SearchTrigger className="shrink-0" />
+          <ShortcutsTrigger className="hidden shrink-0 sm:inline-flex" />
           <PalettePicker className="shrink-0" />
           <ThemeToggle className="shrink-0" />
         </div>
@@ -216,6 +266,7 @@ function Session({
             stats={data.stats}
             cost={data.cost}
             activeMs={activeMs}
+            running={running}
           />
 
           <main id="main" className="mx-auto max-w-6xl px-4 pt-2 pb-5 sm:px-6">
@@ -273,6 +324,10 @@ function Session({
                 <EventsTimeline
                   events={data.events}
                   focusRequest={eventFocusRequest ?? queryFocus}
+                  targetEventId={targetEventId || undefined}
+                  live={live}
+                  onLiveChange={setLive}
+                  running={running}
                 />
               </TabsContent>
 
