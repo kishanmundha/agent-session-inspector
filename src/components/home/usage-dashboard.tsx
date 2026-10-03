@@ -26,7 +26,6 @@ import {
   DIMENSIONS,
   DIMENSION_LABELS,
   computeUsage,
-  projectsOf,
   toWeeks,
   usageModelsOf,
   usageToCsv,
@@ -61,10 +60,20 @@ const SESSION_COLUMNS = ["Session", "Input", "Cached", "Output", "Cost"];
 const tokens = (n: number) => formatTokens(n) ?? "0";
 
 /** Where the money and tokens went: over time, by project, model and agent. */
-export function UsageDashboard({ reloadToken }: { reloadToken: number }) {
+export function UsageDashboard({
+  reloadToken,
+  project,
+  onProjectChange,
+  projectOptions,
+}: {
+  reloadToken: number;
+  /** Shared by every tab on the page; "all" for no filter. */
+  project: string;
+  onProjectChange: (project: string) => void;
+  projectOptions: { value: string; label: string }[];
+}) {
   const { sessions, error } = useAnalyticsSessions(reloadToken);
   const [range, setRange] = useState("30");
-  const [project, setProject] = useState("all");
   const [provider, setProvider] = useState("all");
   const [model, setModel] = useState("all");
   const [unit, setUnit] = useState<Unit>("costUSD");
@@ -87,13 +96,6 @@ export function UsageDashboard({ reloadToken }: { reloadToken: number }) {
 
   const providers = useMemo(
     () => PROVIDER_ORDER.filter((id) => sessions?.some((s) => s.provider === id)),
-    [sessions],
-  );
-  const projectOptions = useMemo(
-    () => [
-      { value: "all", label: "All projects" },
-      ...projectsOf(sessions ?? []).map((p) => ({ value: p, label: p })),
-    ],
     [sessions],
   );
   const providerOptions = useMemo(
@@ -190,7 +192,7 @@ export function UsageDashboard({ reloadToken }: { reloadToken: number }) {
         {projectOptions.length > 2 && (
           <OptionSelect
             value={project}
-            onChange={setProject}
+            onChange={onProjectChange}
             options={projectOptions}
             aria-label="Project"
             className="max-w-56"

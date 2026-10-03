@@ -3,7 +3,9 @@ import { claudeProvider } from "./claude";
 import { codexProvider } from "./codex";
 import { analyzeTokenUsage, computeSessionStats } from "./analysis";
 import { priceBucket, priceBuckets, priceEvents } from "./pricing";
+import { findGitRoot } from "./fs-utils";
 import { firstLine } from "@/lib/format";
+import os from "os";
 import type {
   ActivitySlot,
   AnalyticsSession,
@@ -39,13 +41,87 @@ function byRecency(a: SessionMeta, b: SessionMeta) {
   return bt - at;
 }
 
+/** Sessions of every available provider, as the adapters cached them. */
+function rawSessions(): SessionMeta[] {
+  const sessions: SessionMeta[] = [];
+  for (const provider of PROVIDERS) {
+    if (!provider.isAvailable()) continue;
+    try {
+      sessions.push(...provider.listSessions());
+    } catch {
+      // A broken transcript directory should not take down the whole list.
+    }
+  }
+  return sessions;
+}
+
+/**
+ * The Codex app starts each chat that has no project in a fresh dated folder
+ * (`…/Codex/2026-07-25/some-slug`). Captures the folder they all live under.
+ */
+const CODEX_SCRATCH = /^(.*[\\/]Codex)[\\/]\d{4}-\d{2}-\d{2}[\\/][^\\/]+[\\/]?$/;
+
+const segments = (source: string) => source.split(/[\\/]/).filter(Boolean);
+
+type ProjectFields = Pick<SessionMeta, "project" | "projectPath">;
+
+/**
+ * Works out which project each session belongs to. Sessions started anywhere
+ * inside one repository, or in one of its worktrees, share a project; outside
+ * a repository the working directory is the project, except that Codex's
+ * throwaway chat folders count as one. Two folders with the same name are told
+ * apart by their parent folder.
+ */
+function projectResolver(sessions: SessionMeta[]): (meta: SessionMeta) => ProjectFields {
+  // Lets a session whose checkout is gone join the others from its repository.
+  const repoRoots = new Map<string, string>();
+  for (const meta of sessions) {
+    const root = meta.cwd && meta.repository ? findGitRoot(meta.cwd) : null;
+    if (root && meta.repository) repoRoots.set(meta.repository, root);
+  }
+  const sourceOf = (meta: SessionMeta) =>
+    (meta.cwd && findGitRoot(meta.cwd)) ||
+    (meta.repository && repoRoots.get(meta.repository)) ||
+    (meta.provider === "codex" && meta.cwd?.match(CODEX_SCRATCH)?.[1]) ||
+    meta.cwd ||
+    meta.repository ||
+    "unknown";
+
+  const sourcesByName = new Map<string, Set<string>>();
+  for (const meta of sessions) {
+    const source = sourceOf(meta);
+    const name = segments(source).pop() ?? source;
+    let sources = sourcesByName.get(name);
+    if (!sources) sourcesByName.set(name, (sources = new Set()));
+    sources.add(source);
+  }
+
+  const home = os.homedir();
+  return (meta) => {
+    const source = sourceOf(meta);
+    const parts = segments(source);
+    const name = parts[parts.length - 1] ?? source;
+    const ambiguous = (sourcesByName.get(name)?.size ?? 0) > 1;
+    return {
+      project: ambiguous ? parts.slice(-2).join("/") : name,
+      // A bare repository name is not a place on disk.
+      projectPath:
+        source === meta.repository || source === "unknown"
+          ? undefined
+          : source.startsWith(home)
+            ? `~${source.slice(home.length)}`
+            : source,
+    };
+  };
+}
+
 /**
  * Swaps the cached usage buckets for a cost priced against the current table,
  * so a price change shows up without re-parsing any transcript. The activity
  * slots are dropped too: only the analytics endpoint ships them.
  */
-function withCost(session: SessionMeta): SessionMeta {
-  const meta = { ...session };
+function forList(session: SessionMeta, project: ProjectFields): SessionMeta {
+  const meta = { ...session, ...project };
   delete meta.usage;
   delete meta.activity;
   const cost = priceBuckets(session.usage);
@@ -59,26 +135,14 @@ function withCost(session: SessionMeta): SessionMeta {
 
 /** Sessions from one provider, or from every available provider, newest first. */
 export function listSessions(providerId?: string): SessionMeta[] {
-  const providers = providerId
-    ? [getProvider(providerId)].filter((p): p is SessionProvider => Boolean(p))
-    : PROVIDERS;
-
-  const sessions: SessionMeta[] = [];
-  for (const provider of providers) {
-    if (!provider.isAvailable()) continue;
-    try {
-      sessions.push(...provider.listSessions().map(withCost));
-    } catch {
-      // A broken transcript directory should not take down the whole list.
-    }
-  }
-  return sessions.sort(byRecency);
-}
-
-/** Last path segment of the repository, else of the working directory. */
-function projectOf(meta: SessionMeta): string {
-  const source = meta.repository ?? meta.cwd ?? "";
-  return source.split(/[\\/]/).filter(Boolean).pop() ?? "unknown";
+  // Projects are named against every provider's sessions, so a name means the
+  // same thing whichever provider is asked for.
+  const all = rawSessions();
+  const projectOf = projectResolver(all);
+  return all
+    .filter((s) => !providerId || s.provider === providerId)
+    .map((s) => forList(s, projectOf(s)))
+    .sort(byRecency);
 }
 
 /** The session's activity and usage with each slot priced at today's table. */
@@ -128,26 +192,18 @@ function pricedActivity(
 
 /** Every session reduced to what the analytics dashboard aggregates. */
 export function listAnalyticsSessions(): AnalyticsSession[] {
-  const sessions: AnalyticsSession[] = [];
-  for (const provider of PROVIDERS) {
-    if (!provider.isAvailable()) continue;
-    try {
-      for (const meta of provider.listSessions()) {
-        if (!meta.activity || meta.activity.length === 0) continue;
-        sessions.push({
-          provider: meta.provider,
-          id: meta.id,
-          label: meta.title ?? firstLine(meta.name) ?? meta.id,
-          project: projectOf(meta),
-          model: meta.model,
-          ...pricedActivity(meta),
-        });
-      }
-    } catch {
-      // Same as listSessions: one unreadable provider should not blank the page.
-    }
-  }
-  return sessions;
+  const all = rawSessions();
+  const projectOf = projectResolver(all);
+  return all
+    .filter((meta) => meta.activity && meta.activity.length > 0)
+    .map((meta) => ({
+      provider: meta.provider,
+      id: meta.id,
+      label: meta.title ?? firstLine(meta.name) ?? meta.id,
+      project: projectOf(meta).project ?? "unknown",
+      model: meta.model,
+      ...pricedActivity(meta),
+    }));
 }
 
 export function listProviders(): ProviderInfo[] {
@@ -175,7 +231,7 @@ export function getSession(providerId: string, id: string): SessionDetail | null
 
   return {
     ...detail,
-    meta: withCost(detail.meta),
+    meta: forList(detail.meta, projectResolver(rawSessions())(detail.meta)),
     cost: priceEvents(detail.events),
     stats: computeSessionStats(detail.events),
     tokenAnalysis: analyzeTokenUsage(detail.events, provider.info.id),

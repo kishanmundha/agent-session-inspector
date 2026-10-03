@@ -31,6 +31,14 @@ export interface SessionMeta {
   title?: string;
   cwd?: string;
   repository?: string;
+  /**
+   * Project the session belongs to: the repository folder, else the working
+   * directory. Unique across projects, so it doubles as the filter key.
+   * Assigned by the registry, not by adapters.
+   */
+  project?: string;
+  /** Folder behind `project`, with the home directory as `~`. */
+  projectPath?: string;
   branch?: string;
   created_at?: string;
   updated_at?: string;
@@ -87,7 +95,7 @@ export interface AnalyticsSession {
   provider: ProviderId;
   id: string;
   label: string;
-  /** Repository or working-directory name the session ran in. */
+  /** Same value as `SessionMeta.project`. */
   project: string;
   model?: string;
   activity: ActivitySlot[];

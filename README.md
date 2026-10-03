@@ -37,6 +37,13 @@ replies), which tools ran most, and hints for trimming expensive sessions.
   <img alt="Token Optimizer: context usage breakdown, tool usage and event type charts" src="docs/screenshots/token-optimizer.png">
 </picture>
 
+**Projects.** Sessions are grouped by the repository they ran in, so work
+started from a subfolder or a git worktree lands in the same project. The
+Projects tab lists each one with its sessions, cost and tokens, and picking a
+project filters Analytics, Usage and Sessions together. Outside a repository,
+the working directory is the project; the dated scratch folders the Codex app
+creates for project-less chats count as one project.
+
 > Screenshots use synthetic demo data. To reproduce them locally, see
 > [Demo data](#demo-data).
 

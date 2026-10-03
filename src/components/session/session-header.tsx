@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   CalendarDays,
   Clock,
   Database,
+  FolderGit2,
   GitBranch,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -102,6 +104,16 @@ export function SessionHeader({
 
         {/* Context row */}
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+          {meta.project && (
+            <Link
+              href={`/?tab=sessions&project=${encodeURIComponent(meta.project)}`}
+              title={meta.projectPath}
+              className="inline-flex min-w-0 items-center gap-1.5 rounded-sm hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            >
+              <FolderGit2 className="size-3.5 shrink-0 opacity-70" aria-hidden />
+              <span className="truncate font-medium text-foreground/80">{meta.project}</span>
+            </Link>
+          )}
           {meta.repository && (
             <span className="inline-flex min-w-0 items-center gap-1.5">
               <Database className="size-3.5 shrink-0 opacity-70" aria-hidden />

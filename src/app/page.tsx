@@ -6,6 +6,7 @@ import {
   BarChart3,
   Bot,
   FileText,
+  FolderGit2,
   Inbox,
   ListTree,
   RefreshCw,
@@ -24,16 +25,18 @@ import { PalettePicker } from "@/components/common/palette-picker";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { SessionCard, type SessionMeta } from "@/components/home/session-card";
 import { LogsViewer, type LogFile } from "@/components/home/logs-viewer";
+import { ProjectsTable } from "@/components/home/projects-table";
 import { AnalyticsDashboard } from "@/components/home/analytics-dashboard";
 import { UsageDashboard } from "@/components/home/usage-dashboard";
 import { AboutDialog } from "@/components/home/about-dialog";
 import { APP_INFO } from "@/lib/app-info";
 import { providerStyle } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
-import { useTabParam } from "@/lib/use-tab-param";
+import { ALL_PROJECTS, projectOf, summarizeProjects } from "@/lib/projects";
+import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
 
-const HOME_TABS = ["analytics", "usage", "sessions", "logs"] as const;
+const HOME_TABS = ["analytics", "usage", "projects", "sessions", "logs"] as const;
 
 type SortKey = "recent" | "oldest" | "cost" | "tokens" | "events" | "name";
 
@@ -65,6 +68,7 @@ export default function HomePage() {
 
 function Home() {
   const [tab, setTab] = useTabParam(HOME_TABS, "analytics");
+  const [projectParam, setProject] = useQueryParam("project", ALL_PROJECTS);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [provider, setProvider] = useState<string>("all");
@@ -124,13 +128,41 @@ function Home() {
     [providers],
   );
 
+  const projects = useMemo(() => summarizeProjects(sessions), [sessions]);
+  // A project from a stale link is ignored once the list has loaded.
+  const project =
+    loading || projects.some((p) => p.name === projectParam) ? projectParam : ALL_PROJECTS;
+
+  const projectOptions = useMemo(
+    () => [
+      { value: ALL_PROJECTS, label: "All projects" },
+      ...[...projects]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((p) => ({ value: p.name, label: p.name })),
+    ],
+    [projects],
+  );
+
+  const projectSessions = useMemo(
+    () =>
+      project === ALL_PROJECTS
+        ? sessions
+        : sessions.filter((s) => projectOf(s) === project),
+    [sessions, project],
+  );
+
   const providerSessions = useMemo(
     () =>
       provider === "all"
-        ? sessions
-        : sessions.filter((s) => s.provider === provider),
-    [sessions, provider],
+        ? projectSessions
+        : projectSessions.filter((s) => s.provider === provider),
+    [projectSessions, provider],
   );
+
+  function openProject(name: string) {
+    setProject(name);
+    setTab("sessions");
+  }
 
   const filteredSessions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -250,11 +282,18 @@ function Home() {
               <Wallet className="size-4" aria-hidden />
               Usage
             </TabsTrigger>
+            <TabsTrigger value="projects" className="px-3">
+              <FolderGit2 className="size-4" aria-hidden />
+              Projects
+              <span className="ml-1 rounded-sm bg-foreground/10 px-1.5 text-[11px] tabular-nums">
+                {projects.length}
+              </span>
+            </TabsTrigger>
             <TabsTrigger value="sessions" className="px-3">
               <ListTree className="size-4" aria-hidden />
               Sessions
               <span className="ml-1 rounded-sm bg-foreground/10 px-1.5 text-[11px] tabular-nums">
-                {sessions.length}
+                {projectSessions.length}
               </span>
             </TabsTrigger>
             <TabsTrigger value="logs" className="px-3">
@@ -267,11 +306,30 @@ function Home() {
           </TabsList>
 
           <TabsContent value="analytics">
-            <AnalyticsDashboard reloadToken={reloadToken} />
+            <AnalyticsDashboard
+              reloadToken={reloadToken}
+              project={project}
+              onProjectChange={setProject}
+              projectOptions={projectOptions}
+            />
           </TabsContent>
 
           <TabsContent value="usage">
-            <UsageDashboard reloadToken={reloadToken} />
+            <UsageDashboard
+              reloadToken={reloadToken}
+              project={project}
+              onProjectChange={setProject}
+              projectOptions={projectOptions}
+            />
+          </TabsContent>
+
+          <TabsContent value="projects">
+            <ProjectsTable
+              projects={projects}
+              loading={loading}
+              selected={project}
+              onSelect={openProject}
+            />
           </TabsContent>
 
           <TabsContent value="sessions">
@@ -285,7 +343,7 @@ function Home() {
                   active={provider === "all"}
                   onClick={() => setProvider("all")}
                   label="All agents"
-                  count={sessions.length}
+                  count={projectSessions.length}
                 />
                 {availableProviders.map((p) => (
                   <ProviderChip
@@ -293,7 +351,7 @@ function Home() {
                     active={provider === p.id}
                     onClick={() => setProvider(p.id)}
                     label={providerStyle(p.id).shortLabel}
-                    count={p.sessionCount ?? 0}
+                    count={projectSessions.filter((s) => s.provider === p.id).length}
                     dotCls={providerStyle(p.id).dotCls}
                   />
                 ))}
@@ -308,6 +366,15 @@ function Home() {
                 aria-label="Search sessions"
                 className="w-full max-w-sm"
               />
+              {projectOptions.length > 2 && (
+                <OptionSelect
+                  value={project}
+                  onChange={setProject}
+                  options={projectOptions}
+                  aria-label="Project"
+                  className="max-w-56"
+                />
+              )}
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="hidden sm:inline" aria-hidden>
                   Sort
@@ -340,7 +407,9 @@ function Home() {
                   description={
                     search
                       ? `Nothing matches “${search}”. Try a repository name, branch or session id.`
-                      : "Sessions appear here once Copilot, Claude Code or Codex writes a transcript to your home directory."
+                      : project !== ALL_PROJECTS
+                        ? `No ${providerStyle(provider).shortLabel} sessions in ${project}.`
+                        : "Sessions appear here once Copilot, Claude Code or Codex writes a transcript to your home directory."
                   }
                   action={
                     search ? (

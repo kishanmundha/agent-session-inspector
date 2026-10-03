@@ -28,6 +28,8 @@ export const RANGES: { value: string; label: string; days: number | null }[] = [
 export interface AnalyticsFilter {
   /** How many days back from today to include; null for all time. */
   days: number | null;
+  /** Project name, or "all". */
+  project: string;
   provider: string;
   model: string;
 }
@@ -145,6 +147,7 @@ export function computeAnalytics(
 
   for (const session of all) {
     if (filter.provider !== "all" && session.provider !== filter.provider) continue;
+    if (filter.project !== "all" && session.project !== filter.project) continue;
     if (filter.model !== "all" && session.model !== filter.model) continue;
 
     const row: SessionRow = {

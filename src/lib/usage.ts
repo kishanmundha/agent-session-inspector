@@ -19,9 +19,7 @@ export const DIMENSION_LABELS: Record<Dimension, string> = {
 /** What the charts measure: dollars, or tokens of every class. */
 export type Unit = "costUSD" | "tokens";
 
-export interface UsageFilter extends AnalyticsFilter {
-  project: string;
-}
+export type UsageFilter = AnalyticsFilter;
 
 export interface Amount {
   /** Estimated list-price cost; a floor when some models have no price. */
@@ -78,10 +76,6 @@ function addTo(target: Record<string, Amount>, name: string, costUSD: number, to
   const amount = (target[name] ??= { costUSD: 0, tokens: 0 });
   amount.costUSD += costUSD;
   amount.tokens += tokens;
-}
-
-export function projectsOf(sessions: AnalyticsSession[]): string[] {
-  return [...new Set(sessions.map((s) => s.project))].sort((a, b) => a.localeCompare(b));
 }
 
 /** Every model that used tokens, not only each session's last one. */

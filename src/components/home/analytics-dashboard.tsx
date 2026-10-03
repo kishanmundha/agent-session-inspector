@@ -76,7 +76,18 @@ function formatTop(key: TopKey, session: SessionRow): string {
 }
 
 /** Cross-session analytics: activity, top sessions, tools and agents. */
-export function AnalyticsDashboard({ reloadToken }: { reloadToken: number }) {
+export function AnalyticsDashboard({
+  reloadToken,
+  project,
+  onProjectChange,
+  projectOptions,
+}: {
+  reloadToken: number;
+  /** Shared by every tab on the page; "all" for no filter. */
+  project: string;
+  onProjectChange: (project: string) => void;
+  projectOptions: { value: string; label: string }[];
+}) {
   const { sessions, error } = useAnalyticsSessions(reloadToken);
   const [range, setRange] = useState("90");
   const [provider, setProvider] = useState("all");
@@ -89,10 +100,11 @@ export function AnalyticsDashboard({ reloadToken }: { reloadToken: number }) {
   const filter: AnalyticsFilter = useMemo(
     () => ({
       days: RANGES.find((r) => r.value === range)?.days ?? null,
+      project,
       provider,
       model,
     }),
-    [range, provider, model],
+    [range, project, provider, model],
   );
 
   const data = useMemo(
@@ -176,6 +188,15 @@ export function AnalyticsDashboard({ reloadToken }: { reloadToken: number }) {
           options={RANGES}
           aria-label="Date range"
         />
+        {projectOptions.length > 2 && (
+          <OptionSelect
+            value={project}
+            onChange={onProjectChange}
+            options={projectOptions}
+            aria-label="Project"
+            className="max-w-56"
+          />
+        )}
         {providers.length > 1 && (
           <OptionSelect
             value={provider}
@@ -207,7 +228,7 @@ export function AnalyticsDashboard({ reloadToken }: { reloadToken: number }) {
         <EmptyState
           icon={BarChart3}
           title="No activity for these filters"
-          description="Try a longer date range, or clear the agent and model filters."
+          description="Try a longer date range, or clear the project, agent and model filters."
         />
       ) : (
         <>
