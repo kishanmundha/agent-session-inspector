@@ -1,24 +1,39 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { FolderGit2, Keyboard, PanelLeft, PanelLeftClose } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Toggle } from "@/components/ui/toggle";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { SearchInput } from "@/components/common/search-input";
-import { firstLine, timeAgo } from "@/lib/format";
-import { providerStyle } from "@/lib/provider-meta";
-import { isRunning } from "@/lib/session-state";
-import { useHotkeys } from "@/lib/use-hotkeys";
-import { cn } from "@/lib/utils";
-import type { SessionMeta } from "./types";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { FolderGit2, Keyboard, PanelLeft, PanelLeftClose } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Toggle } from '@/components/ui/toggle';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { SearchInput } from '@/components/common/search-input';
+import { firstLine, timeAgo } from '@/lib/format';
+import { providerStyle } from '@/lib/provider-meta';
+import { isRunning } from '@/lib/session-state';
+import { useHotkeys } from '@/lib/use-hotkeys';
+import { cn } from '@/lib/utils';
+import type { SessionMeta } from './types';
 
-const TOGGLE_SIDEBAR_EVENT = "asv:toggle-sidebar";
-const OPEN_SHORTCUTS_EVENT = "asv:open-shortcuts";
-const SIDEBAR_STORAGE_KEY = "asv-session-sidebar";
+const TOGGLE_SIDEBAR_EVENT = 'asv:toggle-sidebar';
+const OPEN_SHORTCUTS_EVENT = 'asv:open-shortcuts';
+const SIDEBAR_STORAGE_KEY = 'asv-session-sidebar';
 
 /** How often the sidebar re-reads the session list, to keep "running" honest. */
 const LIST_REFRESH_MS = 30_000;
@@ -32,9 +47,11 @@ export function SidebarTrigger({ className }: { className?: string }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => window.dispatchEvent(new Event(TOGGLE_SIDEBAR_EVENT))}
+            onClick={() =>
+              window.dispatchEvent(new Event(TOGGLE_SIDEBAR_EVENT))
+            }
             aria-label="Toggle session sidebar"
-            className={cn("text-muted-foreground", className)}
+            className={cn('text-muted-foreground', className)}
           >
             <PanelLeft aria-hidden />
           </Button>
@@ -52,11 +69,13 @@ export function ShortcutsTrigger({ className }: { className?: string }) {
       <TooltipTrigger
         render={
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
-            onClick={() => window.dispatchEvent(new Event(OPEN_SHORTCUTS_EVENT))}
+            onClick={() =>
+              window.dispatchEvent(new Event(OPEN_SHORTCUTS_EVENT))
+            }
             aria-label="Keyboard shortcuts"
-            className={cn("text-muted-foreground", className)}
+            className={cn('text-muted-foreground', className)}
           >
             <Keyboard aria-hidden />
           </Button>
@@ -73,16 +92,16 @@ const listeners = new Set<() => void>();
 
 function subscribe(onChange: () => void) {
   listeners.add(onChange);
-  window.addEventListener("storage", onChange);
+  window.addEventListener('storage', onChange);
   return () => {
     listeners.delete(onChange);
-    window.removeEventListener("storage", onChange);
+    window.removeEventListener('storage', onChange);
   };
 }
 
 function readDocked() {
   try {
-    return localStorage.getItem(SIDEBAR_STORAGE_KEY) !== "0";
+    return localStorage.getItem(SIDEBAR_STORAGE_KEY) !== '0';
   } catch {
     return true;
   }
@@ -90,49 +109,65 @@ function readDocked() {
 
 function writeDocked(docked: boolean) {
   try {
-    localStorage.setItem(SIDEBAR_STORAGE_KEY, docked ? "1" : "0");
+    localStorage.setItem(SIDEBAR_STORAGE_KEY, docked ? '1' : '0');
   } catch {
     /* private mode: the choice lasts until reload */
   }
   listeners.forEach((notify) => notify());
 }
 
-const SHORTCUTS: { group: string; items: [keys: string[], action: string][] }[] = [
+const SHORTCUTS: {
+  group: string;
+  items: [keys: string[], action: string][];
+}[] = [
   {
-    group: "Timeline",
+    group: 'Timeline',
     items: [
-      [["/"], "Search events in this session"],
-      [["f"], "Cycle the transcript view: normal, compact, focused"],
-      [["o"], "Flip the order: oldest or newest first"],
-      [["l"], "Follow the session live"],
-      [["j", "k"], "Move to the next or previous event"],
-      [["Enter"], "Expand or collapse the selected event"],
-      [["e", "E"], "Expand or collapse every event"],
+      [['/'], 'Search events in this session'],
+      [['f'], 'Cycle the transcript view: normal, compact, focused'],
+      [['o'], 'Flip the order: oldest or newest first'],
+      [['l'], 'Follow the session live'],
+      [['j', 'k'], 'Move to the next or previous event'],
+      [['Enter'], 'Expand or collapse the selected event'],
+      [['e', 'E'], 'Expand or collapse every event'],
     ],
   },
   {
-    group: "Navigation",
+    group: 'Navigation',
     items: [
-      [["b"], "Show or hide the session sidebar"],
-      [["]", "["], "Open the next or previous session"],
-      [["⌘K"], "Search every session"],
-      [["?"], "Show this list"],
+      [['b'], 'Show or hide the session sidebar'],
+      [[']', '['], 'Open the next or previous session'],
+      [['⌘K'], 'Search every session'],
+      [['?'], 'Show this list'],
     ],
   },
 ];
 
-function ShortcutsDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+function ShortcutsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogTitle>Keyboard shortcuts</DialogTitle>
-        <DialogDescription>Available on any session page, outside text fields.</DialogDescription>
+        <DialogDescription>
+          Available on any session page, outside text fields.
+        </DialogDescription>
         {SHORTCUTS.map(({ group, items }) => (
           <div key={group}>
-            <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">{group}</p>
+            <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+              {group}
+            </p>
             <dl className="divide-y divide-border rounded-lg border border-border">
               {items.map(([keys, action]) => (
-                <div key={action} className="flex items-center justify-between gap-4 px-3 py-1.5">
+                <div
+                  key={action}
+                  className="flex items-center justify-between gap-4 px-3 py-1.5"
+                >
                   <dt className="text-xs text-foreground">{action}</dt>
                   <dd className="flex shrink-0 gap-1">
                     {keys.map((key) => (
@@ -173,15 +208,15 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
 
   const [sessions, setSessions] = useState<SessionMeta[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState('');
   const [sameProject, setSameProject] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const res = await fetch("/api/sessions");
-        if (!res.ok) throw new Error("Request failed");
+        const res = await fetch('/api/sessions');
+        if (!res.ok) throw new Error('Request failed');
         const json: SessionMeta[] = await res.json();
         if (!cancelled) {
           setSessions(json);
@@ -202,7 +237,8 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   function toggleSidebar() {
-    if (window.matchMedia("(min-width: 1024px)").matches) writeDocked(!readDocked());
+    if (window.matchMedia('(min-width: 1024px)').matches)
+      writeDocked(!readDocked());
     else setDrawer((open) => !open);
   }
 
@@ -216,7 +252,9 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const current = sessions?.find((s) => s.provider === params.provider && s.id === params.id);
+  const current = sessions?.find(
+    (s) => s.provider === params.provider && s.id === params.id,
+  );
   const project = current?.project;
 
   const visible = useMemo(() => {
@@ -224,35 +262,42 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
     return (sessions ?? []).filter((s) => {
       if (sameProject && project && s.project !== project) return false;
       if (terms.length === 0) return true;
-      const text = `${sessionLabel(s)} ${s.project ?? ""} ${s.branch ?? ""} ${s.id}`.toLowerCase();
+      const text =
+        `${sessionLabel(s)} ${s.project ?? ''} ${s.branch ?? ''} ${s.id}`.toLowerCase();
       return terms.every((term) => text.includes(term));
     });
   }, [sessions, search, sameProject, project]);
 
   /** Opens the session `step` rows away from the current one in the list. */
   function openNeighbour(step: number) {
-    const index = visible.findIndex((s) => s.provider === params.provider && s.id === params.id);
+    const index = visible.findIndex(
+      (s) => s.provider === params.provider && s.id === params.id,
+    );
     const next = visible[index === -1 ? 0 : index + step];
     if (next) router.push(`/sessions/${next.provider}/${next.id}`);
   }
 
   useHotkeys({
     b: toggleSidebar,
-    "?": () => setShortcutsOpen(true),
-    "]": () => openNeighbour(1),
-    "[": () => openNeighbour(-1),
+    '?': () => setShortcutsOpen(true),
+    ']': () => openNeighbour(1),
+    '[': () => openNeighbour(-1),
   });
 
   // Keep the open session in view as the list loads or the session changes.
   const activeRef = useRef<HTMLAnchorElement>(null);
   const loaded = sessions !== null;
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: "nearest" });
+    activeRef.current?.scrollIntoView({ block: 'nearest' });
   }, [params.id, loaded, docked, drawer]);
 
   return (
     <>
-      <div className={cn("flex min-h-full flex-1 flex-col", docked && "lg:pl-72")}>{children}</div>
+      <div
+        className={cn('flex min-h-full flex-1 flex-col', docked && 'lg:pl-72')}
+      >
+        {children}
+      </div>
 
       {drawer && (
         <div
@@ -264,8 +309,8 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
       <aside
         aria-label="Sessions"
         className={cn(
-          "fixed inset-y-0 left-0 z-40 w-72 flex-col border-r border-border bg-background",
-          drawer ? "flex" : docked ? "hidden lg:flex" : "hidden",
+          'fixed inset-y-0 left-0 z-40 w-72 flex-col border-r border-border bg-background',
+          drawer ? 'flex' : docked ? 'hidden lg:flex' : 'hidden',
         )}
       >
         <div className="flex h-[var(--cv-topbar-h)] shrink-0 items-center gap-2 border-b border-border px-3">
@@ -328,12 +373,12 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
                 ref={active ? activeRef : undefined}
                 href={`/sessions/${s.provider}/${s.id}`}
                 onClick={() => setDrawer(false)}
-                aria-current={active ? "page" : undefined}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
-                  "block rounded-md border-l-2 px-2.5 py-1.5 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+                  'block rounded-md border-l-2 px-2.5 py-1.5 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                   active
-                    ? "border-brand bg-muted"
-                    : "border-transparent hover:bg-muted/60",
+                    ? 'border-brand bg-muted'
+                    : 'border-transparent hover:bg-muted/60',
                 )}
               >
                 <span className="line-clamp-2 break-words text-xs font-medium leading-snug text-foreground">
@@ -341,14 +386,22 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
                 </span>
                 <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <span
-                    className={cn("size-1.5 shrink-0 rounded-full", providerStyle(s.provider).dotCls)}
+                    className={cn(
+                      'size-1.5 shrink-0 rounded-full',
+                      providerStyle(s.provider).dotCls,
+                    )}
                     title={providerStyle(s.provider).label}
                   />
-                  <span className="min-w-0 truncate">{s.project ?? s.repository ?? "—"}</span>
+                  <span className="min-w-0 truncate">
+                    {s.project ?? s.repository ?? '—'}
+                  </span>
                   <span className="ml-auto shrink-0 whitespace-nowrap">
                     {running ? (
                       <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-                        <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
+                        <span
+                          className="size-1.5 animate-pulse rounded-full bg-emerald-500"
+                          aria-hidden
+                        />
                         running
                       </span>
                     ) : (
@@ -361,11 +414,15 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
           })}
           {sessions === null && (
             <p className="px-2.5 py-3 text-xs text-muted-foreground">
-              {failed ? "The session list could not be loaded." : "Loading sessions…"}
+              {failed
+                ? 'The session list could not be loaded.'
+                : 'Loading sessions…'}
             </p>
           )}
           {sessions !== null && visible.length === 0 && (
-            <p className="px-2.5 py-3 text-xs text-muted-foreground">No sessions match.</p>
+            <p className="px-2.5 py-3 text-xs text-muted-foreground">
+              No sessions match.
+            </p>
           )}
         </nav>
       </aside>
