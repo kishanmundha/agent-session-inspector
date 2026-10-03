@@ -203,7 +203,7 @@ function CostSection({ cost }: { cost: CostSummary }) {
             {" "}
             No price is known for {cost.unpricedModels.join(", ")}, so the total
             leaves {cost.unpricedModels.length > 1 ? "them" : "it"} out; add one in{" "}
-            <code className="font-mono">~/.agent-session-visualizer/pricing.json</code>.
+            <code className="font-mono">~/.agent-session-inspector/pricing.json</code>.
           </>
         )}
       </p>

@@ -1,4 +1,4 @@
-# Agent Session Visualizer
+# Agent Session Inspector
 
 A local web UI for reading agent CLI transcripts: what the agent did, how long it
 took, and where the tokens went. It reads the on-disk session files directly and
@@ -85,27 +85,38 @@ Whichever directories exist on the machine show up; the rest are hidden.
 
 ## Getting started
 
-Install the prebuilt app (needs [Node.js](https://nodejs.org) 22.13 or newer):
+Run it with [Node.js](https://nodejs.org) 22.13 or newer, nothing to install:
 
 ```bash
-curl -fsSL https://github.com/kishanmundha/agent-session-visualizer/releases/latest/download/install.sh | bash
-```
-
-Then start it:
-
-```bash
-agent-session-visualizer
+npx agent-session-inspector
 ```
 
 It serves on [http://localhost:3000](http://localhost:3000) (or the next free
 port), bound to `127.0.0.1` only, and opens your browser. `--port`, `--host` and
 `--no-open` change that; `--help` lists everything.
 
-The app lives in `~/.agent-session-visualizer` with a command linked into
-`~/.local/bin`. Re-run the install command to update. To uninstall:
+`npx agent-session-inspector@latest` picks up a new release. To keep the command
+around instead, install it globally:
 
 ```bash
-rm -rf ~/.agent-session-visualizer ~/.local/bin/agent-session-visualizer
+npm install -g agent-session-inspector
+```
+
+### Without npm
+
+The same build is on GitHub Releases, with an installer that needs only Node,
+`curl` and `tar`:
+
+```bash
+curl -fsSL https://github.com/kishanmundha/agent-session-inspector/releases/latest/download/install.sh | bash
+```
+
+It puts the app in `~/.agent-session-inspector` and links an
+`agent-session-inspector` command into `~/.local/bin`. Re-run the install
+command to update. To uninstall:
+
+```bash
+rm -rf ~/.agent-session-inspector ~/.local/bin/agent-session-inspector
 ```
 
 ### From source
@@ -130,26 +141,29 @@ generate a fake home directory with a few synthetic sessions and point the app
 at it:
 
 ```bash
-node scripts/demo-data.mjs /tmp/asv-demo
-HOME=/tmp/asv-demo pnpm dev
+node scripts/demo-data.mjs /tmp/asi-demo
+HOME=/tmp/asi-demo pnpm dev
 ```
 
 ### Releasing
 
-Push a version tag and the [release workflow](.github/workflows/release.yml)
-builds the app and publishes `agent-session-visualizer.tar.gz` and `install.sh`
-as a GitHub release, which is what the install command downloads:
+Change `version` in `package.json` and push to `main`. The
+[release workflow](.github/workflows/release.yml) builds the app, publishes it
+to npm, and creates the `vX.Y.Z` tag and GitHub release with
+`agent-session-inspector.tar.gz` and `install.sh`, which is what the install
+command downloads. A push that leaves the version alone releases nothing.
+
+The workflow signs in to npm by
+[trusted publishing](https://docs.npmjs.com/trusted-publishers), so the
+repository holds no npm token. The package's settings on npmjs.com must list
+this repository and `release.yml` as its trusted publisher.
+
+`pnpm package` runs the same build locally into `dist/`. To try the result
+without publishing:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
-
-`pnpm package` builds the same archive locally into `dist/`. To test the
-installer against it without publishing:
-
-```bash
-ASV_TARBALL_URL="file://$PWD/dist/agent-session-visualizer.tar.gz" bash install.sh
+npx ./dist/agent-session-inspector
+ASI_TARBALL_URL="file://$PWD/dist/agent-session-inspector.tar.gz" bash install.sh
 ```
 
 ## How it works
@@ -200,7 +214,7 @@ transcript (title generation, for example) are not counted.
 
 Prices are never stored with a session; cost is computed on every load. To
 correct a price, add a model the bundled table does not know, or record a price
-change, create `~/.agent-session-visualizer/pricing.json`. It is merged over
+change, create `~/.agent-session-inspector/pricing.json`. It is merged over
 [`prices.json`](src/lib/providers/prices.json) per model and picked up without a
 restart:
 

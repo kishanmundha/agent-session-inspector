@@ -1,6 +1,22 @@
 {
-  "name": "agent-session-visualizer",
+  "name": "agent-session-inspector",
   "version": "0.1.1",
+  "description": "Inspect Claude Code, Copilot CLI and Codex sessions in a local web UI: timeline, tokens, cost and analytics.",
+  "keywords": [
+    "agent",
+    "session",
+    "claude-code",
+    "copilot",
+    "codex",
+    "transcript",
+    "tokens",
+    "cost"
+  ],
+  "author": "Kishan Mundha (https://github.com/kishanmundha)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kishanmundha/agent-session-inspector.git"
+  },
   "private": true,
   "scripts": {
     "dev": "next dev",

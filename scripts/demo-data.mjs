@@ -2,8 +2,8 @@
 // Writes a fake $HOME with synthetic Claude Code, Codex and Copilot transcripts, so the
 // UI can be demoed (and README screenshots retaken) without exposing real
 // sessions. Usage:
-//   node scripts/demo-data.mjs /tmp/asv-demo
-//   HOME=/tmp/asv-demo pnpm dev
+//   node scripts/demo-data.mjs /tmp/asi-demo
+//   HOME=/tmp/asi-demo pnpm dev
 import fs from "fs";
 import path from "path";
 

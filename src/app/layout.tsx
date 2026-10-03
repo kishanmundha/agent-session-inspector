@@ -20,8 +20,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Agent Session Visualizer",
-    template: "%s · Agent Session Visualizer",
+    default: "Agent Session Inspector",
+    template: "%s · Agent Session Inspector",
   },
   description:
     "Visualize sessions from Copilot, Claude Code, Codex, OpenCode, Hermes and other coding agents",

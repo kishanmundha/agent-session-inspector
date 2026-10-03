@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Launcher for the packaged (standalone) build. Lives at <app>/bin/ next to the
-// server.js that `next build` emits; see scripts/package-release.sh.
+// Launcher for the packaged (standalone) build, run by npx or the installed
+// command. Lives at <package>/bin/ beside app/, which holds the server.js that
+// `next build` emits; see scripts/package-release.sh.
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -8,9 +9,10 @@ import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const NAME = "agent-session-visualizer";
-const APP_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SERVER = path.join(APP_DIR, "server.js");
+const NAME = "agent-session-inspector";
+const MIN_NODE = [22, 13];
+const PKG_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const SERVER = path.join(PKG_DIR, "app", "server.js");
 
 const HELP = `Usage: ${NAME} [options]
 
@@ -69,7 +71,7 @@ function parseArgs(argv) {
 
 function readVersion() {
   try {
-    return readFileSync(path.join(APP_DIR, "VERSION"), "utf8").trim();
+    return readFileSync(path.join(PKG_DIR, "VERSION"), "utf8").trim();
   } catch {
     return "dev";
   }
@@ -116,6 +118,12 @@ function openBrowser(url) {
 }
 
 const opts = parseArgs(process.argv.slice(2));
+
+// npx only warns about package.json "engines", and the app needs node:sqlite.
+const [major, minor] = process.versions.node.split(".").map(Number);
+if (major < MIN_NODE[0] || (major === MIN_NODE[0] && minor < MIN_NODE[1])) {
+  fail(`Node.js ${MIN_NODE.join(".")} or newer is required (found ${process.version}).`);
+}
 
 if (!existsSync(SERVER)) {
   fail(`no build found at ${SERVER}\nRun scripts/package-release.sh and use dist/${NAME}/bin/${NAME}.mjs.`);

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NAME=agent-session-visualizer
+NAME=agent-session-inspector
 
 docker build -t "$NAME" .
 

@@ -1,32 +1,75 @@
 name: Release
 
-# Pushing a tag like v0.2.0 builds the standalone app and publishes it, with
-# install.sh, as a GitHub release. install.sh downloads from the latest release.
+# A push to main that changes the version in package.json releases it: the
+# build goes to npm, and to a GitHub release (which creates the vX.Y.Z tag) with
+# the archive and install.sh that the curl installer downloads.
+#
+# npm authenticates this workflow by OIDC (trusted publishing), so there is no
+# token to store. The package's trusted publisher on npmjs.com must name this
+# repository and this file, release.yml.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch:
 
 permissions:
   contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  NAME: agent-session-inspector
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
         with:
-          version: 11
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: ./scripts/package-release.sh "$GITHUB_REF_NAME"
-      - name: Publish release
+          persist-credentials: false
+      # Each half is skipped once done, so an edit to package.json that leaves
+      # the version alone does nothing, and a failed run can be re-run.
+      - name: Check what is already released
+        id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            dist/agent-session-visualizer.tar.gz dist/install.sh \
-            --title "$GITHUB_REF_NAME" --generate-notes
+          version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ -z "$(npm view "$NAME@$version" version 2>/dev/null)" ]; then
+            echo "npm=true" >> "$GITHUB_OUTPUT"
+          fi
+          if ! gh release view "v$version" >/dev/null 2>&1; then
+            echo "github=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.check.outputs.npm || steps.check.outputs.github
+        with:
+          version: 11
+      # Trusted publishing needs npm 11.5.1 or newer, which Node 24 ships.
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.npm || steps.check.outputs.github
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - if: steps.check.outputs.npm || steps.check.outputs.github
+        run: pnpm install --frozen-lockfile
+      - if: steps.check.outputs.npm || steps.check.outputs.github
+        run: ./scripts/package-release.sh
+      - name: Publish to npm
+        if: steps.check.outputs.npm
+        run: npm publish "dist/$NAME"
+      - name: Publish GitHub release
+        if: steps.check.outputs.github
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.check.outputs.version }}
+        run: |
+          gh release create "$TAG" \
+            "dist/$NAME.tar.gz" dist/install.sh \
+            --target "$GITHUB_SHA" --title "$TAG" --generate-notes

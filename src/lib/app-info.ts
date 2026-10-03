@@ -1,8 +1,8 @@
-const REPO_URL = "https://github.com/kishanmundha/agent-session-visualizer";
+const REPO_URL = "https://github.com/kishanmundha/agent-session-inspector";
 
 /** What the app says about itself in the header and the About dialog. */
 export const APP_INFO = {
-  name: "Agent Session Visualizer",
+  name: "Agent Session Inspector",
   description:
     "A local web UI for reading agent CLI transcripts: what the agent did, how long it took, and where the tokens went. It reads the session files on this machine and never sends them anywhere.",
   // Inlined from package.json at build time (see next.config.ts).

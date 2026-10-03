@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
-# Installer for Agent Session Visualizer.
+# Installer for Agent Session Inspector.
 #
-#   curl -fsSL https://github.com/kishanmundha/agent-session-visualizer/releases/latest/download/install.sh | bash
+#   curl -fsSL https://github.com/kishanmundha/agent-session-inspector/releases/latest/download/install.sh | bash
 #
-# Downloads the prebuilt app from GitHub Releases into ~/.agent-session-visualizer
-# and links an `agent-session-visualizer` command into ~/.local/bin. Re-run to update.
+# Downloads the prebuilt app from GitHub Releases into ~/.agent-session-inspector
+# and links an `agent-session-inspector` command into ~/.local/bin. Re-run to update.
 #
 # Environment overrides:
-#   ASV_VERSION      release tag to install, e.g. v0.2.0 (default: latest)
-#   ASV_HOME         install directory (default: ~/.agent-session-visualizer)
-#   ASV_BIN_DIR      where to link the command (default: ~/.local/bin)
-#   ASV_TARBALL_URL  download this archive instead of a GitHub release
+#   ASI_VERSION      release tag to install, e.g. v0.2.0 (default: latest)
+#   ASI_HOME         install directory (default: ~/.agent-session-inspector)
+#   ASI_BIN_DIR      where to link the command (default: ~/.local/bin)
+#   ASI_TARBALL_URL  download this archive instead of a GitHub release
 set -euo pipefail
 
-NAME=agent-session-visualizer
-REPO=kishanmundha/agent-session-visualizer
+NAME=agent-session-inspector
+REPO=kishanmundha/agent-session-inspector
 MIN_NODE=22.13.0
 
-INSTALL_DIR="${ASV_HOME:-$HOME/.$NAME}"
-BIN_DIR="${ASV_BIN_DIR:-$HOME/.local/bin}"
-VERSION="${ASV_VERSION:-latest}"
+INSTALL_DIR="${ASI_HOME:-$HOME/.$NAME}"
+BIN_DIR="${ASI_BIN_DIR:-$HOME/.local/bin}"
+VERSION="${ASI_VERSION:-latest}"
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 die() {
@@ -43,8 +43,8 @@ main() {
 	' "$MIN_NODE" || die "Node.js $MIN_NODE or newer is required (found $(node -v))."
 
 	local url
-	if [ -n "${ASV_TARBALL_URL:-}" ]; then
-		url="$ASV_TARBALL_URL"
+	if [ -n "${ASI_TARBALL_URL:-}" ]; then
+		url="$ASI_TARBALL_URL"
 	elif [ "$VERSION" = latest ]; then
 		url="https://github.com/$REPO/releases/latest/download/$NAME.tar.gz"
 	else
@@ -57,7 +57,7 @@ main() {
 	info "Downloading $url"
 	curl -fsSL "$url" -o "$tmp/$NAME.tar.gz" || die "Download failed: $url"
 	tar -xzf "$tmp/$NAME.tar.gz" -C "$tmp"
-	[ -f "$tmp/$NAME/server.js" ] || die "Downloaded archive is not a $NAME build."
+	[ -f "$tmp/$NAME/app/server.js" ] || die "Downloaded archive is not a $NAME build."
 
 	# Swap the new build in only once it is fully extracted.
 	info "Installing to $INSTALL_DIR"

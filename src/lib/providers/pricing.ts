@@ -26,7 +26,7 @@ export type PriceTable = Record<string, PriceEntry[]>;
 
 /** Optional user overrides, merged per model on top of the bundled table. */
 export const PRICING_OVERRIDE_PATH = path.join(
-  process.env.ASV_HOME ?? path.join(os.homedir(), ".agent-session-visualizer"),
+  process.env.ASI_HOME ?? path.join(os.homedir(), ".agent-session-inspector"),
   "pricing.json",
 );
 
