@@ -9,7 +9,8 @@ import type {
   SessionProvider,
 } from "./types";
 import { quickStatsFromEvents } from "./analysis";
-import { createFileCache, readJsonl, walkFiles } from "./fs-utils";
+import { capText, createFileCache, readJsonl, walkFiles } from "./fs-utils";
+import { LOCAL_RUNTIME } from "./pricing";
 
 /** The shell tool reports a failed command only in its output text. */
 const FAILED_EXIT = /^(Process exited with code|Exit code:) [1-9]/m;
@@ -17,17 +18,6 @@ const FAILED_EXIT = /^(Process exited with code|Exit code:) [1-9]/m;
 export const CODEX_DIR = path.join(os.homedir(), ".codex");
 const SESSIONS_DIR = path.join(CODEX_DIR, "sessions");
 const SESSION_INDEX = path.join(CODEX_DIR, "session_index.jsonl");
-
-const TEXT_CAP = 20_000;
-
-/** `model_provider` values that run the model on this machine, e.g. "ollama-launch-codex-app". */
-const LOCAL_PROVIDER = /ollama|lm-?studio|llama\.?cpp|localhost/i;
-
-function capText(value: unknown): { text: string; chars: number; truncated: boolean } {
-  const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
-  if (text.length <= TEXT_CAP) return { text, chars: text.length, truncated: false };
-  return { text: `${text.slice(0, TEXT_CAP)}…`, chars: text.length, truncated: true };
-}
 
 /** Codex content is a list of typed text parts; flatten to plain text. */
 function flattenContent(content: unknown): string {
@@ -158,7 +148,7 @@ function parseFile(filePath: string): ParsedSession {
         meta.cwd = p.cwd as string | undefined;
         meta.host_type = (p.originator as string) ?? (p.source as string);
         meta.client_name = p.cli_version as string | undefined;
-        localModel = LOCAL_PROVIDER.test(String(p.model_provider ?? ""));
+        localModel = LOCAL_RUNTIME.test(String(p.model_provider ?? ""));
         const git = p.git as Record<string, unknown> | undefined;
         if (git) {
           meta.branch = git.branch as string | undefined;

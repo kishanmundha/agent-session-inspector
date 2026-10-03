@@ -25,6 +25,15 @@ export const PROVIDER_STYLES: Record<ProviderId, ProviderStyle> = {
       "border-sky-300 bg-sky-100 text-sky-800 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
     dotCls: "bg-sky-500",
   },
+  vscode: {
+    id: "vscode",
+    label: "GitHub Copilot Chat (VS Code)",
+    shortLabel: "VS Code",
+    rootDir: "VS Code workspace storage",
+    badgeCls:
+      "border-blue-300 bg-blue-100 text-blue-800 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300",
+    dotCls: "bg-blue-500",
+  },
   claude: {
     id: "claude",
     label: "Claude Code",
@@ -33,6 +42,15 @@ export const PROVIDER_STYLES: Record<ProviderId, ProviderStyle> = {
     badgeCls:
       "border-orange-300 bg-orange-100 text-orange-800 dark:border-orange-900 dark:bg-orange-950/60 dark:text-orange-300",
     dotCls: "bg-orange-500",
+  },
+  cowork: {
+    id: "cowork",
+    label: "Claude Cowork",
+    shortLabel: "Cowork",
+    rootDir: "Claude desktop app data",
+    badgeCls:
+      "border-rose-300 bg-rose-100 text-rose-800 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-300",
+    dotCls: "bg-rose-500",
   },
   codex: {
     id: "codex",
@@ -43,9 +61,35 @@ export const PROVIDER_STYLES: Record<ProviderId, ProviderStyle> = {
       "border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300",
     dotCls: "bg-emerald-500",
   },
+  opencode: {
+    id: "opencode",
+    label: "OpenCode",
+    shortLabel: "OpenCode",
+    rootDir: "~/.local/share/opencode",
+    badgeCls:
+      "border-violet-300 bg-violet-100 text-violet-800 dark:border-violet-900 dark:bg-violet-950/60 dark:text-violet-300",
+    dotCls: "bg-violet-500",
+  },
+  hermes: {
+    id: "hermes",
+    label: "Hermes Agent",
+    shortLabel: "Hermes",
+    rootDir: "~/.hermes",
+    badgeCls:
+      "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300",
+    dotCls: "bg-amber-500",
+  },
 };
 
-export const PROVIDER_ORDER: ProviderId[] = ["copilot", "claude", "codex"];
+export const PROVIDER_ORDER: ProviderId[] = [
+  "copilot",
+  "vscode",
+  "claude",
+  "cowork",
+  "codex",
+  "opencode",
+  "hermes",
+];
 
 export function providerStyle(id: string | undefined): ProviderStyle {
   return PROVIDER_STYLES[(id ?? "copilot") as ProviderId] ?? PROVIDER_STYLES.copilot;

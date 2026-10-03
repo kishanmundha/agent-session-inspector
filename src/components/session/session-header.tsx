@@ -62,6 +62,7 @@ export function SessionHeader({
   const health = meta.health;
 
   const provider = providerStyle(meta.provider);
+  const resume = resumeCommand(meta);
   const input = stats?.totalInputTokens ?? 0;
   const output = stats?.totalOutputTokens ?? 0;
   const cache = stats?.totalCacheReadTokens ?? 0;
@@ -89,14 +90,16 @@ export function SessionHeader({
                 {meta.id}
               </span>
               <CopyButton value={meta.id} label="Copy session id" />
-              <CopyButton
-                value={resumeCommand(meta)}
-                label="Copy the command that resumes this session in a terminal"
-                icon={Terminal}
-                className="ml-1"
-              >
-                Resume
-              </CopyButton>
+              {resume && (
+                <CopyButton
+                  value={resume}
+                  label="Copy the command that resumes this session in a terminal"
+                  icon={Terminal}
+                  className="ml-1"
+                >
+                  Resume
+                </CopyButton>
+              )}
             </div>
           </div>
 

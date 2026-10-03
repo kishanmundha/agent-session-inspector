@@ -16,17 +16,22 @@ export function isRunning(updatedAt?: string) {
 
 const quote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
 
+/** How each CLI reopens a session; agents that live in an app have none. */
+const RESUME: Partial<Record<SessionMeta["provider"], (id: string) => string>> = {
+  copilot: (id) => `copilot --resume ${id}`,
+  claude: (id) => `claude --resume ${id}`,
+  codex: (id) => `codex resume ${id}`,
+  opencode: (id) => `opencode --session ${id}`,
+  hermes: (id) => `hermes --resume ${id}`,
+};
+
 /**
- * Shell command that reopens the session in its own CLI. Sessions are looked
- * up relative to the directory they started in, so the command goes there
- * first.
+ * Shell command that reopens the session in its own CLI, or null when the
+ * agent has no CLI to reopen it in. Sessions are looked up relative to the
+ * directory they started in, so the command goes there first.
  */
 export function resumeCommand(meta: Pick<SessionMeta, "provider" | "id" | "cwd">) {
-  const resume =
-    meta.provider === "claude"
-      ? `claude --resume ${meta.id}`
-      : meta.provider === "codex"
-        ? `codex resume ${meta.id}`
-        : `copilot --resume ${meta.id}`;
+  const resume = RESUME[meta.provider]?.(meta.id);
+  if (!resume) return null;
   return meta.cwd ? `cd ${quote(meta.cwd)} && ${resume}` : resume;
 }

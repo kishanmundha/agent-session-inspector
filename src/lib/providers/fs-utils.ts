@@ -111,3 +111,49 @@ export function findGitRoot(cwd: string): string | null {
   gitRoots.set(cwd, root);
   return root;
 }
+
+/**
+ * Where a desktop app keeps its data on this platform: `Application Support`
+ * on macOS, `%APPDATA%` on Windows, `~/.config` elsewhere.
+ */
+export function appDataDir(appName: string): string {
+  const home = os.homedir();
+  if (process.platform === "darwin") {
+    return path.join(home, "Library", "Application Support", appName);
+  }
+  if (process.platform === "win32") {
+    return path.join(process.env.APPDATA ?? path.join(home, "AppData", "Roaming"), appName);
+  }
+  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(home, ".config"), appName);
+}
+
+/** A path for display, with the home directory as `~`. */
+export function tildePath(target: string): string {
+  const home = os.homedir();
+  return target.startsWith(home) ? `~${target.slice(home.length)}` : target;
+}
+
+/** Long payloads are previewed in the UI, so cap what is shipped to the client. */
+const TEXT_CAP = 20_000;
+
+export function capText(value: unknown): { text: string; chars: number; truncated: boolean } {
+  const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
+  if (text.length <= TEXT_CAP) return { text, chars: text.length, truncated: false };
+  return { text: `${text.slice(0, TEXT_CAP)}…`, chars: text.length, truncated: true };
+}
+
+/** Epoch milliseconds as the ISO timestamp events carry; empty when unusable. */
+export function isoFromMs(ms: unknown): string {
+  return typeof ms === "number" && Number.isFinite(ms) && ms > 0
+    ? new Date(ms).toISOString()
+    : "";
+}
+
+export function parseJson<T>(text: unknown): T | null {
+  if (typeof text !== "string" || !text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}

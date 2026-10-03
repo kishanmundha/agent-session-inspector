@@ -11,8 +11,8 @@ never sends them anywhere.
 
 ## Screenshots
 
-**All sessions in one place.** Every Copilot, Claude Code and Codex session on
-the machine, filterable by agent and searchable by title, repo, branch or id.
+**All sessions in one place.** Every session of every supported agent on the
+machine, filterable by agent and searchable by title, repo, branch or id.
 Each card shows turns, tool calls and tokens in/out at a glance.
 
 <picture>
@@ -49,11 +49,27 @@ creates for project-less chats count as one project.
 
 Supported agents:
 
-| Agent               | Reads from                                       | Session titles       | Logs |
-| ------------------- | ------------------------------------------------ | -------------------- | ---- |
-| GitHub Copilot CLI  | `~/.copilot/session-state`, `~/.copilot/logs`     | checkpoint DB        | yes  |
-| Claude Code         | `~/.claude/projects/<project>/<session>.jsonl`    | `custom`/`ai` titles | no   |
-| OpenAI Codex CLI    | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`    | `session_index.jsonl`| no   |
+| Agent                         | Reads from                                                    | Session titles        | Logs |
+| ----------------------------- | ------------------------------------------------------------- | --------------------- | ---- |
+| GitHub Copilot CLI            | `~/.copilot/session-state`, `~/.copilot/logs`                 | checkpoint DB         | yes  |
+| GitHub Copilot Chat (VS Code) | `<Code>/User/workspaceStorage/*/chatSessions`                 | chat title            | no   |
+| Claude Code                   | `~/.claude/projects/<project>/<session>.jsonl`                | `custom`/`ai` titles  | no   |
+| Claude Cowork                 | `<Claude>/local-agent-mode-sessions`                          | session descriptor    | no   |
+| OpenAI Codex CLI              | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`                | `session_index.jsonl` | no   |
+| OpenCode                      | `~/.local/share/opencode/opencode.db`                         | `session` table       | no   |
+| Hermes Agent                  | `~/.hermes/state.db`                                          | `sessions` table      | no   |
+
+`<Code>` and `<Claude>` are the desktop apps' data folders: `~/Library/Application
+Support/…` on macOS, `%APPDATA%\…` on Windows, `~/.config/…` on Linux. VS Code
+Insiders is read too. The two SQLite stores are opened read-only.
+
+Two things differ from the CLIs that log every request:
+
+- **Copilot Chat** meters a whole request, and its prompt count is that of the
+  last model round. For a request that called tools, input tokens and cost are a
+  floor.
+- **Hermes** counts tokens per session, so its usage appears as one checkpoint at
+  the end of the timeline rather than per message.
 
 Whichever directories exist on the machine show up; the rest are hidden.
 
@@ -138,9 +154,14 @@ src/lib/providers/
   pricing.ts    dated price table lookup, per-event and per-session cost
   prices.json   bundled list prices, USD per million tokens
   fs-utils.ts   jsonl reading, directory walking, mtime-keyed caching
+  sqlite-utils.ts  read-only access to agents that keep sessions in SQLite
   copilot.ts    ~/.copilot adapter
+  vscode.ts     Copilot Chat in VS Code: replays the editor's chat change logs
   claude.ts     ~/.claude adapter
+  cowork.ts     Claude desktop agent mode; reuses the Claude transcript parser
   codex.ts      ~/.codex adapter
+  opencode.ts   OpenCode's opencode.db
+  hermes.ts     Hermes Agent's state.db
   index.ts      registry: listSessions / getSession / listLogs across providers
 ```
 

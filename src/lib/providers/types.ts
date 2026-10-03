@@ -6,7 +6,14 @@
  * below so the UI only ever deals with one shape.
  */
 
-export type ProviderId = "copilot" | "claude" | "codex";
+export type ProviderId =
+  | "copilot"
+  | "vscode"
+  | "claude"
+  | "cowork"
+  | "codex"
+  | "opencode"
+  | "hermes";
 
 export interface ProviderInfo {
   id: ProviderId;

@@ -15,6 +15,13 @@ import type {
   UsageBucket,
 } from "./types";
 
+/**
+ * Names and endpoints of runtimes that run the model on this machine, e.g.
+ * "ollama-launch-codex-app" or "http://127.0.0.1:11434/v1". Their usage is
+ * recorded as `BilledUsage.local`.
+ */
+export const LOCAL_RUNTIME = /ollama|lm-?studio|llama\.?cpp|localhost|127\.0\.0\.1/i;
+
 export type PriceTable = Record<string, PriceEntry[]>;
 
 /** Optional user overrides, merged per model on top of the bundled table. */

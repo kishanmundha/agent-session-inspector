@@ -4,12 +4,14 @@ import os from "os";
 import type {
   AgentEvent,
   BilledUsage,
+  ProviderId,
   SessionDetail,
   SessionMeta,
   SessionProvider,
 } from "./types";
 import { quickStatsFromEvents } from "./analysis";
 import {
+  capText,
   createFileCache,
   readJsonl,
   safeReaddir,
@@ -18,15 +20,6 @@ import {
 
 export const CLAUDE_DIR = path.join(os.homedir(), ".claude");
 const PROJECTS_DIR = path.join(CLAUDE_DIR, "projects");
-
-/** Long payloads are previewed in the UI, so cap what we ship to the client. */
-const TEXT_CAP = 20_000;
-
-function capText(value: unknown): { text: string; chars: number; truncated: boolean } {
-  const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
-  if (text.length <= TEXT_CAP) return { text, chars: text.length, truncated: false };
-  return { text: `${text.slice(0, TEXT_CAP)}…`, chars: text.length, truncated: true };
-}
 
 interface ClaudeUsage {
   input_tokens?: number;
@@ -303,15 +296,22 @@ function instructionFilesText(attachment: Record<string, unknown>): string {
     .join("\n\n");
 }
 
-interface ParsedSession {
+export interface ParsedSession {
   meta: SessionMeta;
   events: AgentEvent[];
   files: string[];
 }
 
-function parseFile(filePath: string, projectDir: string): ParsedSession {
+/**
+ * Reads one Claude Code transcript. Cowork runs the same CLI inside its own
+ * sessions, so its adapter parses with this too, under its own provider id.
+ */
+export function parseClaudeTranscript(
+  filePath: string,
+  provider: ProviderId = "claude",
+  id = path.basename(filePath, ".jsonl"),
+): ParsedSession {
   const records = readJsonl<ClaudeRecord>(filePath);
-  const id = path.basename(filePath, ".jsonl");
   const events: AgentEvent[] = [];
   const files = new Set<string>();
   /** tool_use id → tool name, so results can be labelled. */
@@ -321,7 +321,7 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
   let lastSystemPrompt = "";
   let lastToolDefinitions = "";
 
-  const meta: SessionMeta = { provider: "claude", id };
+  const meta: SessionMeta = { provider, id };
   let firstTimestamp = "";
   let lastTimestamp = "";
   let seq = 0;
@@ -626,11 +626,16 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
     });
   }
 
-  if (!meta.cwd) meta.cwd = decodeProjectDir(path.basename(projectDir));
   meta.created_at = firstTimestamp || undefined;
   meta.updated_at = lastTimestamp || firstTimestamp || undefined;
 
   return { meta, events, files: [...files] };
+}
+
+function parseFile(filePath: string, projectDir: string): ParsedSession {
+  const parsed = parseClaudeTranscript(filePath);
+  if (!parsed.meta.cwd) parsed.meta.cwd = decodeProjectDir(path.basename(projectDir));
+  return parsed;
 }
 
 /** Listing only needs meta + counters, and those are stable per file version. */

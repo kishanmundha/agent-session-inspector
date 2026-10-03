@@ -1,13 +1,17 @@
 import { copilotProvider } from "./copilot";
 import { claudeProvider } from "./claude";
 import { codexProvider } from "./codex";
+import { vscodeProvider } from "./vscode";
+import { coworkProvider } from "./cowork";
+import { opencodeProvider } from "./opencode";
+import { hermesProvider } from "./hermes";
 import { analyzeTokenUsage, computeSessionStats } from "./analysis";
 import { priceBucket, priceBuckets, priceEvents } from "./pricing";
 import { settleHealth } from "./health";
-import { findGitRoot } from "./fs-utils";
+import { findGitRoot, tildePath } from "./fs-utils";
 import { isRunning } from "@/lib/session-state";
 import { firstLine } from "@/lib/format";
-import os from "os";
+import path from "path";
 import type {
   ActivitySlot,
   AnalyticsSession,
@@ -25,8 +29,12 @@ export * from "./types";
 /** Registration order is the display order in the UI. */
 export const PROVIDERS: SessionProvider[] = [
   copilotProvider,
+  vscodeProvider,
   claudeProvider,
+  coworkProvider,
   codexProvider,
+  opencodeProvider,
+  hermesProvider,
 ];
 
 export function isProviderId(value: string): value is ProviderId {
@@ -87,6 +95,8 @@ function projectResolver(sessions: SessionMeta[]): (meta: SessionMeta) => Projec
     (meta.provider === "codex" && meta.cwd?.match(CODEX_SCRATCH)?.[1]) ||
     meta.cwd ||
     meta.repository ||
+    // Cowork sessions the user gave no folder to run in a throwaway sandbox.
+    (meta.provider === "cowork" && "Cowork") ||
     "unknown";
 
   const sourcesByName = new Map<string, Set<string>>();
@@ -98,7 +108,6 @@ function projectResolver(sessions: SessionMeta[]): (meta: SessionMeta) => Projec
     sources.add(source);
   }
 
-  const home = os.homedir();
   return (meta) => {
     const source = sourceOf(meta);
     const parts = segments(source);
@@ -106,13 +115,8 @@ function projectResolver(sessions: SessionMeta[]): (meta: SessionMeta) => Projec
     const ambiguous = (sourcesByName.get(name)?.size ?? 0) > 1;
     return {
       project: ambiguous ? parts.slice(-2).join("/") : name,
-      // A bare repository name is not a place on disk.
-      projectPath:
-        source === meta.repository || source === "unknown"
-          ? undefined
-          : source.startsWith(home)
-            ? `~${source.slice(home.length)}`
-            : source,
+      // A bare repository or agent name is not a place on disk.
+      projectPath: path.isAbsolute(source) ? tildePath(source) : undefined,
     };
   };
 }
