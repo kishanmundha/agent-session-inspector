@@ -13,6 +13,7 @@ import type {
   SessionDetail,
   SessionMeta,
   SessionProvider,
+  UsageSlice,
 } from "./types";
 
 export * from "./types";
@@ -80,22 +81,47 @@ function projectOf(meta: SessionMeta): string {
   return source.split(/[\\/]/).filter(Boolean).pop() ?? "unknown";
 }
 
-/** The session's activity with each slot's usage priced at today's table. */
-function pricedActivity(meta: SessionMeta): Pick<AnalyticsSession, "activity" | "unpricedModels"> {
+/** The session's activity and usage with each slot priced at today's table. */
+function pricedActivity(
+  meta: SessionMeta,
+): Pick<AnalyticsSession, "activity" | "usage" | "unpricedModels"> {
   const slots = new Map<number, ActivitySlot>();
   for (const slot of meta.activity ?? []) slots.set(slot.t, { ...slot });
+  const slices = new Map<string, UsageSlice>();
   const unpriced = new Set<string>();
   for (const bucket of meta.usage ?? []) {
+    const model = bucket.model ?? "unknown";
     const cost = priceBucket(bucket);
-    if (cost === null) {
-      unpriced.add(bucket.model ?? "unknown");
-      continue;
-    }
+    if (cost === null) unpriced.add(model);
+    // Usage without a timestamp cannot be placed on a day, so it is left out.
     const slot = bucket.t === undefined ? undefined : slots.get(bucket.t);
-    if (slot) slot.costUSD = (slot.costUSD ?? 0) + cost;
+    if (!slot) continue;
+    if (cost !== null) slot.costUSD = (slot.costUSD ?? 0) + cost;
+
+    // Speed tiers of one model share a slice: the usage page groups by model.
+    const key = `${slot.t}|${model}`;
+    let slice = slices.get(key);
+    if (!slice) {
+      slice = {
+        t: slot.t,
+        model,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        costUSD: cost === null ? null : 0,
+      };
+      slices.set(key, slice);
+    }
+    slice.inputTokens += bucket.inputTokens;
+    slice.outputTokens += bucket.outputTokens;
+    slice.cacheReadTokens += bucket.cacheReadTokens ?? 0;
+    slice.cacheWriteTokens += (bucket.cacheWriteTokens ?? 0) + (bucket.cacheWrite1hTokens ?? 0);
+    if (cost !== null) slice.costUSD = (slice.costUSD ?? 0) + cost;
   }
   return {
     activity: [...slots.values()],
+    usage: [...slices.values()],
     unpricedModels: unpriced.size > 0 ? [...unpriced] : undefined,
   };
 }

@@ -16,6 +16,15 @@ export const METRIC_LABELS: Record<Metric, string> = {
   costUSD: "Cost",
 };
 
+/** Date ranges offered by the analytics and usage filters. */
+export const RANGES: { value: string; label: string; days: number | null }[] = [
+  { value: "7", label: "Last 7 days", days: 7 },
+  { value: "30", label: "Last 30 days", days: 30 },
+  { value: "90", label: "Last 90 days", days: 90 },
+  { value: "365", label: "Last year", days: 365 },
+  { value: "all", label: "All time", days: null },
+];
+
 export interface AnalyticsFilter {
   /** How many days back from today to include; null for all time. */
   days: number | null;
@@ -89,12 +98,12 @@ const emptyCounts = (): Counts => ({
   costUSD: 0,
 });
 
-function startOfDay(date: Date): Date {
+export function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 /** Calendar-day arithmetic, so a daylight-saving change cannot skip a day. */
-function addDays(date: Date, days: number): Date {
+export function addDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 

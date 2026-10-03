@@ -91,8 +91,24 @@ export interface AnalyticsSession {
   project: string;
   model?: string;
   activity: ActivitySlot[];
+  /** Token usage per slot and model, for the usage page. */
+  usage: UsageSlice[];
   /** Models that used tokens but have no price, so the cost is a floor. */
   unpricedModels?: string[];
+}
+
+/** One model's tokens in one activity slot, priced at today's table. */
+export interface UsageSlice {
+  /** Slot start, epoch milliseconds. */
+  t: number;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  /** Cache writes at either TTL. */
+  cacheWriteTokens: number;
+  /** Null when the model has no price. */
+  costUSD: number | null;
 }
 
 /**

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, BarChart3, Download } from "lucide-react";
 import { BarList } from "@/components/common/bar-list";
 import { EmptyState } from "@/components/common/empty-state";
+import { downloadCsv } from "@/lib/download";
 import { OptionSelect } from "@/components/common/option-select";
+import { Panel } from "@/components/common/panel";
 import { Segmented } from "@/components/common/segmented";
 import { Skeleton } from "@/components/common/skeleton";
 import { StatCard, StatCardGrid } from "@/components/common/stat-card";
@@ -21,6 +23,7 @@ import {
 import {
   METRICS,
   METRIC_LABELS,
+  RANGES,
   computeAnalytics,
   daysToCsv,
   modelsOf,
@@ -30,17 +33,9 @@ import {
 } from "@/lib/analytics";
 import { formatCost, formatCount, formatDuration, formatTokens } from "@/lib/format";
 import { PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
-import type { AnalyticsSession } from "@/lib/providers/types";
+import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
 import { cn } from "@/lib/utils";
 import { CalendarHeatmap, HourHeatmap, WeeklyBars } from "./analytics-charts";
-
-const RANGES: { value: string; label: string; days: number | null }[] = [
-  { value: "7", label: "Last 7 days", days: 7 },
-  { value: "30", label: "Last 30 days", days: 30 },
-  { value: "90", label: "Last 90 days", days: 90 },
-  { value: "365", label: "Last year", days: 365 },
-  { value: "all", label: "All time", days: null },
-];
 
 const METRIC_OPTIONS = METRICS.map((value) => ({ value, label: METRIC_LABELS[value] }));
 
@@ -80,46 +75,9 @@ function formatTop(key: TopKey, session: SessionRow): string {
   return session.messages.toLocaleString();
 }
 
-function Panel({
-  title,
-  note,
-  action,
-  className,
-  children,
-}: {
-  title: string;
-  note?: string;
-  action?: React.ReactNode;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className={cn("min-w-0 rounded-xl border border-border bg-card p-4", className)}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">
-          {title}
-          {note && <span className="ml-2 text-xs font-normal text-muted-foreground">{note}</span>}
-        </h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function downloadCsv(name: string, content: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: "text/csv" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = name;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 /** Cross-session analytics: activity, top sessions, tools and agents. */
 export function AnalyticsDashboard({ reloadToken }: { reloadToken: number }) {
-  const [sessions, setSessions] = useState<AnalyticsSession[] | null>(null);
-  const [error, setError] = useState(false);
+  const { sessions, error } = useAnalyticsSessions(reloadToken);
   const [range, setRange] = useState("90");
   const [provider, setProvider] = useState("all");
   const [model, setModel] = useState("all");
@@ -127,25 +85,6 @@ export function AnalyticsDashboard({ reloadToken }: { reloadToken: number }) {
   const [hourMetric, setHourMetric] = useState<Metric>("messages");
   const [topKey, setTopKey] = useState<TopKey>("messages");
   const [projectKey, setProjectKey] = useState<ProjectKey>("messages");
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/analytics");
-        if (!res.ok) throw new Error("Request failed");
-        const next = await res.json();
-        if (cancelled) return;
-        setSessions(next);
-        setError(false);
-      } catch {
-        if (!cancelled) setError(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [reloadToken]);
 
   const filter: AnalyticsFilter = useMemo(
     () => ({

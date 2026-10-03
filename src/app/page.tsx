@@ -9,6 +9,7 @@ import {
   Inbox,
   ListTree,
   RefreshCw,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
@@ -24,12 +25,13 @@ import { ThemeToggle } from "@/components/common/theme-toggle";
 import { SessionCard, type SessionMeta } from "@/components/home/session-card";
 import { LogsViewer, type LogFile } from "@/components/home/logs-viewer";
 import { AnalyticsDashboard } from "@/components/home/analytics-dashboard";
+import { UsageDashboard } from "@/components/home/usage-dashboard";
 import { providerStyle } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
 import { useTabParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
 
-const HOME_TABS = ["analytics", "sessions", "logs"] as const;
+const HOME_TABS = ["analytics", "usage", "sessions", "logs"] as const;
 
 type SortKey = "recent" | "oldest" | "cost" | "tokens" | "events" | "name";
 
@@ -243,6 +245,10 @@ function Home() {
               <BarChart3 className="size-4" aria-hidden />
               Analytics
             </TabsTrigger>
+            <TabsTrigger value="usage" className="px-3">
+              <Wallet className="size-4" aria-hidden />
+              Usage
+            </TabsTrigger>
             <TabsTrigger value="sessions" className="px-3">
               <ListTree className="size-4" aria-hidden />
               Sessions
@@ -261,6 +267,10 @@ function Home() {
 
           <TabsContent value="analytics">
             <AnalyticsDashboard reloadToken={reloadToken} />
+          </TabsContent>
+
+          <TabsContent value="usage">
+            <UsageDashboard reloadToken={reloadToken} />
           </TabsContent>
 
           <TabsContent value="sessions">
