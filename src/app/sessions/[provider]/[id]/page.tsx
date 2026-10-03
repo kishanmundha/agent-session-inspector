@@ -203,9 +203,9 @@ function Session({
             activeMs={activeMs}
           />
 
-          <main id="main" className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="sticky top-[var(--cv-topbar-h)] z-20 -mx-4 mb-5 overflow-x-auto scrollbar-none bg-background/85 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:-mx-6 sm:px-6">
+          <main id="main" className="mx-auto max-w-6xl px-4 pt-2 pb-5 sm:px-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-0">
+              <div className="sticky top-[var(--cv-topbar-h)] z-20 -mx-4 overflow-x-auto scrollbar-none bg-background/85 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:-mx-6 sm:px-6">
                 <TabsList className="w-max">
                   <TabsTrigger value="events" className="px-3">
                     <Zap className="size-4" aria-hidden />
@@ -261,19 +261,19 @@ function Session({
                 />
               </TabsContent>
 
-              <TabsContent value="checkpoints">
+              <TabsContent value="checkpoints" className="pt-2">
                 <CheckpointsList checkpoints={data.checkpoints} />
               </TabsContent>
 
-              <TabsContent value="files">
+              <TabsContent value="files" className="pt-2">
                 <PathList paths={data.files} kind="file" />
               </TabsContent>
 
-              <TabsContent value="research">
+              <TabsContent value="research" className="pt-2">
                 <PathList paths={data.research} kind="research" />
               </TabsContent>
 
-              <TabsContent value="workspace">
+              <TabsContent value="workspace" className="pt-2">
                 <div className="overflow-hidden rounded-xl border border-border">
                   <div className="flex items-center gap-2 border-b border-border bg-muted/60 px-4 py-2">
                     <span className="font-mono text-xs text-muted-foreground">
@@ -295,7 +295,7 @@ function Session({
                 </div>
               </TabsContent>
 
-              <TabsContent value="optimizer">
+              <TabsContent value="optimizer" className="pt-2">
                 <TokenOptimizer
                   analysis={data.tokenAnalysis}
                   stats={data.stats}

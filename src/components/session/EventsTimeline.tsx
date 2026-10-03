@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Braces,
   ChevronDown,
@@ -2095,6 +2095,26 @@ export function EventsTimeline({ events, focusRequest }: Props) {
   const [showSystem, setShowSystem] = useState(true);
   const [onlyTokenEvents, setOnlyTokenEvents] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // The toolbar only needs its bottom border once it is stuck and events
+  // scroll beneath it; at rest the first date divider already separates them.
+  const stickySentinel = useRef<HTMLDivElement>(null);
+  const [toolbarStuck, setToolbarStuck] = useState(false);
+  useEffect(() => {
+    const sentinel = stickySentinel.current;
+    if (!sentinel) return;
+    const rootStyle = getComputedStyle(document.documentElement);
+    const offset =
+      parseFloat(rootStyle.getPropertyValue("--cv-topbar-h")) +
+      parseFloat(rootStyle.getPropertyValue("--cv-tabbar-h"));
+    const observer = new IntersectionObserver(
+      ([entry]) =>
+        setToolbarStuck(!entry.isIntersecting && entry.boundingClientRect.top < offset),
+      { rootMargin: `-${offset}px 0px 0px 0px` },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
   const [expandAll, setExpandAll] = useState<{
     nonce: number;
     mode: "open" | "closed";
@@ -2235,7 +2255,13 @@ export function EventsTimeline({ events, focusRequest }: Props) {
     <div className="flex flex-col">
       {/* Toolbar. Sticks below the page chrome so filters stay reachable
           while scrolling a long timeline. */}
-      <div className="sticky top-[calc(var(--cv-topbar-h)+var(--cv-tabbar-h))] z-10 -mx-4 mb-4 border-b border-border bg-background/90 px-4 py-2.5 backdrop-blur supports-[backdrop-filter]:bg-background/75 sm:-mx-6 sm:px-6">
+      <div ref={stickySentinel} aria-hidden />
+      <div
+        className={cn(
+          "sticky top-[calc(var(--cv-topbar-h)+var(--cv-tabbar-h))] z-10 -mx-4 border-b bg-background/90 px-4 pt-1 pb-2.5 backdrop-blur transition-colors supports-[backdrop-filter]:bg-background/75 sm:-mx-6 sm:px-6",
+          toolbarStuck ? "border-border" : "border-transparent",
+        )}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <SearchInput
             value={search}
@@ -2467,7 +2493,7 @@ export function EventsTimeline({ events, focusRequest }: Props) {
         )}
 
         {filtered.length === 0 && (
-          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-14 text-center">
+          <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-6 py-14 text-center">
             <div className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <SearchX className="size-5" aria-hidden />
             </div>

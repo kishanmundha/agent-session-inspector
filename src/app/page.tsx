@@ -26,6 +26,8 @@ import { SessionCard, type SessionMeta } from "@/components/home/session-card";
 import { LogsViewer, type LogFile } from "@/components/home/logs-viewer";
 import { AnalyticsDashboard } from "@/components/home/analytics-dashboard";
 import { UsageDashboard } from "@/components/home/usage-dashboard";
+import { AboutDialog } from "@/components/home/about-dialog";
+import { APP_INFO } from "@/lib/app-info";
 import { providerStyle } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
 import { useTabParam } from "@/lib/use-tab-param";
@@ -176,9 +178,7 @@ function Home() {
                 Agent <span className="text-brand">Session</span> Visualizer
               </h1>
               <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                {availableProviders.length > 0
-                  ? availableProviders.map((p) => p.rootDir).join("  ·  ")
-                  : "no agent directories found"}
+                v{APP_INFO.version}
               </p>
             </div>
           </div>
@@ -219,6 +219,7 @@ function Home() {
             </Tooltip>
             <PalettePicker />
             <ThemeToggle />
+            <AboutDialog providers={providers} />
           </div>
         </div>
       </header>
