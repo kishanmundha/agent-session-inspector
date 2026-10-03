@@ -11,6 +11,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { GradeBadge } from "@/components/common/grade-badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   firstLine,
@@ -19,6 +20,7 @@ import {
   formatTokens,
   timeAgo,
 } from "@/lib/format";
+import { OUTCOME_LABELS, SIGNAL_INFO } from "@/lib/health";
 import { providerStyle } from "@/lib/provider-meta";
 import { isRunning } from "@/lib/session-state";
 import { cn } from "@/lib/utils";
@@ -51,6 +53,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
   const rawName = firstLine(s.name);
   const displayTitle = s.title ?? rawName;
   const subtitle = s.title ? rawName : undefined;
+  const health = s.health;
   const input = s.totalInputTokens ?? 0;
   const output = s.totalOutputTokens ?? 0;
   const cost = s.estimatedCostUSD;
@@ -58,7 +61,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
   // A session that only used unpriced models has nothing worth showing.
   const showCost = cost != null && (cost > 0 || unpriced.length === 0);
   const hasStats =
-    !!s.eventCount || !!s.toolCallCount || !!s.userMessageCount || input + output > 0;
+    !!s.eventCount || !!s.toolCallCount || !!s.userMessageCount || input + output > 0 || !!health;
   const provider = providerStyle(s.provider);
 
   return (
@@ -156,8 +159,21 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
             )}
             {!!s.eventCount && <Stat icon={Zap} value={s.eventCount} label="events" />}
 
-            {(input + output > 0 || showCost) && (
+            {(input + output > 0 || showCost || health) && (
               <div className="ml-auto flex items-center gap-1.5">
+                {health && (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<GradeBadge grade={health.grade} className="h-[22px]" />}
+                    />
+                    <TooltipContent>
+                      Health {health.score} · {OUTCOME_LABELS[health.outcome].toLowerCase()}
+                      {health.signals
+                        .filter((signal) => signal.id !== "outcome")
+                        .map((signal) => ` · ${SIGNAL_INFO[signal.id].label.toLowerCase()}`)}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 {showCost && (
                   <Tooltip>
                     <TooltipTrigger

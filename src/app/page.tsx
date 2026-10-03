@@ -7,6 +7,7 @@ import {
   Bot,
   FileText,
   FolderGit2,
+  HeartPulse,
   Inbox,
   ListTree,
   RefreshCw,
@@ -29,6 +30,7 @@ import { LogsViewer, type LogFile } from "@/components/home/logs-viewer";
 import { ProjectsTable } from "@/components/home/projects-table";
 import { AnalyticsDashboard } from "@/components/home/analytics-dashboard";
 import { UsageDashboard } from "@/components/home/usage-dashboard";
+import { QualityDashboard } from "@/components/home/quality-dashboard";
 import { AboutDialog } from "@/components/home/about-dialog";
 import { APP_INFO } from "@/lib/app-info";
 import { providerStyle } from "@/lib/provider-meta";
@@ -37,9 +39,9 @@ import { ALL_PROJECTS, projectOf, summarizeProjects } from "@/lib/projects";
 import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
 
-const HOME_TABS = ["analytics", "usage", "projects", "sessions", "logs"] as const;
+const HOME_TABS = ["analytics", "usage", "quality", "projects", "sessions", "logs"] as const;
 
-type SortKey = "recent" | "oldest" | "cost" | "tokens" | "events" | "name";
+type SortKey = "recent" | "oldest" | "cost" | "tokens" | "events" | "health" | "name";
 
 const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "recent", label: "Most recent" },
@@ -47,6 +49,7 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "cost", label: "Highest cost" },
   { value: "tokens", label: "Most tokens" },
   { value: "events", label: "Most events" },
+  { value: "health", label: "Lowest health" },
   { value: "name", label: "Name (A–Z)" },
 ];
 
@@ -193,6 +196,9 @@ function Home() {
         return sorted.sort((a, b) => totalTokens(b) - totalTokens(a));
       case "events":
         return sorted.sort((a, b) => (b.eventCount ?? 0) - (a.eventCount ?? 0));
+      case "health":
+        // Unscored sessions have nothing to rank, so they go last.
+        return sorted.sort((a, b) => (a.health?.score ?? 101) - (b.health?.score ?? 101));
       case "name":
         return sorted.sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b)));
     }
@@ -284,6 +290,10 @@ function Home() {
               <Wallet className="size-4" aria-hidden />
               Usage
             </TabsTrigger>
+            <TabsTrigger value="quality" className="px-3">
+              <HeartPulse className="size-4" aria-hidden />
+              Quality
+            </TabsTrigger>
             <TabsTrigger value="projects" className="px-3">
               <FolderGit2 className="size-4" aria-hidden />
               Projects
@@ -318,6 +328,15 @@ function Home() {
 
           <TabsContent value="usage">
             <UsageDashboard
+              reloadToken={reloadToken}
+              project={project}
+              onProjectChange={setProject}
+              projectOptions={projectOptions}
+            />
+          </TabsContent>
+
+          <TabsContent value="quality">
+            <QualityDashboard
               reloadToken={reloadToken}
               project={project}
               onProjectChange={setProject}

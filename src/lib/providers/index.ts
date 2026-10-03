@@ -3,7 +3,9 @@ import { claudeProvider } from "./claude";
 import { codexProvider } from "./codex";
 import { analyzeTokenUsage, computeSessionStats } from "./analysis";
 import { priceBucket, priceBuckets, priceEvents } from "./pricing";
+import { settleHealth } from "./health";
 import { findGitRoot } from "./fs-utils";
+import { isRunning } from "@/lib/session-state";
 import { firstLine } from "@/lib/format";
 import os from "os";
 import type {
@@ -119,9 +121,15 @@ function projectResolver(sessions: SessionMeta[]): (meta: SessionMeta) => Projec
  * Swaps the cached usage buckets for a cost priced against the current table,
  * so a price change shows up without re-parsing any transcript. The activity
  * slots are dropped too: only the analytics endpoint ships them.
+ * Health is settled here for the same reason: whether the session is still
+ * running depends on when it is read.
  */
 function forList(session: SessionMeta, project: ProjectFields): SessionMeta {
-  const meta = { ...session, ...project };
+  const meta = {
+    ...session,
+    ...project,
+    health: settleHealth(session.health, isRunning(session.updated_at)),
+  };
   delete meta.usage;
   delete meta.activity;
   const cost = priceBuckets(session.usage);
@@ -202,6 +210,7 @@ export function listAnalyticsSessions(): AnalyticsSession[] {
       label: meta.title ?? firstLine(meta.name) ?? meta.id,
       project: projectOf(meta).project ?? "unknown",
       model: meta.model,
+      health: settleHealth(meta.health, isRunning(meta.updated_at)),
       ...pricedActivity(meta),
     }));
 }

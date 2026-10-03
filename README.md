@@ -188,6 +188,27 @@ whose `from` day is the latest one on or before the request, so a price change
 does not rewrite the cost of older sessions. Models with no price show as
 unpriced and are left out of the total rather than counted as free.
 
+### Session health
+
+Every session gets a score out of 100 and a grade (A to F), shown on its card
+and in its header. The score is rule-based and read straight off the transcript
+by `health.ts`: it measures how smoothly the session ran, not whether the result
+was any good. A session starts at 100 and loses points for:
+
+| Signal            | What it means                                           | Points          |
+| ----------------- | ------------------------------------------------------- | --------------- |
+| Unfinished        | Ends on an API error, or stops without a final reply    | 25 / 15         |
+| Tool failures     | Share of tool results that failed                       | up to 25        |
+| Retry loops       | The same tool failing three times in a row              | 6 each, max 18  |
+| API errors        | Errors and retried requests                             | 2 each, max 10  |
+| Interrupted turns | Turns stopped before the agent finished                 | 4 each, max 12  |
+| Compactions       | Context summarized mid-session                          | 3 each, max 9   |
+
+90 and up is an A, 80 a B, 70 a C, 60 a D. A session that is still running is not
+marked down for being unfinished. Click the Health card on a session to see what
+it lost points for and jump to those events; the Quality tab on the home page
+shows grades, outcomes and the most common problems across sessions.
+
 ### Adding a provider
 
 1. Write `src/lib/providers/<name>.ts` exporting a `SessionProvider`: `info`,

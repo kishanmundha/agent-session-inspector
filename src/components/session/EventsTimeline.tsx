@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  CircleX,
   Filter,
   Info,
   Link2,
@@ -38,6 +39,7 @@ interface Props {
     categories?: string[];
     subKeys?: string[];
     search?: string;
+    failures?: boolean;
   } | null;
   /** Event a copied link points at: scrolled to, opened and outlined. */
   targetEventId?: string;
@@ -381,6 +383,15 @@ function splitEventType(type: string) {
     category: category || "unknown",
     subCategory: rest.join(".") || "general",
   };
+}
+
+/** A tool result, or an applied patch, that reported failure. */
+function eventFailed(event: AgentEvent | undefined): boolean {
+  return (
+    !!event &&
+    event.data.success === false &&
+    (CALL_END_TYPES.has(event.type) || event.type === "file.patch_applied")
+  );
 }
 
 function eventHasTokenUsage(event: AgentEvent): boolean {
@@ -2268,6 +2279,7 @@ export function EventsTimeline({
   const [search, setSearch] = useState("");
   const [showSystem, setShowSystem] = useState(true);
   const [onlyTokenEvents, setOnlyTokenEvents] = useState(false);
+  const [onlyFailures, setOnlyFailures] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   // The toolbar only needs its bottom border once it is stuck and events
@@ -2455,6 +2467,7 @@ export function EventsTimeline({
     setSelectedCategories(focusRequest.categories ?? []);
     setSelectedSubKeys(focusRequest.subKeys ?? []);
     setSearch(focusRequest.search ?? "");
+    setOnlyFailures(focusRequest.failures ?? false);
     const wantsSystem =
       (focusRequest.categories ?? []).includes("system")
       || (focusRequest.subKeys ?? []).includes("system.message");
@@ -2474,6 +2487,10 @@ export function EventsTimeline({
       if (categorySet.size > 0 && !categorySet.has(event.category)) return false;
       if (subKeySet.size > 0 && !subKeySet.has(event.subKey)) return false;
       if (onlyTokenEvents && !eventHasTokenUsage(event)) return false;
+      // A call is kept alongside its failed result, so what was tried is in view.
+      if (onlyFailures && !eventFailed(event) && !eventFailed(callResults.results.get(event.id))) {
+        return false;
+      }
       if (terms.length > 0) {
         // A merged row answers for its result too.
         const result = mode === "compact" ? callResults.results.get(event.id) : undefined;
@@ -2483,13 +2500,13 @@ export function EventsTimeline({
       return true;
     });
     return order === "desc" ? matched.reverse() : matched;
-  }, [visibleBySystem, activeCategories, selectedSubKeys, onlyTokenEvents, search, mode, callResults, order]);
+  }, [visibleBySystem, activeCategories, selectedSubKeys, onlyTokenEvents, onlyFailures, search, mode, callResults, order]);
 
   // Render in pages: huge sessions (thousands of events) would otherwise mount
   // every card up front and make the tab feel frozen. Tagging the page state
   // with the filter signature resets it back to page one whenever the filters
   // change, without an effect.
-  const filterKey = `${activeCategories.join()}|${selectedSubKeys.join()}|${search}|${showSystem}|${onlyTokenEvents}|${mode}|${order}`;
+  const filterKey = `${activeCategories.join()}|${selectedSubKeys.join()}|${search}|${showSystem}|${onlyTokenEvents}|${onlyFailures}|${mode}|${order}`;
   const [page, setPage] = useState({ key: filterKey, count: PAGE_SIZE });
   // A linked event has to be on the page, however far down it sits.
   const targetIndex = targetEventId
@@ -2552,6 +2569,7 @@ export function EventsTimeline({
     activeCategories.length +
     selectedSubKeys.length +
     (onlyTokenEvents ? 1 : 0) +
+    (onlyFailures ? 1 : 0) +
     (hasContext && !showSystem ? 1 : 0);
   const activeFilterCount = panelFilterCount + (search ? 1 : 0);
 
@@ -2560,6 +2578,7 @@ export function EventsTimeline({
     setSelectedSubKeys([]);
     setSearch("");
     setOnlyTokenEvents(false);
+    setOnlyFailures(false);
     setShowSystem(true);
     setMode("normal");
   }
@@ -2757,6 +2776,13 @@ export function EventsTimeline({
                 icon={ListFilter}
                 label="Token events"
                 title="Show only events that report token usage"
+              />
+              <ToolbarToggle
+                active={onlyFailures}
+                onClick={() => setOnlyFailures(!onlyFailures)}
+                icon={CircleX}
+                label="Failures"
+                title="Show only tool calls that failed"
               />
             </div>
             <div className="flex flex-wrap items-center gap-1.5">

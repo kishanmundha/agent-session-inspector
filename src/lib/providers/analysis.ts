@@ -8,6 +8,7 @@ import type {
 } from "./types";
 import { ACTIVITY_SLOT_MS } from "./types";
 import { bucketUsage } from "./pricing";
+import { assessHealth } from "./health";
 
 /**
  * Cumulative session totals an adapter can attach to any event (usually a
@@ -102,6 +103,7 @@ export function quickStatsFromEvents(events: AgentEvent[]) {
     totalOutputTokens: stats.totalOutputTokens,
     usage: bucketUsage(events),
     activity: summarizeActivity(events),
+    health: assessHealth(events),
   };
 }
 

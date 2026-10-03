@@ -179,6 +179,12 @@ function Session({ provider, id }: { provider: string; id: string }) {
     return Math.max(...times) - Math.min(...times);
   }, [data]);
 
+  // A hint or a health signal opens the timeline filtered to its events.
+  function focusEvents(focus: Omit<EventFocusRequest, "nonce">) {
+    setActiveTab("events");
+    setEventFocusRequest({ nonce: Date.now(), ...focus });
+  }
+
   function retry() {
     setLoading(true);
     setError(null);
@@ -267,6 +273,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
             cost={data.cost}
             activeMs={activeMs}
             running={running}
+            onFocusEvents={focusEvents}
           />
 
           <main id="main" className="mx-auto max-w-6xl px-4 pt-2 pb-5 sm:px-6">
@@ -371,15 +378,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
                   stats={data.stats}
                   cost={data.cost}
                   eventTypeCounts={eventTypeCounts}
-                  onFocusHint={(focus) => {
-                    setActiveTab("events");
-                    setEventFocusRequest({
-                      nonce: Date.now(),
-                      categories: focus.categories,
-                      subKeys: focus.subKeys,
-                      search: focus.search,
-                    });
-                  }}
+                  onFocusHint={focusEvents}
                 />
               </TabsContent>
             </Tabs>

@@ -8,13 +8,18 @@ export type {
   CostBreakdown,
   CostLine,
   CostSummary,
+  HealthGrade,
+  HealthSignal,
+  HealthSignalId,
   LogFile,
   ModelCost,
   PriceEntry,
   ProviderId,
   ProviderInfo,
   RawMetaDoc,
+  SessionHealth,
   SessionMeta,
+  SessionOutcome,
   SessionStats,
   TokenAnalysis,
   TokenHint,
@@ -47,4 +52,6 @@ export interface EventFocusRequest {
   categories?: string[];
   subKeys?: string[];
   search?: string;
+  /** Only failed tool results. */
+  failures?: boolean;
 }

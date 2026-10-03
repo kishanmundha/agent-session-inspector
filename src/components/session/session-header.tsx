@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CopyButton } from "@/components/common/copy-button";
 import { StatCard, StatCardGrid } from "@/components/common/stat-card";
 import { CostDialog } from "./cost-dialog";
+import { HealthDialog } from "./health-dialog";
 import {
   firstLine,
   formatCost,
@@ -22,6 +23,7 @@ import {
   formatFullDateTime,
   timeAgo,
 } from "@/lib/format";
+import { OUTCOME_LABELS, healthSummary, type HealthFocus } from "@/lib/health";
 import { providerStyle } from "@/lib/provider-meta";
 import { resumeCommand } from "@/lib/session-state";
 import { cn } from "@/lib/utils";
@@ -39,6 +41,7 @@ export function SessionHeader({
   cost,
   activeMs,
   running = false,
+  onFocusEvents,
 }: {
   meta: SessionMeta;
   stats?: SessionStats;
@@ -47,12 +50,16 @@ export function SessionHeader({
   activeMs?: number | null;
   /** The agent wrote to the transcript in the last few minutes. */
   running?: boolean;
+  /** Shows the events behind a health signal in the timeline. */
+  onFocusEvents?: (focus: HealthFocus) => void;
 }) {
   const rawName = firstLine(meta.name);
   const title = meta.title ?? rawName;
   const subtitle = meta.title ? rawName : undefined;
 
   const [costOpen, setCostOpen] = useState(false);
+  const [healthOpen, setHealthOpen] = useState(false);
+  const health = meta.health;
 
   const provider = providerStyle(meta.provider);
   const input = stats?.totalInputTokens ?? 0;
@@ -206,6 +213,18 @@ export function SessionHeader({
                   onClick={() => setCostOpen(true)}
                 />
               )}
+              {health && (
+                <StatCard
+                  label="Health"
+                  value={healthSummary(health)}
+                  sub={
+                    health.signals.length > 0
+                      ? `${OUTCOME_LABELS[health.outcome].toLowerCase()} · ${health.signals.length} signal${health.signals.length === 1 ? "" : "s"}`
+                      : OUTCOME_LABELS[health.outcome].toLowerCase()
+                  }
+                  onClick={() => setHealthOpen(true)}
+                />
+              )}
               {/* Only surface the token buckets the session actually reported —
                   empty "—" cards are noise. */}
               {input > 0 && (
@@ -241,6 +260,14 @@ export function SessionHeader({
             </StatCardGrid>
             {cost && (
               <CostDialog cost={cost} open={costOpen} onOpenChange={setCostOpen} />
+            )}
+            {health && (
+              <HealthDialog
+                health={health}
+                open={healthOpen}
+                onOpenChange={setHealthOpen}
+                onFocus={onFocusEvents}
+              />
             )}
           </div>
         )}

@@ -41,6 +41,8 @@ interface ClaudeUsage {
   speed?: string;
 }
 
+const INTERRUPTED = /^\[Request interrupted by user/;
+
 interface ClaudeBlock {
   type?: string;
   text?: string;
@@ -72,6 +74,7 @@ interface ClaudeRecord {
   durationMs?: number;
   hookCount?: number;
   hookErrors?: unknown[];
+  compactMetadata?: { trigger?: string; preTokens?: number };
   mode?: string;
   permissionMode?: string;
   customTitle?: string;
@@ -447,6 +450,11 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
             hookCount: rec.hookCount,
             success: (rec.hookErrors?.length ?? 0) === 0,
           }, rec.uuid, rec.parentUuid);
+        } else if (rec.subtype === "compact_boundary") {
+          push(ts, "session.compaction_start", {
+            trigger: rec.compactMetadata?.trigger,
+            preTokens: rec.compactMetadata?.preTokens,
+          }, rec.uuid, rec.parentUuid);
         } else if (rec.subtype === "turn_duration") {
           push(ts, "assistant.turn_end", {
             durationMs: rec.durationMs,
@@ -465,13 +473,23 @@ function parseFile(filePath: string, projectDir: string): ParsedSession {
 
       case "user": {
         const content = rec.message?.content;
+        // An interruption is logged as if the user had typed it. Same concept
+        // as Codex's turn_aborted; use one vocabulary for both.
+        const pushText = (raw: unknown) => {
+          const { text } = capText(raw);
+          if (INTERRUPTED.test(text)) {
+            push(ts, "session.turn_aborted", { reason: "interrupted", message: text }, rec.uuid, rec.parentUuid);
+          } else {
+            push(ts, "user.message", { content: text }, rec.uuid, rec.parentUuid);
+          }
+        };
         if (typeof content === "string") {
-          push(ts, "user.message", { content: capText(content).text }, rec.uuid, rec.parentUuid);
+          pushText(content);
           continue;
         }
         for (const block of content ?? []) {
           if (block.type === "text") {
-            push(ts, "user.message", { content: capText(block.text).text }, rec.uuid, rec.parentUuid);
+            pushText(block.text);
           } else if (block.type === "tool_result") {
             const raw = block.content ?? rec.toolUseResult;
             const { text, chars, truncated } = capText(

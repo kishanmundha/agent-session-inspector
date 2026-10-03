@@ -63,6 +63,50 @@ export interface SessionMeta {
   unpricedModels?: string[];
   /** When the session was busy, kept by adapters for cross-session analytics. */
   activity?: ActivitySlot[];
+  /** How smoothly the session ran; absent when the agent never did anything. */
+  health?: SessionHealth;
+}
+
+export type HealthGrade = "A" | "B" | "C" | "D" | "F";
+
+/**
+ * How the transcript ends. `completed`: the agent had the last word.
+ * `abandoned`: it stopped mid-work, or a prompt went unanswered. `errored`:
+ * it ends on an API error. `in_progress`: the agent is still writing.
+ */
+export type SessionOutcome = "completed" | "abandoned" | "errored" | "in_progress";
+
+export const HEALTH_SIGNALS = [
+  "outcome",
+  "tool_failures",
+  "retry_loops",
+  "api_errors",
+  "aborted_turns",
+  "compactions",
+] as const;
+export type HealthSignalId = (typeof HEALTH_SIGNALS)[number];
+
+/** One thing that went wrong, and the points it took off the score. */
+export interface HealthSignal {
+  id: HealthSignalId;
+  /** How often it happened; 1 for `outcome`. */
+  count: number;
+  penalty: number;
+}
+
+/**
+ * Rule-based score out of 100, read straight off the transcript. It measures
+ * how smoothly the session ran, not whether the result was any good.
+ */
+export interface SessionHealth {
+  score: number;
+  grade: HealthGrade;
+  outcome: SessionOutcome;
+  /** Tool calls that reported a result. */
+  toolResults: number;
+  toolFailures: number;
+  /** Only the signals that fired, in `HEALTH_SIGNALS` order. */
+  signals: HealthSignal[];
 }
 
 /**
@@ -103,6 +147,7 @@ export interface AnalyticsSession {
   usage: UsageSlice[];
   /** Models that used tokens but have no price, so the cost is a floor. */
   unpricedModels?: string[];
+  health?: SessionHealth;
 }
 
 /** One model's tokens in one activity slot, priced at today's table. */

@@ -11,6 +11,9 @@ import type {
 import { quickStatsFromEvents } from "./analysis";
 import { createFileCache, readJsonl, walkFiles } from "./fs-utils";
 
+/** The shell tool reports a failed command only in its output text. */
+const FAILED_EXIT = /^(Process exited with code|Exit code:) [1-9]/m;
+
 export const CODEX_DIR = path.join(os.homedir(), ".codex");
 const SESSIONS_DIR = path.join(CODEX_DIR, "sessions");
 const SESSION_INDEX = path.join(CODEX_DIR, "session_index.jsonl");
@@ -469,7 +472,7 @@ function parseFile(filePath: string): ParsedSession {
             push(ts, "tool.execution_complete", {
               toolName: toolNames.get(String(p.call_id)) ?? "exec",
               toolCallId: p.call_id,
-              success: true,
+              success: !FAILED_EXIT.test(capped.text),
               resultChars: capped.chars,
               truncated: capped.truncated,
               result: { content: capped.text },
