@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { themeInitScript } from "@/components/common/theme-toggle";
+import { CommandPalette } from "@/components/common/command-palette";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -57,7 +58,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to content
         </a>
-        <TooltipProvider>{children}</TooltipProvider>
+        <TooltipProvider>
+          {children}
+          <CommandPalette />
+        </TooltipProvider>
       </body>
     </html>
   );

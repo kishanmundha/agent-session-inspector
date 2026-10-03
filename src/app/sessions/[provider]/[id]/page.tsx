@@ -19,6 +19,7 @@ import { CopyButton } from "@/components/common/copy-button";
 import { ScrollToTop } from "@/components/common/scroll-to-top";
 import { Skeleton } from "@/components/common/skeleton";
 import { PalettePicker } from "@/components/common/palette-picker";
+import { SearchTrigger } from "@/components/common/command-palette";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { EventsTimeline } from "@/components/session/EventsTimeline";
 import { SessionHeader } from "@/components/session/session-header";
@@ -29,7 +30,7 @@ import {
 } from "@/components/session/checkpoints-list";
 import type { EventFocusRequest, SessionData } from "@/components/session/types";
 import { firstLine } from "@/lib/format";
-import { useTabParam } from "@/lib/use-tab-param";
+import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
 
 const SESSION_TABS = [
   "events",
@@ -71,6 +72,19 @@ function Session({
   const [error, setError] = useState<string | null>(null);
   const [eventFocusRequest, setEventFocusRequest] =
     useState<EventFocusRequest | null>(null);
+
+  // A search result links here with `?q=`, which opens the timeline filtered
+  // to the matches. A newer search replaces whatever a hint had focused.
+  const [query] = useQueryParam("q", "");
+  const queryFocus = useMemo<EventFocusRequest | null>(
+    () => (query ? { nonce: 0, search: query } : null),
+    [query],
+  );
+  const [seenQuery, setSeenQuery] = useState(query);
+  if (query !== seenQuery) {
+    setSeenQuery(query);
+    setEventFocusRequest(null);
+  }
 
   // Bumped by the retry button to re-run the fetch effect below.
   const [reloadToken, setReloadToken] = useState(0);
@@ -155,6 +169,7 @@ function Session({
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
             {title}
           </span>
+          <SearchTrigger className="shrink-0" />
           <PalettePicker className="shrink-0" />
           <ThemeToggle className="shrink-0" />
         </div>
@@ -257,7 +272,7 @@ function Session({
               <TabsContent value="events">
                 <EventsTimeline
                   events={data.events}
-                  focusRequest={eventFocusRequest}
+                  focusRequest={eventFocusRequest ?? queryFocus}
                 />
               </TabsContent>
 

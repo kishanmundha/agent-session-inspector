@@ -2198,13 +2198,15 @@ export function EventsTimeline({ events, focusRequest }: Props) {
   const filtered = useMemo(() => {
     const categorySet = new Set(selectedCategories);
     const subKeySet = new Set(selectedSubKeys);
+    // Every word has to appear in the event, as in the cross-session search.
+    const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
     return visibleBySystem.filter((event) => {
       if (categorySet.size > 0 && !categorySet.has(event.category)) return false;
       if (subKeySet.size > 0 && !subKeySet.has(event.subKey)) return false;
       if (onlyTokenEvents && !eventHasTokenUsage(event)) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        return JSON.stringify(event).toLowerCase().includes(q);
+      if (terms.length > 0) {
+        const text = JSON.stringify(event).toLowerCase();
+        return terms.every((term) => text.includes(term));
       }
       return true;
     });
