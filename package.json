@@ -1,6 +1,6 @@
 {
   "name": "agent-session-inspector",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Inspect Claude Code, Copilot CLI and Codex sessions in a local web UI: timeline, tokens, cost and analytics.",
   "keywords": [
     "agent",

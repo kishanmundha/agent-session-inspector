@@ -63,7 +63,8 @@ jobs:
         run: ./scripts/package-release.sh
       - name: Publish to npm
         if: steps.check.outputs.npm
-        run: npm publish "dist/$NAME"
+        # The leading ./ matters: npm reads a bare "dist/name" as a GitHub repo.
+        run: npm publish "./dist/$NAME" --access public --provenance
       - name: Publish GitHub release
         if: steps.check.outputs.github
         env:
