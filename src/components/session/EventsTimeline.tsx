@@ -29,6 +29,7 @@ import { Segmented } from "@/components/common/segmented";
 import { costTimeline, type CostTurn } from "@/lib/cost-timeline";
 import { formatCost } from "@/lib/format";
 import { useHotkeys } from "@/lib/use-hotkeys";
+import { useQueryParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
 
 import type { AgentEvent } from "./types";
@@ -2308,7 +2309,12 @@ export function EventsTimeline({
   onLiveChange,
   running = false,
 }: Props) {
-  const [mode, setMode] = useState<ViewMode>("normal");
+  // The view mode is mirrored to `?mode=`, so a refresh keeps it.
+  const [modeParam, setModeParam] = useQueryParam("mode", "normal");
+  const [mode, setMode] = useState<ViewMode>(
+    VIEW_MODES.includes(modeParam as ViewMode) ? (modeParam as ViewMode) : "normal",
+  );
+  useEffect(() => setModeParam(mode), [mode, setModeParam]);
   const [order, setOrder] = useState<"asc" | "desc">("asc");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSubKeys, setSelectedSubKeys] = useState<string[]>([]);

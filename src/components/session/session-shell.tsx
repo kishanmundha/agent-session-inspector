@@ -189,6 +189,22 @@ function ShortcutsDialog({
   );
 }
 
+/**
+ * Link to a session that carries over the open tab and transcript view, so
+ * switching sessions keeps them. Read from the address bar when followed,
+ * since both are written there without a navigation.
+ */
+function sessionHref(s: SessionMeta) {
+  const current = new URLSearchParams(window.location.search);
+  const kept = new URLSearchParams();
+  for (const name of ['tab', 'mode']) {
+    const value = current.get(name);
+    if (value) kept.set(name, value);
+  }
+  const query = kept.toString();
+  return `/sessions/${s.provider}/${s.id}${query ? `?${query}` : ''}`;
+}
+
 function sessionLabel(s: SessionMeta) {
   return s.title ?? firstLine(s.name) ?? s.id;
 }
@@ -274,7 +290,7 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
       (s) => s.provider === params.provider && s.id === params.id,
     );
     const next = visible[index === -1 ? 0 : index + step];
-    if (next) router.push(`/sessions/${next.provider}/${next.id}`);
+    if (next) router.push(sessionHref(next));
   }
 
   useHotkeys({
@@ -373,6 +389,10 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
                 ref={active ? activeRef : undefined}
                 href={`/sessions/${s.provider}/${s.id}`}
                 onClick={() => setDrawer(false)}
+                onNavigate={(e) => {
+                  e.preventDefault();
+                  router.push(sessionHref(s));
+                }}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'block rounded-md border-l-2 px-2.5 py-1.5 transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
