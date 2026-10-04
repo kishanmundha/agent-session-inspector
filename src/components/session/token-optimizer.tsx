@@ -18,10 +18,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { BarList } from "@/components/common/bar-list";
+import { CostByTurn } from "./cost-by-turn";
 import { CostDialog } from "./cost-dialog";
 import { formatCost, formatTokens } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type {
+  AgentEvent,
   CostSummary,
   SessionStats,
   TokenAnalysis,
@@ -216,14 +218,18 @@ export function TokenOptimizer({
   analysis,
   stats,
   cost,
+  events,
   eventTypeCounts,
   onFocusHint,
+  onOpenEvent,
 }: {
   analysis: TokenAnalysis;
   stats: SessionStats;
   cost: CostSummary;
+  events: AgentEvent[];
   eventTypeCounts: { name: string; value: number }[];
   onFocusHint: (focus: NonNullable<TokenHint["focus"]>) => void;
+  onOpenEvent: (eventId: string) => void;
 }) {
   const breakdown = [
     {
@@ -255,6 +261,12 @@ export function TokenOptimizer({
   return (
     <div className="space-y-6">
       <CostSection cost={cost} />
+
+      <CostByTurn
+        events={events}
+        partial={cost.unpricedModels.length > 0}
+        onOpenEvent={onOpenEvent}
+      />
 
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="mb-4 text-sm font-semibold text-foreground">

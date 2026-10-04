@@ -26,6 +26,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CopyButton } from "@/components/common/copy-button";
 import { SearchInput } from "@/components/common/search-input";
 import { Segmented } from "@/components/common/segmented";
+import { costTimeline, type CostTurn } from "@/lib/cost-timeline";
 import { formatCost } from "@/lib/format";
 import { useHotkeys } from "@/lib/use-hotkeys";
 import { cn } from "@/lib/utils";
@@ -1861,6 +1862,9 @@ function EventCard({
   target = false,
   merged = false,
   result,
+  runningUSD,
+  costShare = 0,
+  turn,
 }: {
   event: AgentEvent;
   prevTimestamp?: string;
@@ -1872,6 +1876,12 @@ function EventCard({
   merged?: boolean;
   /** The event that completed this call; absent while it runs or if it never returned. */
   result?: AgentEvent;
+  /** The session's cost up to and including this request. */
+  runningUSD?: number;
+  /** This request's cost against the session's dearest, 0 to 1. */
+  costShare?: number;
+  /** What the prompt and everything done to answer it cost; prompts only. */
+  turn?: CostTurn;
   /** Bumped by the toolbar; `open` forces every row open, `closed` closes them. */
   expandAll: { nonce: number; mode: "open" | "closed" } | null;
 }) {
@@ -2044,11 +2054,19 @@ function EventCard({
           single object rather than two stacked cards. */}
       <div
         className={cn(
-          "overflow-hidden rounded-lg border border-border bg-card",
+          "relative overflow-hidden rounded-lg border border-border bg-card",
           parallel && "border-l-2 border-l-amber-400 dark:border-l-amber-600",
           target && "ring-2 ring-brand/60",
         )}
       >
+        {/* Left edge, stronger the more the request cost: dear ones stand out in a scroll. */}
+        {costShare > 0 && (
+          <span
+            className="pointer-events-none absolute inset-y-0 left-0 w-[3px] bg-emerald-500"
+            style={{ opacity: Math.max(0.12, costShare) }}
+            aria-hidden
+          />
+        )}
         <button
           type="button"
           data-event-row
@@ -2128,6 +2146,24 @@ function EventCard({
               title="Estimated cost of this request at API list prices"
             >
               {formatCost(costUSD)}
+            </span>
+          )}
+
+          {runningUSD !== undefined && (
+            <span
+              className="hidden shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground md:inline"
+              title="Estimated cost of the session up to and including this request"
+            >
+              Σ {formatCost(runningUSD)}
+            </span>
+          )}
+
+          {turn && turn.costUSD > 0 && (
+            <span
+              className="hidden shrink-0 font-mono text-[11px] tabular-nums text-emerald-700 dark:text-emerald-400 sm:inline"
+              title={`Estimated cost of the ${turn.requests} ${turn.requests === 1 ? "request" : "requests"} made to answer this prompt; ${formatCost(turn.totalUSD)} for the session by the end of the turn`}
+            >
+              turn {formatCost(turn.costUSD)}
             </span>
           )}
 
@@ -2317,6 +2353,9 @@ export function EventsTimeline({
       };
     });
   }, [events]);
+
+  // Where the cost built up, for each row's running total and turn subtotal.
+  const cost = useMemo(() => costTimeline(events), [events]);
 
   // The focused transcript: each prompt and the answer the turn ended on,
   // without the reasoning and tool calls in between.
@@ -2893,6 +2932,13 @@ export function EventsTimeline({
                     target={event.id === targetEventId}
                     merged={mode === "compact" && CALL_START_TYPES.has(event.type)}
                     result={mode === "compact" ? callResults.results.get(event.id) : undefined}
+                    runningUSD={cost.runningUSD.get(event.id)}
+                    costShare={
+                      cost.runningUSD.has(event.id) && typeof event.data.costUSD === "number"
+                        ? event.data.costUSD / cost.maxEventUSD
+                        : 0
+                    }
+                    turn={cost.turnByPrompt.get(event.id)}
                   />
                 </Fragment>
               );

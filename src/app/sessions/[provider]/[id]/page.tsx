@@ -414,8 +414,10 @@ function Session({ provider, id }: { provider: string; id: string }) {
                   analysis={data.tokenAnalysis}
                   stats={data.stats}
                   cost={data.cost}
+                  events={data.events}
                   eventTypeCounts={eventTypeCounts}
                   onFocusHint={focusEvents}
+                  onOpenEvent={openEvent}
                 />
               </TabsContent>
             </Tabs>

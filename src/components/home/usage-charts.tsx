@@ -30,7 +30,7 @@ export function formatUnit(unit: Unit, value: number): string {
 }
 
 /** The next round multiple of a power of ten, so the axis ticks land on round numbers. */
-function niceCeil(value: number): number {
+export function niceCeil(value: number): number {
   if (value <= 0) return 1;
   const power = 10 ** Math.floor(Math.log10(value));
   const step = [1, 1.5, 2, 3, 4, 5, 6, 8, 10].find((m) => m * power >= value) ?? 10;
