@@ -13,7 +13,8 @@ const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n ==
 
 /**
  * The files the session changed, turn by turn in timeline order: each prompt
- * with what the agent wrote, edited or patched in response.
+ * with what the agent wrote, edited or patched in response, shell commands
+ * included.
  */
 export function SessionEdits({
   events,
@@ -27,7 +28,7 @@ export function SessionEdits({
   onOpenEvent: (eventId: string) => void;
 }) {
   const [filter, setFilter] = useState("");
-  const turns = useMemo(() => editsByTurn(events), [events]);
+  const turns = useMemo(() => editsByTurn(events, cwd), [events, cwd]);
 
   const q = filter.trim().toLowerCase();
   const visible = useMemo(
@@ -48,7 +49,7 @@ export function SessionEdits({
       <EmptyState
         icon={FilePen}
         title="No file edits"
-        description="Files appear here, grouped by prompt, when the agent writes, edits or patches one."
+        description="Files appear here, grouped by prompt, when the agent writes, edits or patches one, or changes one from the shell."
       />
     );
   }

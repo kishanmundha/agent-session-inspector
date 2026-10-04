@@ -1,4 +1,5 @@
 import type { AgentEvent } from "@/lib/providers/types";
+import { shellWrittenPaths } from "./shell-writes";
 
 /**
  * The files a session wrote to, read off its events and grouped by the prompt
@@ -8,9 +9,9 @@ import type { AgentEvent } from "@/lib/providers/types";
 /** One file changed during a turn. */
 export interface TurnFile {
   path: string;
-  /** Edit, write and patch calls that named the file in this turn. */
+  /** Edit, write, patch and shell calls that wrote the file in this turn. */
   count: number;
-  /** The tools that made them, e.g. `Write`, `Edit`, `apply_patch`. */
+  /** The tools that made them, e.g. `Write`, `Edit`, `apply_patch`, `Bash`. */
   tools: string[];
   /** The first of those calls, to open in the timeline. */
   eventId: string;
@@ -34,6 +35,10 @@ const FILE_ARG_KEYS = ["file_path", "filePath", "notebook_path", "path"] as cons
 const EDIT_TOOL =
   /^(edit|write|multiedit|notebookedit|update|create|patch|apply_patch|str_replace\w*|(copilot_)?(write|edit|create|replace|insert)\w*(file|string|edit|notebook)\w*)$/i;
 
+/** Tools that run a shell command, which may write files of its own. */
+const SHELL_TOOL =
+  /^(bash|sh|zsh|shell|exec|exec_command|shell_command|local_shell|terminal|run_in_terminal|run_terminal_cmd|run_command|execute_command|container\.exec)$/i;
+
 const PATCH_FILE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm;
 
 function toolNameOf(data: Record<string, unknown>): string {
@@ -51,11 +56,38 @@ function editedPaths(data: Record<string, unknown>): string[] {
   }
   const patch = typeof raw === "string" ? raw : (args.input ?? args.patch ?? args.patchText);
   if (typeof patch !== "string") return [];
-  return [...new Set([...patch.matchAll(PATCH_FILE)].map((m) => m[1].trim()))];
+  return patchedFiles(patch);
 }
 
-/** Every turn that changed a file, oldest first. */
-export function editsByTurn(events: AgentEvent[]): TurnEdits[] {
+const patchedFiles = (patch: string) => [
+  ...new Set([...patch.matchAll(PATCH_FILE)].map((m) => m[1].trim())),
+];
+
+/** The command line of a shell-tool call, whether given as text or as argv. */
+function shellCommand(data: Record<string, unknown>): string | undefined {
+  const raw = data.arguments;
+  if (typeof raw === "string") return raw;
+  const args = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const command = args.command ?? args.cmd ?? args.script ?? args.input;
+  if (typeof command === "string") return command;
+  if (!Array.isArray(command) || !command.every((part) => typeof part === "string")) return undefined;
+  // `["bash", "-lc", "<script>"]` carries the command line as one argument.
+  return /^-l?c$/.test(command[1] ?? "") && command.length === 3 ? command[2] : command.join(" ");
+}
+
+/** The files a shell call wrote: those of a patch it applied, or of the command itself. */
+function shellEditedPaths(data: Record<string, unknown>, cwd?: string): string[] {
+  const command = shellCommand(data);
+  if (!command) return [];
+  const patched = patchedFiles(command);
+  return patched.length > 0 ? patched : shellWrittenPaths(command, cwd);
+}
+
+/**
+ * Every turn that changed a file, oldest first. Relative paths in shell
+ * commands are resolved against `cwd`, the session's working directory.
+ */
+export function editsByTurn(events: AgentEvent[], cwd?: string): TurnEdits[] {
   // A patch reported on completion lists every file it touched, so the call
   // that requested it is not counted as well.
   const reported = new Set<unknown>();
@@ -95,8 +127,13 @@ export function editsByTurn(events: AgentEvent[]): TurnEdits[] {
       }
     } else if (e.type === "tool.execution_start") {
       const tool = toolNameOf(e.data);
-      if (!EDIT_TOOL.test(tool) || reported.has(e.data.toolCallId)) continue;
-      for (const path of editedPaths(e.data)) record(e, path, tool);
+      if (reported.has(e.data.toolCallId)) continue;
+      const paths = EDIT_TOOL.test(tool)
+        ? editedPaths(e.data)
+        : SHELL_TOOL.test(tool)
+          ? shellEditedPaths(e.data, cwd)
+          : [];
+      for (const path of paths) record(e, path, tool);
     }
   }
   return turns;

@@ -174,7 +174,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
   }, [data]);
 
   const editCount = useMemo(
-    () => editsByTurn(data?.events ?? []).reduce((sum, turn) => sum + turn.edits, 0),
+    () => editsByTurn(data?.events ?? [], data?.meta.cwd).reduce((sum, turn) => sum + turn.edits, 0),
     [data],
   );
 
