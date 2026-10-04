@@ -1,7 +1,6 @@
 # Agent Session Inspector
 
 [![npm version](https://img.shields.io/npm/v/agent-session-inspector)](https://www.npmjs.com/package/agent-session-inspector)
-[![npm downloads](https://img.shields.io/npm/dm/agent-session-inspector)](https://www.npmjs.com/package/agent-session-inspector)
 [![CI](https://github.com/kishanmundha/agent-session-inspector/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kishanmundha/agent-session-inspector/actions/workflows/ci.yml)
 [![node](https://img.shields.io/node/v/agent-session-inspector)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/agent-session-inspector)](LICENSE)
@@ -57,15 +56,15 @@ use `npx`.
 
 ## Supported agents
 
-| Agent                         | Reads from                                                    | Session titles        | Logs |
-| ----------------------------- | ------------------------------------------------------------- | --------------------- | ---- |
-| GitHub Copilot CLI            | `~/.copilot/session-state`, `~/.copilot/logs`                 | checkpoint DB         | yes  |
-| GitHub Copilot Chat (VS Code) | `<Code>/User/workspaceStorage/*/chatSessions`                 | chat title            | no   |
-| Claude Code                   | `~/.claude/projects/<project>/<session>.jsonl`                | `custom`/`ai` titles  | no   |
-| Claude Cowork                 | `<Claude>/local-agent-mode-sessions`                          | session descriptor    | no   |
-| OpenAI Codex CLI              | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`                | `session_index.jsonl` | no   |
-| OpenCode                      | `~/.local/share/opencode/opencode.db`                         | `session` table       | no   |
-| Hermes Agent                  | `~/.hermes/state.db`                                          | `sessions` table      | no   |
+| Agent                         | Reads from                                     | Session titles        | Logs |
+| ----------------------------- | ---------------------------------------------- | --------------------- | ---- |
+| GitHub Copilot CLI            | `~/.copilot/session-state`, `~/.copilot/logs`  | checkpoint DB         | yes  |
+| GitHub Copilot Chat (VS Code) | `<Code>/User/workspaceStorage/*/chatSessions`  | chat title            | no   |
+| Claude Code                   | `~/.claude/projects/<project>/<session>.jsonl` | `custom`/`ai` titles  | no   |
+| Claude Cowork                 | `<Claude>/local-agent-mode-sessions`           | session descriptor    | no   |
+| OpenAI Codex CLI              | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | `session_index.jsonl` | no   |
+| OpenCode                      | `~/.local/share/opencode/opencode.db`          | `session` table       | no   |
+| Hermes Agent                  | `~/.hermes/state.db`                           | `sessions` table      | no   |
 
 `<Code>` and `<Claude>` are the desktop apps' data folders: `~/Library/Application
 Support/…` on macOS, `%APPDATA%\…` on Windows, `~/.config/…` on Linux. VS Code
@@ -196,8 +195,21 @@ restart:
 {
   "my-local-model": { "input": 0, "output": 0 },
   "claude-opus-5-5": [
-    { "input": 4, "output": 20, "cacheRead": 0.2, "cacheWrite": 5, "cacheWrite1h": 8 },
-    { "from": "2027-01-01", "input": 3, "output": 15, "cacheRead": 0.15, "cacheWrite": 3.75, "cacheWrite1h": 6 }
+    {
+      "input": 4,
+      "output": 20,
+      "cacheRead": 0.2,
+      "cacheWrite": 5,
+      "cacheWrite1h": 8
+    },
+    {
+      "from": "2027-01-01",
+      "input": 3,
+      "output": 15,
+      "cacheRead": 0.15,
+      "cacheWrite": 3.75,
+      "cacheWrite1h": 6
+    }
   ]
 }
 ```
@@ -214,14 +226,14 @@ and in its header. The score is rule-based and read straight off the transcript
 by `health.ts`: it measures how smoothly the session ran, not whether the result
 was any good. A session starts at 100 and loses points for:
 
-| Signal            | What it means                                           | Points          |
-| ----------------- | ------------------------------------------------------- | --------------- |
-| Unfinished        | Ends on an API error, or stops without a final reply    | 25 / 15         |
-| Tool failures     | Share of tool results that failed                       | up to 25        |
-| Retry loops       | The same tool failing three times in a row              | 6 each, max 18  |
-| API errors        | Errors and retried requests                             | 2 each, max 10  |
-| Interrupted turns | Turns stopped before the agent finished                 | 4 each, max 12  |
-| Compactions       | Context summarized mid-session                          | 3 each, max 9   |
+| Signal            | What it means                                        | Points         |
+| ----------------- | ---------------------------------------------------- | -------------- |
+| Unfinished        | Ends on an API error, or stops without a final reply | 25 / 15        |
+| Tool failures     | Share of tool results that failed                    | up to 25       |
+| Retry loops       | The same tool failing three times in a row           | 6 each, max 18 |
+| API errors        | Errors and retried requests                          | 2 each, max 10 |
+| Interrupted turns | Turns stopped before the agent finished              | 4 each, max 12 |
+| Compactions       | Context summarized mid-session                       | 3 each, max 9  |
 
 90 and up is an A, 80 a B, 70 a C, 60 a D. A session that is still running is not
 marked down for being unfinished. Click the Health card on a session to see what
