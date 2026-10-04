@@ -1,63 +1,61 @@
 # Agent Session Inspector
 
-A local web UI for reading agent CLI transcripts: what the agent did, how long it
-took, and where the tokens went. It reads the on-disk session files directly and
-never sends them anywhere.
+[![npm version](https://img.shields.io/npm/v/agent-session-inspector)](https://www.npmjs.com/package/agent-session-inspector)
+[![npm downloads](https://img.shields.io/npm/dm/agent-session-inspector)](https://www.npmjs.com/package/agent-session-inspector)
+[![CI](https://github.com/kishanmundha/agent-session-inspector/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kishanmundha/agent-session-inspector/actions/workflows/ci.yml)
+[![node](https://img.shields.io/node/v/agent-session-inspector)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/agent-session-inspector)](LICENSE)
+
+A local web UI for reading coding-agent transcripts (Claude Code, Codex, GitHub
+Copilot, OpenCode, Hermes): what the agent did, how long it took, and where the
+tokens went. It reads the on-disk session files directly and never sends them
+anywhere.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/session-overview-dark.png">
-  <img alt="Session overview: token, tool-call and timing stats above the event timeline" src="docs/screenshots/session-overview.png">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/session-overview-dark.png">
+  <img alt="Session overview: token, tool-call and timing stats above the event timeline" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/session-overview.png">
 </picture>
 
-## Screenshots
+## Quick start
 
-**All sessions in one place.** Every session of every supported agent on the
-machine, filterable by agent and searchable by title, repo, branch or id.
-Each card shows turns, tool calls and tokens in/out at a glance.
+Run it with [Node.js](https://nodejs.org) 22.13 or newer, nothing to install:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/sessions-dark.png">
-  <img alt="Session list with agent filters, search and per-session token counts" src="docs/screenshots/sessions.png">
-</picture>
+```bash
+npx agent-session-inspector
+```
 
-**Step-by-step timeline.** Prompts, reasoning, tool calls and their results in
-order, with per-step token counts. Expand any event to see its content, or open
-the raw record.
+It serves on [http://localhost:3000](http://localhost:3000) (or the next free
+port), bound to `127.0.0.1` only, and opens your browser. `--port`, `--host` and
+`--no-open` change that; `--help` lists everything.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/timeline-dark.png">
-  <img alt="Event timeline showing user prompt, thinking, and Grep/Read tool calls" src="docs/screenshots/timeline.png">
-</picture>
+`npx agent-session-inspector@latest` picks up a new release. To keep the command
+around instead, install it globally:
 
-**Token Optimizer.** Where the context went (system prompt vs. tool results vs.
-replies), which tools ran most, and hints for trimming expensive sessions.
+```bash
+npm install -g agent-session-inspector
+```
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/token-optimizer-dark.png">
-  <img alt="Token Optimizer: context usage breakdown, tool usage and event type charts" src="docs/screenshots/token-optimizer.png">
-</picture>
+### Install script
 
-**Projects.** Sessions are grouped by the repository they ran in, so work
-started from a subfolder or a git worktree lands in the same project. The
-Projects tab lists each one with its sessions, cost and tokens, and picking a
-project filters Analytics, Usage and Sessions together. Outside a repository,
-the working directory is the project; the dated scratch folders the Codex app
-creates for project-less chats count as one project.
+The same build is on GitHub Releases, with an installer that needs only Node,
+`curl` and `tar`:
 
-**Activity.** One day at a time: how many sessions were working at once in each
-15-minute slot, the agent time and cost of each session, and the day's split by
-project, model and agent.
+```bash
+curl -fsSL https://github.com/kishanmundha/agent-session-inspector/releases/latest/download/install.sh | bash
+```
 
-**Edits per turn.** A session's Edits tab lists each prompt with the files the
-agent wrote, edited or patched in response, linked to the event in the timeline.
+It puts the app in `~/.agent-session-inspector` and links an
+`agent-session-inspector` command into `~/.local/bin`. Re-run the install
+command to update. To uninstall:
 
-**Skills and MCP tools.** The Analytics tab counts which skills were loaded and
-which MCP servers and tools were called, for the selected range.
+```bash
+rm -rf ~/.agent-session-inspector ~/.local/bin/agent-session-inspector
+```
 
-> Screenshots use synthetic demo data. To reproduce them locally, see
-> [Demo data](#demo-data).
+The install script needs bash, so it covers macOS, Linux and WSL. On Windows
+use `npx`.
 
-Supported agents:
+## Supported agents
 
 | Agent                         | Reads from                                                    | Session titles        | Logs |
 | ----------------------------- | ------------------------------------------------------------- | --------------------- | ---- |
@@ -83,88 +81,64 @@ Two things differ from the CLIs that log every request:
 
 Whichever directories exist on the machine show up; the rest are hidden.
 
-## Getting started
+## Privacy
 
-Run it with [Node.js](https://nodejs.org) 22.13 or newer, nothing to install:
+Transcripts hold your prompts, code and file contents, so the app is built to
+keep them on the machine:
 
-```bash
-npx agent-session-inspector
-```
+- It reads the session files in place and makes no outbound network requests.
+  There is no telemetry, account or sync.
+- The server binds to `127.0.0.1` unless you pass `--host`.
+- Session files are only read, and the SQLite stores are opened read-only.
+- Cost is computed from a price table bundled with the app, not fetched.
 
-It serves on [http://localhost:3000](http://localhost:3000) (or the next free
-port), bound to `127.0.0.1` only, and opens your browser. `--port`, `--host` and
-`--no-open` change that; `--help` lists everything.
+## Features
 
-`npx agent-session-inspector@latest` picks up a new release. To keep the command
-around instead, install it globally:
+**All sessions in one place.** Every session of every supported agent on the
+machine, filterable by agent and searchable by title, repo, branch or id.
+Each card shows turns, tool calls and tokens in/out at a glance.
 
-```bash
-npm install -g agent-session-inspector
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/sessions-dark.png">
+  <img alt="Session list with agent filters, search and per-session token counts" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/sessions.png">
+</picture>
 
-### Without npm
+**Step-by-step timeline.** Prompts, reasoning, tool calls and their results in
+order, with per-step token counts. Expand any event to see its content, or open
+the raw record.
 
-The same build is on GitHub Releases, with an installer that needs only Node,
-`curl` and `tar`:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/timeline-dark.png">
+  <img alt="Event timeline showing user prompt, thinking, and Grep/Read tool calls" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/timeline.png">
+</picture>
 
-```bash
-curl -fsSL https://github.com/kishanmundha/agent-session-inspector/releases/latest/download/install.sh | bash
-```
+**Token Optimizer.** Where the context went (system prompt vs. tool results vs.
+replies), which tools ran most, and hints for trimming expensive sessions.
 
-It puts the app in `~/.agent-session-inspector` and links an
-`agent-session-inspector` command into `~/.local/bin`. Re-run the install
-command to update. To uninstall:
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer-dark.png">
+  <img alt="Token Optimizer: context usage breakdown, tool usage and event type charts" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer.png">
+</picture>
 
-```bash
-rm -rf ~/.agent-session-inspector ~/.local/bin/agent-session-inspector
-```
+**Projects.** Sessions are grouped by the repository they ran in, so work
+started from a subfolder or a git worktree lands in the same project. The
+Projects tab lists each one with its sessions, cost and tokens, and picking a
+project filters Analytics, Usage and Sessions together. Outside a repository,
+the working directory is the project; the dated scratch folders the Codex app
+creates for project-less chats count as one project.
 
-### From source
+**Activity.** One day at a time: how many sessions were working at once in each
+15-minute slot, the agent time and cost of each session, and the day's split by
+project, model and agent.
 
-```bash
-pnpm install
-pnpm dev
-```
+**Edits per turn.** A session's Edits tab lists each prompt with the files the
+agent wrote, edited or patched in response, linked to the event in the timeline.
 
-Open [http://localhost:3000](http://localhost:3000).
+**Skills and MCP tools.** The Analytics tab counts which skills were loaded and
+which MCP servers and tools were called, for the selected range.
 
-To run it in Docker with the transcript directories mounted read-only:
-
-```bash
-pnpm deploy:docker
-```
-
-### Demo data
-
-To try the UI without your own transcripts (or to retake the screenshots),
-generate a fake home directory with a few synthetic sessions and point the app
-at it:
-
-```bash
-node scripts/demo-data.mjs /tmp/asi-demo
-HOME=/tmp/asi-demo pnpm dev
-```
-
-### Releasing
-
-Change `version` in `package.json` and push to `main`. The
-[release workflow](.github/workflows/release.yml) builds the app, publishes it
-to npm, and creates the `vX.Y.Z` tag and GitHub release with
-`agent-session-inspector.tar.gz` and `install.sh`, which is what the install
-command downloads. A push that leaves the version alone releases nothing.
-
-The workflow signs in to npm by
-[trusted publishing](https://docs.npmjs.com/trusted-publishers), so the
-repository holds no npm token. The package's settings on npmjs.com must list
-this repository and `release.yml` as its trusted publisher.
-
-`pnpm package` runs the same build locally into `dist/`. To try the result
-without publishing:
-
-```bash
-npx ./dist/agent-session-inspector
-ASI_TARBALL_URL="file://$PWD/dist/agent-session-inspector.tar.gz" bash install.sh
-```
+> Screenshots use synthetic demo data. To reproduce them locally, see
+> [CONTRIBUTING.md](CONTRIBUTING.md#demo-data).
 
 ## How it works
 
@@ -254,18 +228,13 @@ marked down for being unfinished. Click the Health card on a session to see what
 it lost points for and jump to those events; the Quality tab on the home page
 shows grades, outcomes and the most common problems across sessions.
 
-### Adding a provider
+## Contributing
 
-1. Write `src/lib/providers/<name>.ts` exporting a `SessionProvider`: `info`,
-   `isAvailable`, `listSessions`, `getSession`, plus `listLogs`/`getLogContent`
-   (return empty when the agent has no log directory).
-2. Map its records onto the canonical event types; cap huge payloads before they
-   reach the client, and set `resultChars` on tool results so the token review
-   can size them. Attach `billedUsage` wherever the transcript reports usage so
-   the session can be priced.
-3. Register it in `src/lib/providers/index.ts` and add its id to
-   `ProviderId` in `types.ts`.
-4. Add its badge colours to `src/lib/provider-meta.ts`.
+Bug reports and pull requests are welcome; open an
+[issue](https://github.com/kishanmundha/agent-session-inspector/issues) for anything that looks wrong, ideally with the
+agent, OS and Node version. [CONTRIBUTING.md](CONTRIBUTING.md) covers running
+from source, demo data, adding a provider and releasing.
 
-Routes are provider-scoped: `/sessions/<provider>/<id>` and
-`/api/sessions/<provider>/<id>`.
+## License
+
+[MIT](LICENSE) © Kishan Mundha

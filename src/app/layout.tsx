@@ -5,6 +5,7 @@ import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { themeInitScript } from "@/components/common/theme-toggle";
 import { CommandPalette } from "@/components/common/command-palette";
+import { FaviconSync } from "@/components/common/favicon-sync";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           Skip to content
         </a>
+        <FaviconSync />
         <TooltipProvider>
           {children}
           <CommandPalette />

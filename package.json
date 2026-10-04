@@ -1,18 +1,32 @@
 {
   "name": "agent-session-inspector",
   "version": "0.1.2",
-  "description": "Inspect Claude Code, Copilot CLI and Codex sessions in a local web UI: timeline, tokens, cost and analytics.",
+  "description": "Inspect Claude Code, Codex, GitHub Copilot, OpenCode and Hermes agent sessions in a local web UI: timeline, tokens, cost and analytics.",
   "keywords": [
     "agent",
+    "ai-agent",
     "session",
     "claude-code",
+    "claude",
     "copilot",
+    "copilot-chat",
+    "vscode",
     "codex",
+    "opencode",
+    "hermes",
+    "llm",
     "transcript",
     "tokens",
-    "cost"
+    "token-usage",
+    "cost",
+    "observability"
   ],
   "author": "Kishan Mundha (https://github.com/kishanmundha)",
+  "license": "MIT",
+  "homepage": "https://github.com/kishanmundha/agent-session-inspector#readme",
+  "bugs": {
+    "url": "https://github.com/kishanmundha/agent-session-inspector/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kishanmundha/agent-session-inspector.git"

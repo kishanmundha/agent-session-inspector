@@ -2450,20 +2450,18 @@ export function EventsTimeline({
     return Array.from(counts.values()).sort((a, b) => b.count - a.count || a.subCategory.localeCompare(b.subCategory));
   }, [visibleBySystem, activeCategories]);
 
-  useEffect(() => {
-    if (activeCategories.length === 0 && selectedSubKeys.length > 0) {
-      setSelectedSubKeys([]);
-      return;
-    }
+  // As with categories: a sub-type the current view or category choice no
+  // longer offers is ignored, not left to filter everything out.
+  const activeSubKeys = useMemo(() => {
     const available = new Set(subCategoryCounts.map((item) => `${item.category}.${item.subCategory}`));
-    const next = selectedSubKeys.filter((key) => available.has(key));
-    if (next.length !== selectedSubKeys.length) {
-      setSelectedSubKeys(next);
-    }
-  }, [activeCategories, selectedSubKeys, subCategoryCounts]);
+    return selectedSubKeys.filter((key) => available.has(key));
+  }, [selectedSubKeys, subCategoryCounts]);
 
-  useEffect(() => {
-    if (!focusRequest) return;
+  // A new request replaces the filters. Done while rendering, so the timeline
+  // never paints the old filters first.
+  const [appliedFocus, setAppliedFocus] = useState<Props["focusRequest"]>(null);
+  if (focusRequest && focusRequest !== appliedFocus) {
+    setAppliedFocus(focusRequest);
     setSelectedCategories(focusRequest.categories ?? []);
     setSelectedSubKeys(focusRequest.subKeys ?? []);
     setSearch(focusRequest.search ?? "");
@@ -2476,11 +2474,11 @@ export function EventsTimeline({
     setMode("normal");
     // Reveal the chips so it is obvious which filters the hint applied.
     setFiltersOpen(true);
-  }, [focusRequest]);
+  }
 
   const filtered = useMemo(() => {
     const categorySet = new Set(activeCategories);
-    const subKeySet = new Set(selectedSubKeys);
+    const subKeySet = new Set(activeSubKeys);
     // Every word has to appear in the event, as in the cross-session search.
     const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
     const matched = visibleBySystem.filter((event) => {
@@ -2500,13 +2498,13 @@ export function EventsTimeline({
       return true;
     });
     return order === "desc" ? matched.reverse() : matched;
-  }, [visibleBySystem, activeCategories, selectedSubKeys, onlyTokenEvents, onlyFailures, search, mode, callResults, order]);
+  }, [visibleBySystem, activeCategories, activeSubKeys, onlyTokenEvents, onlyFailures, search, mode, callResults, order]);
 
   // Render in pages: huge sessions (thousands of events) would otherwise mount
   // every card up front and make the tab feel frozen. Tagging the page state
   // with the filter signature resets it back to page one whenever the filters
   // change, without an effect.
-  const filterKey = `${activeCategories.join()}|${selectedSubKeys.join()}|${search}|${showSystem}|${onlyTokenEvents}|${onlyFailures}|${mode}|${order}`;
+  const filterKey = `${activeCategories.join()}|${activeSubKeys.join()}|${search}|${showSystem}|${onlyTokenEvents}|${onlyFailures}|${mode}|${order}`;
   const [page, setPage] = useState({ key: filterKey, count: PAGE_SIZE });
   // A linked event has to be on the page, however far down it sits.
   const targetIndex = targetEventId
@@ -2567,7 +2565,7 @@ export function EventsTimeline({
   // Everything set inside the filter panel, shown on its button.
   const panelFilterCount =
     activeCategories.length +
-    selectedSubKeys.length +
+    activeSubKeys.length +
     (onlyTokenEvents ? 1 : 0) +
     (onlyFailures ? 1 : 0) +
     (hasContext && !showSystem ? 1 : 0);
@@ -2825,7 +2823,7 @@ export function EventsTimeline({
                 </span>
                 {subCategoryCounts.map(({ category, subCategory, count }) => {
                   const key = `${category}.${subCategory}`;
-                  const isActive = selectedSubKeys.includes(key);
+                  const isActive = activeSubKeys.includes(key);
                   return (
                     <button
                       key={key}

@@ -23,9 +23,8 @@ pnpm run build
 
 mkdir -p "$APP"
 
-# next build leaves public/ and .next/static out of the standalone folder.
+# next build leaves .next/static out of the standalone folder.
 cp -R .next/standalone/. "$APP/"
-cp -R public "$APP/public"
 mkdir -p "$APP/.next"
 cp -R .next/static "$APP/.next/static"
 
@@ -33,7 +32,7 @@ mkdir -p "$STAGE/bin"
 cp "bin/$NAME.mjs" "$STAGE/bin/$NAME.mjs"
 chmod +x "$STAGE/bin/$NAME.mjs"
 echo "$VERSION" > "$STAGE/VERSION"
-cp README.md "$STAGE/README.md"
+cp README.md LICENSE "$STAGE/"
 
 # The tracer drags in sharp (unused: images are unoptimized) with its
 # per-platform binaries and dependencies.
@@ -71,9 +70,9 @@ fi
 node -e '
 	const pkg = require(process.argv[1]);
 	const [name, version] = process.argv.slice(2);
-	const { description, keywords, author, license, repository, engines } = pkg;
+	const { description, keywords, author, license, homepage, bugs, repository, engines } = pkg;
 	console.log(JSON.stringify({
-		name, version, description, keywords, author, license, repository, engines,
+		name, version, description, keywords, author, license, homepage, bugs, repository, engines,
 		bin: { [name]: `bin/${name}.mjs` },
 		files: ["app", "bin", "VERSION"],
 	}, null, 2));
