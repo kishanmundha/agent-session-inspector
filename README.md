@@ -7,12 +7,16 @@
 
 A local web UI for reading coding-agent transcripts (Claude Code, Codex, GitHub
 Copilot, OpenCode, Hermes): what the agent did, how long it took, and where the
-tokens went. It reads the on-disk session files directly and never sends them
-anywhere.
+tokens went.
+
+> **Your sessions never leave your machine.** The app collects nothing: no
+> telemetry, no analytics, no account, no cloud. It reads the transcript files
+> already on your disk, read-only, and serves them to your own browser on
+> `127.0.0.1`. See [Privacy](#privacy) for the details and how to check.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/session-overview-dark.png">
-  <img alt="Session overview: token, tool-call and timing stats above the event timeline" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/session-overview.png">
+  <img alt="Session overview: token, cost, health and timing stats above the event timeline" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/session-overview.png">
 </picture>
 
 ## Quick start
@@ -83,27 +87,47 @@ Whichever directories exist on the machine show up; the rest are hidden.
 ## Privacy
 
 Transcripts hold your prompts, code and file contents, so the app is built to
-keep them on the machine:
+keep them on the machine. Nothing about you or your sessions is collected, by
+this project or anyone else:
 
-- It reads the session files in place and makes no outbound network requests.
-  There is no telemetry, account or sync.
-- The server binds to `127.0.0.1` unless you pass `--host`.
-- Session files are only read, and the SQLite stores are opened read-only.
-- Cost is computed from a price table bundled with the app, not fetched.
+- **No data collection.** There is no telemetry, analytics, crash reporting,
+  account or sync, and Next.js's own telemetry is switched off.
+- **No outbound requests.** The app reads the session files in place and talks
+  only to your browser. Fonts and the price table used for cost estimates are
+  bundled, not fetched. The one download is the app itself, when `npx` or the
+  install script fetches it.
+- **Local only.** The server binds to `127.0.0.1`, so other machines on your
+  network cannot reach it unless you pass `--host`.
+- **Read-only.** Session files are only read, and the SQLite stores are opened
+  read-only. The app never edits or deletes a transcript.
+
+You don't have to take this on trust. The code is open, and the browser's
+Network tab shows every request going to `localhost` and nowhere else; the app
+works the same with the network disconnected.
 
 ## Features
 
+**Analytics across sessions.** Cost, messages, tool calls and active time for
+the selected range, with an activity calendar and filters for project, agent
+and model.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/analytics-dark.png">
+  <img alt="Analytics tab: cost, session and token totals above an activity calendar" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/analytics.png">
+</picture>
+
 **All sessions in one place.** Every session of every supported agent on the
 machine, filterable by agent and searchable by title, repo, branch or id.
-Each card shows turns, tool calls and tokens in/out at a glance.
+Each card shows turns, tool calls, health grade, cost and tokens in/out at a
+glance.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/sessions-dark.png">
-  <img alt="Session list with agent filters, search and per-session token counts" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/sessions.png">
+  <img alt="Session list with agent filters, search and per-session health, cost and token counts" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/sessions.png">
 </picture>
 
 **Step-by-step timeline.** Prompts, reasoning, tool calls and their results in
-order, with per-step token counts. Expand any event to see its content, or open
+order, with per-step token counts and cost. Expand any event to see its content, or open
 the raw record.
 
 <picture>
@@ -111,12 +135,13 @@ the raw record.
   <img alt="Event timeline showing user prompt, thinking, and Grep/Read tool calls" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/timeline.png">
 </picture>
 
-**Token Optimizer.** Where the context went (system prompt vs. tool results vs.
-replies), which tools ran most, and hints for trimming expensive sessions.
+**Token Optimizer.** What the session cost by token class, model and turn, where
+the context went (system prompt vs. tool results vs. replies), which tools ran
+most, and hints for trimming expensive sessions.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer-dark.png">
-  <img alt="Token Optimizer: context usage breakdown, tool usage and event type charts" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer.png">
+  <img alt="Token Optimizer: estimated cost by token class and model, and a cost-by-turn chart" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer.png">
 </picture>
 
 **Projects.** Sessions are grouped by the repository they ran in, so work
