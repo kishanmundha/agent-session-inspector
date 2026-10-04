@@ -22,6 +22,7 @@ import { Skeleton } from "@/components/common/skeleton";
 import { PalettePicker } from "@/components/common/palette-picker";
 import { SearchTrigger } from "@/components/common/command-palette";
 import { ThemeToggle } from "@/components/common/theme-toggle";
+import { AboutDialog } from "@/components/home/about-dialog";
 import { EventsTimeline } from "@/components/session/EventsTimeline";
 import { SessionEdits } from "@/components/session/session-edits";
 import { SessionHeader } from "@/components/session/session-header";
@@ -256,6 +257,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
           <ShortcutsTrigger className="hidden shrink-0 sm:inline-flex" />
           <PalettePicker className="shrink-0" />
           <ThemeToggle className="shrink-0" />
+          <AboutDialog className="shrink-0" />
         </div>
       </div>
 

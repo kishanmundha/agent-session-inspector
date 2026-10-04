@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Bot, Bug, Info, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,8 +28,28 @@ function GitHubMark({ className }: { className?: string }) {
 const externalLink = { target: "_blank", rel: "noreferrer" } as const;
 
 /** Header button plus the dialog it opens: version, author, links and data sources. */
-export function AboutDialog({ providers }: { providers: ProviderInfo[] }) {
+export function AboutDialog({
+  providers: providersProp,
+  className,
+}: {
+  /** Omit to have the dialog fetch the list itself the first time it opens. */
+  providers?: ProviderInfo[];
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
+  const [fetched, setFetched] = useState<ProviderInfo[] | null>(null);
+  const requested = useRef(false);
+  const providers = providersProp ?? fetched;
+
+  function openDialog() {
+    setOpen(true);
+    if (providersProp || requested.current) return;
+    requested.current = true;
+    fetch("/api/providers")
+      .then((res) => (res.ok ? res.json() : []))
+      .then(setFetched)
+      .catch(() => setFetched([]));
+  }
 
   return (
     <>
@@ -39,9 +59,9 @@ export function AboutDialog({ providers }: { providers: ProviderInfo[] }) {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setOpen(true)}
+              onClick={openDialog}
               aria-label="About"
-              className="text-muted-foreground"
+              className={cn("text-muted-foreground", className)}
             >
               <Info className="size-3.5" aria-hidden />
             </Button>
@@ -106,7 +126,9 @@ export function AboutDialog({ providers }: { providers: ProviderInfo[] }) {
 
           <section className="space-y-2 border-t border-border pt-3">
             <h3 className="text-xs font-medium text-foreground">Data sources</h3>
-            {providers.length > 0 ? (
+            {!providers ? (
+              <p className="text-xs text-muted-foreground">Loading…</p>
+            ) : providers.length > 0 ? (
               <ul className="overflow-hidden rounded-lg border border-border text-xs">
                 {providers.map((p) => (
                   <li
