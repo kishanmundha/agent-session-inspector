@@ -1,6 +1,6 @@
 {
   "name": "agent-session-inspector",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Inspect Claude Code, Codex, GitHub Copilot, OpenCode and Hermes agent sessions in a local web UI: timeline, tokens, cost and analytics.",
   "keywords": [
     "agent",
