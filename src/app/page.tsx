@@ -224,7 +224,7 @@ function Home() {
             </span>
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold leading-none tracking-tight">
-                Agent <span className="text-brand">Session</span> Visualizer
+                Agent <span className="text-brand">Session</span> Inspector
               </h1>
               <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
                 v{APP_INFO.version}
