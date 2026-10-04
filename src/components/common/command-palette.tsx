@@ -240,7 +240,8 @@ export function CommandPalette() {
           ref={listRef}
           id="cv-palette-list"
           role="listbox"
-          className="min-h-0 flex-1 overflow-y-auto py-1.5"
+          // DialogContent pins its children with *:shrink-0; the list must shrink to scroll.
+          className="min-h-0 flex-1 shrink! overflow-y-auto py-1.5"
         >
           {pages.length > 0 && (
             <>
