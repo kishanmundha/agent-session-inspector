@@ -43,6 +43,7 @@ export interface SessionData {
   research: string[];
   rawMeta: RawMetaDoc;
   storagePath?: string;
+  revealable?: boolean;
   stats: SessionStats;
   tokenAnalysis: TokenAnalysis;
   cost: CostSummary;

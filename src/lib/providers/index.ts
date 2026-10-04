@@ -8,7 +8,7 @@ import { hermesProvider } from "./hermes";
 import { analyzeTokenUsage, computeSessionStats } from "./analysis";
 import { priceBucket, priceBuckets, priceEvents } from "./pricing";
 import { settleHealth } from "./health";
-import { findGitRoot, tildePath } from "./fs-utils";
+import { findGitRoot, hostPath, ON_HOST, tildePath } from "./fs-utils";
 import { isRunning } from "@/lib/session-state";
 import { firstLine } from "@/lib/format";
 import path from "path";
@@ -247,6 +247,8 @@ export function getSession(providerId: string, id: string): SessionDetail | null
 
   return {
     ...detail,
+    storagePath: detail.storagePath && hostPath(detail.storagePath),
+    revealable: ON_HOST && Boolean(detail.storagePath),
     meta: forList(detail.meta, projectResolver(rawSessions())(detail.meta)),
     cost: priceEvents(detail.events),
     stats: computeSessionStats(detail.events),

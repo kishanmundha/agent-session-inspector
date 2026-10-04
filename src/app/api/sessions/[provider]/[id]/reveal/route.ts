@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProvider } from "@/lib/providers";
+import { ON_HOST } from "@/lib/providers/fs-utils";
 import { revealInFileManager } from "@/lib/reveal";
 
 export async function POST(
@@ -18,7 +19,8 @@ export async function POST(
   if (!storagePath) {
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
-  if (!(await revealInFileManager(storagePath))) {
+  // In a container the path is a mount, and there is no desktop to open it on.
+  if (!ON_HOST || !(await revealInFileManager(storagePath))) {
     return NextResponse.json({ error: "No file manager available" }, { status: 501 });
   }
   return NextResponse.json({ ok: true });

@@ -81,6 +81,7 @@ function RevealButton({ meta }: { meta: Pick<SessionMeta, "provider" | "id"> }) 
 export function SessionHeader({
   meta,
   storagePath,
+  revealable = false,
   stats,
   cost,
   activeMs,
@@ -90,6 +91,8 @@ export function SessionHeader({
   meta: SessionMeta;
   /** Where the session is stored on disk, when the provider knows. */
   storagePath?: string;
+  /** The server can show `storagePath` in a file manager. */
+  revealable?: boolean;
   stats?: SessionStats;
   cost?: CostSummary;
   /** First-to-last event span. Real working time, unlike created→updated. */
@@ -155,7 +158,7 @@ export function SessionHeader({
                   >
                     Path
                   </CopyButton>
-                  <RevealButton meta={meta} />
+                  {revealable && <RevealButton meta={meta} />}
                 </>
               )}
             </div>

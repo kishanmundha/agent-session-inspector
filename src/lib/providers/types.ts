@@ -404,8 +404,14 @@ export interface SessionDetail {
   checkpoints: CheckpointFile[];
   research: string[];
   rawMeta: RawMetaDoc;
-  /** Absolute path of the folder or file that holds the session on disk. */
+  /**
+   * Absolute path of the folder or file that holds the session on disk, as
+   * the user's machine names it. Adapters return the path they read; the
+   * registry translates it when the app runs in a container.
+   */
   storagePath?: string;
+  /** The server can open `storagePath` in a file manager. Set by the registry. */
+  revealable?: boolean;
   stats: SessionStats;
   tokenAnalysis: TokenAnalysis;
   cost: CostSummary;

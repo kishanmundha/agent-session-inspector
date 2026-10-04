@@ -60,5 +60,8 @@ if [ ${#mounts[@]} -eq 0 ]; then
 	exit 1
 fi
 
+# The app shows where each session is stored; tell it what the mounts are
+# called out here, so the paths it shows are ones that exist on this machine.
 docker run -d --name "$NAME" --restart unless-stopped --user root -e HOME=/root \
+	-e ASI_HOST_HOME="$HOME" -e ASI_HOST_APP_DATA="$HOME/$APP_DATA" \
 	"${mounts[@]}" "$NAME"

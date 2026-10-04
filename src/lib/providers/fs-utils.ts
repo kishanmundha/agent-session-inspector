@@ -133,6 +133,32 @@ export function tildePath(target: string): string {
   return target.startsWith(home) ? `~${target.slice(home.length)}` : target;
 }
 
+/**
+ * Set when the app runs in a container that only sees the user's files through
+ * mounts: where the home directory, and the desktop apps' data directory, live
+ * on the machine the user is sitting at.
+ */
+const HOST_HOME = process.env.ASI_HOST_HOME;
+const HOST_APP_DATA = process.env.ASI_HOST_APP_DATA;
+
+/** Whether paths this process sees are the ones the user sees. */
+export const ON_HOST = !HOST_HOME;
+
+/** A path as the user would find it on their own machine. */
+export function hostPath(target: string): string {
+  if (!HOST_HOME) return target;
+  // App data first: it sits inside the home directory here, but need not there.
+  const roots: [string, string | undefined][] = [
+    [appDataDir(""), HOST_APP_DATA],
+    [os.homedir(), HOST_HOME],
+  ];
+  for (const [seen, real] of roots) {
+    const rel = path.relative(seen, target);
+    if (real && !rel.startsWith("..") && !path.isAbsolute(rel)) return path.join(real, rel);
+  }
+  return target;
+}
+
 /** Long payloads are previewed in the UI, so cap what is shipped to the client. */
 const TEXT_CAP = 20_000;
 

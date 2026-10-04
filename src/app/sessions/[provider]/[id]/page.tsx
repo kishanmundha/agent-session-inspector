@@ -300,6 +300,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
           <SessionHeader
             meta={data.meta}
             storagePath={data.storagePath}
+            revealable={data.revealable}
             stats={data.stats}
             cost={data.cost}
             activeMs={activeMs}
