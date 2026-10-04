@@ -7,9 +7,12 @@ import {
   Clock,
   Database,
   FolderGit2,
+  FolderOpen,
+  FolderSearch,
   GitBranch,
   Terminal,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
@@ -35,8 +38,49 @@ function tokens(n: number) {
   return n.toLocaleString();
 }
 
+/** Shows the session's files in the file manager of the machine running the app. */
+function RevealButton({ meta }: { meta: Pick<SessionMeta, "provider" | "id"> }) {
+  const [failed, setFailed] = useState(false);
+
+  async function reveal() {
+    try {
+      const res = await fetch(
+        `/api/sessions/${meta.provider}/${encodeURIComponent(meta.id)}/reveal`,
+        { method: "POST" },
+      );
+      setFailed(!res.ok);
+    } catch {
+      setFailed(true);
+    }
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={reveal}
+            className={cn("text-muted-foreground", failed && "text-destructive")}
+          >
+            <FolderSearch className="size-3.5" aria-hidden />
+            Reveal
+          </Button>
+        }
+      />
+      <TooltipContent>
+        {failed
+          ? "Could not open a file manager here. Copy the path instead."
+          : "Show this session's files in the file manager"}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function SessionHeader({
   meta,
+  storagePath,
   stats,
   cost,
   activeMs,
@@ -44,6 +88,8 @@ export function SessionHeader({
   onFocusEvents,
 }: {
   meta: SessionMeta;
+  /** Where the session is stored on disk, when the provider knows. */
+  storagePath?: string;
   stats?: SessionStats;
   cost?: CostSummary;
   /** First-to-last event span. Real working time, unlike created→updated. */
@@ -85,7 +131,7 @@ export function SessionHeader({
                 {subtitle}
               </p>
             )}
-            <div className="mt-1.5 flex items-center gap-1">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
               <span className="truncate font-mono text-xs text-muted-foreground">
                 {meta.id}
               </span>
@@ -99,6 +145,18 @@ export function SessionHeader({
                 >
                   Resume
                 </CopyButton>
+              )}
+              {storagePath && (
+                <>
+                  <CopyButton
+                    value={storagePath}
+                    label={`Copy where this session is stored: ${storagePath}`}
+                    icon={FolderOpen}
+                  >
+                    Path
+                  </CopyButton>
+                  <RevealButton meta={meta} />
+                </>
               )}
             </div>
           </div>

@@ -404,6 +404,8 @@ export interface SessionDetail {
   checkpoints: CheckpointFile[];
   research: string[];
   rawMeta: RawMetaDoc;
+  /** Absolute path of the folder or file that holds the session on disk. */
+  storagePath?: string;
   stats: SessionStats;
   tokenAnalysis: TokenAnalysis;
   cost: CostSummary;

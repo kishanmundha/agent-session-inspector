@@ -550,6 +550,7 @@ export const codexProvider: SessionProvider = {
         content: JSON.stringify({ rollout: filePath, ...named }, null, 2),
         language: "json",
       },
+      storagePath: filePath,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 

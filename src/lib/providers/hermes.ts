@@ -264,6 +264,7 @@ export const hermesProvider: SessionProvider = {
         ),
         language: "json",
       },
+      storagePath: STATE_DB,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 

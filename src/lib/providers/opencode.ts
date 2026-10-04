@@ -341,6 +341,7 @@ export const opencodeProvider: SessionProvider = {
         content: JSON.stringify({ database: DATABASE, ...session }, null, 2),
         language: "json",
       },
+      storagePath: DATABASE,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 

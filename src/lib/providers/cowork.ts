@@ -149,6 +149,7 @@ export const coworkProvider: SessionProvider = {
         ),
         language: "json",
       },
+      storagePath: session.descriptorPath.slice(0, -".json".length),
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 

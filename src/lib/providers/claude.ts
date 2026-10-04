@@ -712,6 +712,7 @@ export const claudeProvider: SessionProvider = {
         ),
         language: "json",
       },
+      storagePath: found.filePath,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 

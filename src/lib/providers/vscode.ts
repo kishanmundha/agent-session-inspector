@@ -429,6 +429,7 @@ export const vscodeProvider: SessionProvider = {
         content: JSON.stringify({ transcript: found.filePath, ...meta }, null, 2),
         language: "json",
       },
+      storagePath: found.filePath,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 

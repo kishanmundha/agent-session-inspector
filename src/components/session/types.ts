@@ -42,6 +42,7 @@ export interface SessionData {
   checkpoints: CheckpointFile[];
   research: string[];
   rawMeta: RawMetaDoc;
+  storagePath?: string;
   stats: SessionStats;
   tokenAnalysis: TokenAnalysis;
   cost: CostSummary;

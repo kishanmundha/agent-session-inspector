@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
+import { InputTokensIcon, OutputTokensIcon } from "@/components/common/token-icons";
 import { SearchInput } from "@/components/common/search-input";
 import { Segmented } from "@/components/common/segmented";
 import { costTimeline, type CostTurn } from "@/lib/cost-timeline";
@@ -2132,12 +2133,21 @@ function EventCard({
 
           {tokenBadge && (
             <span
-              className="hidden shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline"
-              title={`${tokenBadge.input.toLocaleString()} in · ${tokenBadge.output.toLocaleString()} out`}
+              className="hidden shrink-0 items-center gap-1.5 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline-flex"
+              title={`${tokenBadge.input.toLocaleString()} input tokens · ${tokenBadge.output.toLocaleString()} output tokens`}
             >
-              {tokenBadge.input > 0 && `↓${formatCompactNumber(tokenBadge.input)}`}
-              {tokenBadge.input > 0 && tokenBadge.output > 0 && " "}
-              {tokenBadge.output > 0 && `↑${formatCompactNumber(tokenBadge.output)}`}
+              {tokenBadge.input > 0 && (
+                <span className="inline-flex items-center gap-0.5">
+                  <InputTokensIcon className="size-3" aria-hidden />
+                  <span className="opacity-70">in</span> {formatCompactNumber(tokenBadge.input)}
+                </span>
+              )}
+              {tokenBadge.output > 0 && (
+                <span className="inline-flex items-center gap-0.5">
+                  <OutputTokensIcon className="size-3" aria-hidden />
+                  <span className="opacity-70">out</span> {formatCompactNumber(tokenBadge.output)}
+                </span>
+              )}
             </span>
           )}
 

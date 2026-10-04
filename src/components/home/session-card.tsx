@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
   ChevronRight,
   GitBranch,
   MessageSquare,
@@ -12,6 +10,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { GradeBadge } from "@/components/common/grade-badge";
+import { InputTokensIcon, OutputTokensIcon } from "@/components/common/token-icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   firstLine,
@@ -197,7 +196,8 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                     <TooltipTrigger
                       render={
                         <span className="inline-flex items-center gap-1 rounded-sm border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-xs text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300">
-                          <ArrowUpFromLine className="size-3" aria-hidden />
+                          <InputTokensIcon className="size-3" aria-hidden />
+                          <span className="opacity-70">in</span>
                           {formatTokens(input)}
                         </span>
                       }
@@ -212,7 +212,8 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                     <TooltipTrigger
                       render={
                         <span className="inline-flex items-center gap-1 rounded-sm border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 font-mono text-xs text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">
-                          <ArrowDownToLine className="size-3" aria-hidden />
+                          <OutputTokensIcon className="size-3" aria-hidden />
+                          <span className="opacity-70">out</span>
                           {formatTokens(output)}
                         </span>
                       }

@@ -250,6 +250,7 @@ export const copilotProvider: SessionProvider = {
         content: safeReadFile(path.join(sessionDir, "workspace.yaml")),
         language: "yaml",
       },
+      storagePath: sessionDir,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
   },
 
