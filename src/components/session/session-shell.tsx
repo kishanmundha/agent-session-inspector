@@ -27,6 +27,7 @@ import { SearchInput } from '@/components/common/search-input';
 import { firstLine, timeAgo } from '@/lib/format';
 import { providerStyle } from '@/lib/provider-meta';
 import { isRunning } from '@/lib/session-state';
+import { sortSessions, useSessionSort } from '@/lib/session-sort';
 import { useHotkeys } from '@/lib/use-hotkeys';
 import { cn } from '@/lib/utils';
 import type { SessionMeta } from './types';
@@ -226,6 +227,8 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
   const [failed, setFailed] = useState(false);
   const [search, setSearch] = useState('');
   const [sameProject, setSameProject] = useState(false);
+  // Shared with the home list, so both show sessions in the same order.
+  const [sort] = useSessionSort();
 
   useEffect(() => {
     let cancelled = false;
@@ -275,14 +278,15 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
 
   const visible = useMemo(() => {
     const terms = search.toLowerCase().split(/\s+/).filter(Boolean);
-    return (sessions ?? []).filter((s) => {
+    const matched = (sessions ?? []).filter((s) => {
       if (sameProject && project && s.project !== project) return false;
       if (terms.length === 0) return true;
       const text =
         `${sessionLabel(s)} ${s.project ?? ''} ${s.branch ?? ''} ${s.id}`.toLowerCase();
       return terms.every((term) => text.includes(term));
     });
-  }, [sessions, search, sameProject, project]);
+    return sortSessions(matched, sort);
+  }, [sessions, search, sameProject, project, sort]);
 
   /** Opens the session `step` rows away from the current one in the list. */
   function openNeighbour(step: number) {
@@ -305,7 +309,7 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
   const loaded = sessions !== null;
   useEffect(() => {
     activeRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [params.id, loaded, docked, drawer]);
+  }, [params.id, loaded, docked, drawer, sort]);
 
   return (
     <>

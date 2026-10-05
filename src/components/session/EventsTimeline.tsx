@@ -376,6 +376,12 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+function formatFullDate(iso: string) {
+  return new Date(iso).toLocaleDateString([], {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+}
+
 function durationMs(a: string, b: string) {
   return new Date(b).getTime() - new Date(a).getTime();
 }
@@ -2188,7 +2194,10 @@ function EventCard({
           )}
 
           {/* Timestamp is the row's right-hand anchor and never moves. */}
-          <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">
+          <span
+            className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground"
+            title={`${formatFullDate(event.timestamp)}, ${formatTime(event.timestamp)}`}
+          >
             {formatTime(event.timestamp)}
           </span>
         </button>
@@ -2351,6 +2360,18 @@ export function EventsTimeline({
       { rootMargin: `-${offset}px 0px 0px 0px` },
     );
     observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
+  // The date pills stick just under the toolbar, whose height changes as
+  // it wraps or the filter panel opens.
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarHeight, setToolbarHeight] = useState(0);
+  useEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+    const observer = new ResizeObserver(() => setToolbarHeight(toolbar.offsetHeight));
+    observer.observe(toolbar);
     return () => observer.disconnect();
   }, []);
   const [expandAll, setExpandAll] = useState<{
@@ -2607,11 +2628,12 @@ export function EventsTimeline({
   });
 
   const groups = useMemo(() => {
-    const g: { date: string; events: AgentEvent[] }[] = [];
+    const g: { date: string; fullDate: string; events: AgentEvent[] }[] = [];
     for (const ev of shown) {
       const d = formatDate(ev.timestamp);
       const last = g[g.length - 1];
-      if (!last || last.date !== d) g.push({ date: d, events: [ev] });
+      if (!last || last.date !== d)
+        g.push({ date: d, fullDate: formatFullDate(ev.timestamp), events: [ev] });
       else last.events.push(ev);
     }
     return g;
@@ -2669,6 +2691,7 @@ export function EventsTimeline({
           while scrolling a long timeline. */}
       <div ref={stickySentinel} aria-hidden />
       <div
+        ref={toolbarRef}
         className={cn(
           "sticky top-[calc(var(--cv-topbar-h)+var(--cv-tabbar-h))] z-10 -mx-4 border-b bg-background/90 px-4 pt-1 pb-2.5 backdrop-blur transition-colors supports-[backdrop-filter]:bg-background/75 sm:-mx-6 sm:px-6",
           toolbarStuck ? "border-border" : "border-transparent",
@@ -2919,13 +2942,22 @@ export function EventsTimeline({
       <div className="pr-2">
         {tail && loadMore}
         {groups.map((group) => (
-          <div key={group.date}>
-            <div className="my-4 flex items-center gap-3">
-              <div className="h-px flex-1 bg-border" />
-              <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+          <div key={group.date} className="relative">
+            {/* The rule stays where the day starts; only the pill follows the
+                scroll, so the day in view is always named under the toolbar. */}
+            <div className="absolute inset-x-0 top-[27px] h-px bg-border" aria-hidden />
+            <div
+              className="pointer-events-none sticky z-[5] flex justify-center py-4"
+              style={{
+                top: `calc(var(--cv-topbar-h) + var(--cv-tabbar-h) + ${toolbarHeight}px - 0.5rem)`,
+              }}
+            >
+              <span
+                className="pointer-events-auto rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm"
+                title={group.fullDate}
+              >
                 {group.date}
               </span>
-              <div className="h-px flex-1 bg-border" />
             </div>
             {group.events.map((event, i) => {
               const parallel = parallelGroups.get(event.id);

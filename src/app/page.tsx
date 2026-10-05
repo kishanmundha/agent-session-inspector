@@ -38,6 +38,7 @@ import { APP_INFO } from "@/lib/app-info";
 import { providerStyle } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
 import { ALL_PROJECTS, projectOf, summarizeProjects } from "@/lib/projects";
+import { SORT_OPTIONS, sortSessions, useSessionSort } from "@/lib/session-sort";
 import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
 
@@ -50,26 +51,6 @@ const HOME_TABS = [
   "sessions",
   "logs",
 ] as const;
-
-type SortKey = "recent" | "oldest" | "cost" | "tokens" | "events" | "health" | "name";
-
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "recent", label: "Most recent" },
-  { value: "oldest", label: "Oldest first" },
-  { value: "cost", label: "Highest cost" },
-  { value: "tokens", label: "Most tokens" },
-  { value: "events", label: "Most events" },
-  { value: "health", label: "Lowest health" },
-  { value: "name", label: "Name (A–Z)" },
-];
-
-function totalTokens(s: SessionMeta) {
-  return (s.totalInputTokens ?? 0) + (s.totalOutputTokens ?? 0);
-}
-
-function sessionLabel(s: SessionMeta) {
-  return (s.title ?? s.name ?? s.id).toLowerCase();
-}
 
 export default function HomePage() {
   // useTabParam reads the URL, which needs a Suspense boundary to prerender.
@@ -90,7 +71,7 @@ function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<SortKey>("recent");
+  const [sort, setSort] = useSessionSort();
 
   // Bumped by the refresh button to re-run the fetch effect below.
   const [reloadToken, setReloadToken] = useState(0);
@@ -192,26 +173,7 @@ function Home() {
         )
       : providerSessions;
 
-    // The API already returns updated_at desc, so "recent" needs no re-sort.
-    if (sort === "recent") return matched;
-    const sorted = [...matched];
-    switch (sort) {
-      case "oldest":
-        return sorted.reverse();
-      case "cost":
-        return sorted.sort(
-          (a, b) => (b.estimatedCostUSD ?? 0) - (a.estimatedCostUSD ?? 0),
-        );
-      case "tokens":
-        return sorted.sort((a, b) => totalTokens(b) - totalTokens(a));
-      case "events":
-        return sorted.sort((a, b) => (b.eventCount ?? 0) - (a.eventCount ?? 0));
-      case "health":
-        // Unscored sessions have nothing to rank, so they go last.
-        return sorted.sort((a, b) => (a.health?.score ?? 101) - (b.health?.score ?? 101));
-      case "name":
-        return sorted.sort((a, b) => sessionLabel(a).localeCompare(sessionLabel(b)));
-    }
+    return sortSessions(matched, sort);
   }, [providerSessions, search, sort]);
 
   return (

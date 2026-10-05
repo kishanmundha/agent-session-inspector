@@ -76,6 +76,16 @@ function normalizeModelId(model: string): string {
   return id.startsWith("claude") ? id.replace(/\./g, "-") : id;
 }
 
+/** The key a `pricing.json` entry needs for it to price this transcript model id. */
+export function overrideKeyOf(model: string): string {
+  return normalizeModelId(model).replace(SNAPSHOT_SUFFIX, "");
+}
+
+/** Where user price overrides are read from, with the home dir as `~`. */
+export function overridePathLabel(): string {
+  return PRICING_OVERRIDE_PATH.replace(os.homedir(), "~");
+}
+
 /** Table key for a transcript model id, or null when the model has no price. */
 export function resolveModel(model: string | undefined, table: PriceTable): string | null {
   if (!model) return null;
@@ -228,7 +238,7 @@ class CostAccumulator {
           ),
       ),
       prices,
-      overridePath: PRICING_OVERRIDE_PATH.replace(os.homedir(), "~"),
+      overridePath: overridePathLabel(),
       unpricedModels: byModel.filter((m) => m.costUSD === null).map((m) => m.model),
     };
   }

@@ -8,6 +8,7 @@ import { OptionSelect } from "@/components/common/option-select";
 import { Panel } from "@/components/common/panel";
 import { Segmented } from "@/components/common/segmented";
 import { Skeleton } from "@/components/common/skeleton";
+import { UnpricedNotice } from "@/components/common/unpriced-notice";
 import { StatCard, StatCardGrid } from "@/components/common/stat-card";
 import { Button } from "@/components/ui/button";
 import {
@@ -288,17 +289,7 @@ export function UsageDashboard({
             />
           </StatCardGrid>
 
-          {unpriced.length > 0 && (
-            <p className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
-              <span>
-                No price is known for{" "}
-                <span className="font-mono text-foreground">{unpriced.join(", ")}</span>, so cost
-                figures leave {unpriced.length > 1 ? "them" : "it"} out. Token counts still include{" "}
-                {unpriced.length > 1 ? "them" : "it"}.
-              </span>
-            </p>
-          )}
+          <UnpricedNotice models={unpriced} />
 
           <Panel
             title={unit === "costUSD" ? "Cost over time" : "Tokens over time"}
