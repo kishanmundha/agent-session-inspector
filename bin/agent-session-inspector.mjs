@@ -16,8 +16,8 @@ const SERVER = path.join(PKG_DIR, "app", "server.js");
 
 const HELP = `Usage: ${NAME} [options]
 
-Browse Claude Code, Codex, Copilot, OpenCode and Hermes session transcripts in a
-local web UI.
+Browse Claude Code, Codex, Copilot, Cursor, Gemini CLI, OpenCode and Hermes
+session transcripts in a local web UI.
 
 Options:
   -p, --port <port>   Port to listen on (default: 3000, or the next free one)

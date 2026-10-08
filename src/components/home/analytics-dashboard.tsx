@@ -33,7 +33,7 @@ import {
   type SessionRow,
 } from "@/lib/analytics";
 import { formatCost, formatCount, formatDuration, formatTokens } from "@/lib/format";
-import { PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
+import { PROVIDER_ORDER, SUPPORTED_AGENTS, providerStyle } from "@/lib/provider-meta";
 import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
 import { cn } from "@/lib/utils";
 import { CalendarHeatmap, HourHeatmap, WeeklyBars } from "./analytics-charts";
@@ -177,7 +177,7 @@ export function AnalyticsDashboard({
       <EmptyState
         icon={BarChart3}
         title="Nothing to chart yet"
-        description="Analytics appear once Copilot, Claude Code or Codex writes a transcript to your home directory."
+        description={`Analytics appear once a supported agent writes a transcript on this machine: ${SUPPORTED_AGENTS}.`}
       />
     );
   }

@@ -5,6 +5,8 @@ import { vscodeProvider } from "./vscode";
 import { coworkProvider } from "./cowork";
 import { opencodeProvider } from "./opencode";
 import { hermesProvider } from "./hermes";
+import { geminiProvider } from "./gemini";
+import { cursorProvider } from "./cursor";
 import { analyzeTokenUsage, computeSessionStats } from "./analysis";
 import { priceBucket, priceBuckets, priceEvents } from "./pricing";
 import { settleHealth } from "./health";
@@ -35,6 +37,8 @@ export const PROVIDERS: SessionProvider[] = [
   codexProvider,
   opencodeProvider,
   hermesProvider,
+  geminiProvider,
+  cursorProvider,
 ];
 
 export function isProviderId(value: string): value is ProviderId {

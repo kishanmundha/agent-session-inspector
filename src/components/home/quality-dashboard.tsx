@@ -30,7 +30,7 @@ import {
   SIGNAL_INFO,
 } from "@/lib/health";
 import { gradeOf } from "@/lib/providers/health";
-import { PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
+import { SUPPORTED_AGENTS, PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
 import {
   computeQuality,
   qualityToCsv,
@@ -300,7 +300,7 @@ export function QualityDashboard({
       <EmptyState
         icon={HeartPulse}
         title="No sessions to score yet"
-        description="Health scores appear once Copilot, Claude Code or Codex writes a transcript to your home directory."
+        description={`Health scores appear once a supported agent writes a transcript on this machine: ${SUPPORTED_AGENTS}.`}
       />
     );
   }

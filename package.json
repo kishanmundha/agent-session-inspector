@@ -1,7 +1,7 @@
 {
   "name": "agent-session-inspector",
   "version": "0.1.4",
-  "description": "Inspect Claude Code, Codex, GitHub Copilot, OpenCode and Hermes agent sessions in a local web UI: timeline, tokens, cost and analytics.",
+  "description": "Inspect Claude Code, Codex, GitHub Copilot, Cursor, Gemini CLI, OpenCode and Hermes agent sessions in a local web UI: timeline, tokens, cost and analytics.",
   "keywords": [
     "agent",
     "ai-agent",
@@ -12,6 +12,8 @@
     "copilot-chat",
     "vscode",
     "codex",
+    "cursor",
+    "gemini-cli",
     "opencode",
     "hermes",
     "llm",

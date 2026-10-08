@@ -23,6 +23,7 @@ const RESUME: Partial<Record<SessionMeta["provider"], (id: string) => string>> =
   codex: (id) => `codex resume ${id}`,
   opencode: (id) => `opencode --session ${id}`,
   hermes: (id) => `hermes --resume ${id}`,
+  gemini: (id) => `gemini --resume ${id}`,
 };
 
 /**

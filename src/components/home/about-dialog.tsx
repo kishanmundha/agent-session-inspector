@@ -39,7 +39,10 @@ export function AboutDialog({
   const [open, setOpen] = useState(false);
   const [fetched, setFetched] = useState<ProviderInfo[] | null>(null);
   const requested = useRef(false);
-  const providers = providersProp ?? fetched;
+  // Agents with no folder on this machine are named as supported, not listed as missing.
+  const known = providersProp ?? fetched;
+  const providers = known?.filter((p) => p.available);
+  const unused = known?.filter((p) => !p.available) ?? [];
 
   function openDialog() {
     setOpen(true);
@@ -136,10 +139,7 @@ export function AboutDialog({
                     className="flex items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
                   >
                     <span
-                      className={cn(
-                        "size-1.5 shrink-0 rounded-full",
-                        p.available ? providerStyle(p.id).dotCls : "bg-muted-foreground/40",
-                      )}
+                      className={cn("size-1.5 shrink-0 rounded-full", providerStyle(p.id).dotCls)}
                       aria-hidden
                     />
                     <div className="min-w-0 flex-1">
@@ -147,9 +147,7 @@ export function AboutDialog({
                       <p className="truncate font-mono text-muted-foreground">{p.rootDir}</p>
                     </div>
                     <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {p.available
-                        ? `${p.sessionCount ?? 0} ${p.sessionCount === 1 ? "session" : "sessions"}`
-                        : "not found"}
+                      {`${p.sessionCount ?? 0} ${p.sessionCount === 1 ? "session" : "sessions"}`}
                     </span>
                     <CopyButton value={p.rootDir} label="Copy path" />
                   </li>
@@ -157,6 +155,12 @@ export function AboutDialog({
               </ul>
             ) : (
               <p className="text-xs text-muted-foreground">No agent directories found.</p>
+            )}
+            {unused.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {providers?.length ? "Also supports" : "Supports"}{" "}
+                {unused.map((p) => p.label).join(", ")}.
+              </p>
             )}
           </section>
         </DialogContent>

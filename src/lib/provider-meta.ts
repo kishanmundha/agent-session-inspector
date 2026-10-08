@@ -79,6 +79,24 @@ export const PROVIDER_STYLES: Record<ProviderId, ProviderStyle> = {
       "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300",
     dotCls: "bg-amber-500",
   },
+  gemini: {
+    id: "gemini",
+    label: "Gemini CLI",
+    shortLabel: "Gemini",
+    rootDir: "~/.gemini/tmp",
+    badgeCls:
+      "border-indigo-300 bg-indigo-100 text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/60 dark:text-indigo-300",
+    dotCls: "bg-indigo-500",
+  },
+  cursor: {
+    id: "cursor",
+    label: "Cursor",
+    shortLabel: "Cursor",
+    rootDir: "Cursor app data",
+    badgeCls:
+      "border-teal-300 bg-teal-100 text-teal-800 dark:border-teal-900 dark:bg-teal-950/60 dark:text-teal-300",
+    dotCls: "bg-teal-500",
+  },
 };
 
 export const PROVIDER_ORDER: ProviderId[] = [
@@ -89,7 +107,14 @@ export const PROVIDER_ORDER: ProviderId[] = [
   "codex",
   "opencode",
   "hermes",
+  "gemini",
+  "cursor",
 ];
+
+/** Every supported agent by name, for telling a new user what to expect. */
+export const SUPPORTED_AGENTS = new Intl.ListFormat("en", { type: "disjunction" }).format(
+  PROVIDER_ORDER.map((id) => PROVIDER_STYLES[id].label),
+);
 
 export function providerStyle(id: string | undefined): ProviderStyle {
   return PROVIDER_STYLES[(id ?? "copilot") as ProviderId] ?? PROVIDER_STYLES.copilot;

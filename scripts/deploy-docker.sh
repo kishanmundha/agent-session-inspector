@@ -10,8 +10,10 @@ if docker container inspect "$NAME" >/dev/null 2>&1; then
 fi
 
 # Mount only the transcript paths the app reads, read-only. Deliberately narrow:
-# ~/.codex/auth.json, ~/.copilot/config.json and ~/.hermes/auth.json hold
-# credentials and stay out.
+# ~/.codex/auth.json, ~/.copilot/config.json, ~/.hermes/auth.json and
+# ~/.gemini/oauth_creds.json hold credentials and stay out. So does Cursor's
+# state.vscdb, which keeps its sign-in next to the chats: Cursor sessions are
+# read from the transcripts under ~/.cursor/projects instead.
 PATHS=(
 	".copilot/session-state"
 	".copilot/logs"
@@ -27,6 +29,8 @@ PATHS=(
 	".hermes/state.db"
 	".hermes/state.db-shm"
 	".hermes/state.db-wal"
+	".gemini/tmp"
+	".cursor/projects"
 )
 
 # Desktop apps keep their data somewhere else on each OS; inside the Linux

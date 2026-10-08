@@ -22,7 +22,7 @@ import {
 import { RANGES } from "@/lib/analytics";
 import { downloadCsv } from "@/lib/download";
 import { formatCost, formatTokens } from "@/lib/format";
-import { PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
+import { SUPPORTED_AGENTS, PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
 import {
   DIMENSIONS,
   DIMENSION_LABELS,
@@ -166,7 +166,7 @@ export function UsageDashboard({
       <EmptyState
         icon={Wallet}
         title="No usage yet"
-        description="Cost and token usage appear once Copilot, Claude Code or Codex writes a transcript to your home directory."
+        description={`Cost and token usage appear once a supported agent writes a transcript on this machine: ${SUPPORTED_AGENTS}.`}
       />
     );
   }

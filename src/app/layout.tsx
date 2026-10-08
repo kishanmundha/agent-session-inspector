@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     template: "%s · Agent Session Inspector",
   },
   description:
-    "Visualize sessions from Copilot, Claude Code, Codex, OpenCode, Hermes and other coding agents",
+    "Visualize sessions from Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes and other coding agents",
 };
 
 export const viewport: Viewport = {

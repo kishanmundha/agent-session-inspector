@@ -18,7 +18,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatCost, formatDateTime, formatTokens, timeAgo } from "@/lib/format";
 import type { ProjectSummary } from "@/lib/projects";
-import { providerStyle } from "@/lib/provider-meta";
+import { SUPPORTED_AGENTS, providerStyle } from "@/lib/provider-meta";
 import { cn } from "@/lib/utils";
 
 type SortKey = "recent" | "sessions" | "cost" | "tokens" | "name";
@@ -91,7 +91,7 @@ export function ProjectsTable({
       <EmptyState
         icon={FolderGit2}
         title="No projects yet"
-        description="Projects appear once Copilot, Claude Code or Codex writes a transcript to your home directory."
+        description={`Projects appear once a supported agent writes a transcript on this machine: ${SUPPORTED_AGENTS}.`}
       />
     );
   }

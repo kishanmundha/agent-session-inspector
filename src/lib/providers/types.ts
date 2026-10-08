@@ -13,7 +13,9 @@ export type ProviderId =
   | "cowork"
   | "codex"
   | "opencode"
-  | "hermes";
+  | "hermes"
+  | "gemini"
+  | "cursor";
 
 export interface ProviderInfo {
   id: ProviderId;

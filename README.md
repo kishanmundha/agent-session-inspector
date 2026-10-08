@@ -6,8 +6,8 @@
 [![license](https://img.shields.io/npm/l/agent-session-inspector)](LICENSE)
 
 A local web UI for reading coding-agent transcripts (Claude Code, Codex, GitHub
-Copilot, OpenCode, Hermes): what the agent did, how long it took, and where the
-tokens went.
+Copilot, Cursor, Gemini CLI, OpenCode, Hermes): what the agent did, how long it
+took, and where the tokens went.
 
 > **Your sessions never leave your machine.** The app collects nothing: no
 > telemetry, no analytics, no account, no cloud. It reads the transcript files
@@ -69,18 +69,26 @@ use `npx`.
 | OpenAI Codex CLI              | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | `session_index.jsonl` | no   |
 | OpenCode                      | `~/.local/share/opencode/opencode.db`          | `session` table       | no   |
 | Hermes Agent                  | `~/.hermes/state.db`                           | `sessions` table      | no   |
+| Gemini CLI                    | `~/.gemini/tmp/<project>/chats/session-*`      | session summary       | no   |
+| Cursor                        | `<Cursor>/User/globalStorage/state.vscdb`      | chat name             | no   |
 
-`<Code>` and `<Claude>` are the desktop apps' data folders: `~/Library/Application
-Support/…` on macOS, `%APPDATA%\…` on Windows, `~/.config/…` on Linux. VS Code
-Insiders is read too. The two SQLite stores are opened read-only.
+`<Code>`, `<Claude>` and `<Cursor>` are the desktop apps' data folders:
+`~/Library/Application Support/…` on macOS, `%APPDATA%\…` on Windows,
+`~/.config/…` on Linux. VS Code Insiders is read too. The SQLite stores are
+opened read-only.
 
-Two things differ from the CLIs that log every request:
+Three things differ from the CLIs that log every request:
 
 - **Copilot Chat** meters a whole request, and its prompt count is that of the
   last model round. For a request that called tools, input tokens and cost are a
   floor.
 - **Hermes** counts tokens per session, so its usage appears as one checkpoint at
   the end of the timeline rather than per message.
+- **Cursor** rarely writes token counts to disk, so most of its sessions show the
+  timeline, tools and timing but no tokens or cost. Only the chat table of
+  `state.vscdb` is read. A session that is not in it, such as one from the
+  Cursor CLI, is read from the plainer transcript under `~/.cursor/projects`,
+  which has no tool results and is timed to the minute.
 
 Whichever directories exist on the machine show up; the rest are hidden.
 
@@ -184,6 +192,8 @@ src/lib/providers/
   codex.ts      ~/.codex adapter
   opencode.ts   OpenCode's opencode.db
   hermes.ts     Hermes Agent's state.db
+  gemini.ts     Gemini CLI: replays the session logs under ~/.gemini/tmp
+  cursor.ts     Cursor's state.vscdb, else its ~/.cursor/projects transcripts
   index.ts      registry: listSessions / getSession / listLogs across providers
 ```
 

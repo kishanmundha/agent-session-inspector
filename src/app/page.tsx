@@ -35,7 +35,7 @@ import { QualityDashboard } from "@/components/home/quality-dashboard";
 import { ActivityDashboard } from "@/components/home/activity-dashboard";
 import { AboutDialog } from "@/components/home/about-dialog";
 import { APP_INFO } from "@/lib/app-info";
-import { providerStyle } from "@/lib/provider-meta";
+import { SUPPORTED_AGENTS, providerStyle } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
 import { ALL_PROJECTS, projectOf, summarizeProjects } from "@/lib/projects";
 import { SORT_OPTIONS, sortSessions, useSessionSort } from "@/lib/session-sort";
@@ -118,8 +118,9 @@ function Home() {
     setReloadToken((t) => t + 1);
   }
 
+  // An agent whose folder is there but empty has nothing to filter by.
   const availableProviders = useMemo(
-    () => providers.filter((p) => p.available),
+    () => providers.filter((p) => p.available && (p.sessionCount ?? 0) > 0),
     [providers],
   );
 
@@ -415,7 +416,7 @@ function Home() {
                       ? `Nothing matches “${search}”. Try a repository name, branch or session id.`
                       : project !== ALL_PROJECTS
                         ? `No ${providerStyle(provider).shortLabel} sessions in ${project}.`
-                        : "Sessions appear here once Copilot, Claude Code or Codex writes a transcript to your home directory."
+                        : `Sessions appear here once a supported agent writes a transcript on this machine: ${SUPPORTED_AGENTS}.`
                   }
                   action={
                     search ? (

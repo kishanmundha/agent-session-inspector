@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Writes a fake $HOME with synthetic Claude Code, Codex and Copilot transcripts, so the
+// Writes a fake $HOME with synthetic Claude Code, Codex, Copilot and Gemini CLI transcripts, so the
 // UI can be demoed (and README screenshots retaken) without exposing real
 // sessions. Usage:
 //   node scripts/demo-data.mjs /tmp/asi-demo
@@ -282,6 +282,53 @@ const codexId = "0199a3f2-7c41-7d20-9e8b-5a4c3b2d1e0f";
     path.join(root, ".copilot", "logs", "process-1758715500000-4821.log"),
     `${start} [INFO] Starting Copilot CLI 0.0.412\n${start} [INFO] Session ${id} created in ${cwd}\n2026-09-24T12:07:10Z [INFO] Session ${id} shut down\n`,
   );
+}
+
+// ----------------------------------------------------------------- Gemini CLI
+
+{
+  const id = "7c1e4a92-5b3d-4f08-9a6e-2d8f0b3c5e71";
+  const cwd = "/Users/demo/code/weather-api";
+  const start = "2026-09-25T09:10:00Z";
+  const at = clock(start);
+  const project = path.join(root, ".gemini", "tmp", "weather-api");
+  const model = "gemini-3.7-flash";
+  fs.mkdirSync(project, { recursive: true });
+  fs.writeFileSync(path.join(project, ".project_root"), cwd);
+
+  const tool = (callId, name, args, output) => ({
+    id: callId,
+    name,
+    args,
+    status: "success",
+    timestamp: at(2),
+    result: [{ functionResponse: { id: callId, name, response: { output } } }],
+  });
+  const reply = (messageId, fields) => ({ id: messageId, timestamp: at(4), type: "gemini", content: "", model, ...fields });
+  const prompt = { id: "m1", timestamp: at(3), type: "user", content: [{ text: "Forecast responses are cached for an hour. Make the TTL configurable." }] };
+  const grep = reply("m2", {
+    thoughts: [{ subject: "Locating the cache", description: "The forecast handler should own the TTL; search for it first.", timestamp: at(1) }],
+    tokens: { input: 11_200, output: 140, cached: 0, thoughts: 220, tool: 0, total: 11_560 },
+  });
+  writeJsonl(path.join(project, "chats", `session-2026-09-25T09-10-${id.slice(0, 8)}.jsonl`), [
+    { sessionId: id, projectHash: "3f9a1c", startTime: start, lastUpdated: start },
+    prompt,
+    grep,
+    // The CLI writes a message again as its tool calls come in; the last copy wins.
+    { ...grep, toolCalls: [tool("g1", "search_file_content", { pattern: "CACHE_TTL" }, "src/forecast/cache.ts:4:const CACHE_TTL = 3600;")] },
+    reply("m3", {
+      toolCalls: [
+        tool("g2", "replace", { file_path: `${cwd}/src/forecast/cache.ts`, old_string: "const CACHE_TTL = 3600;", new_string: "const CACHE_TTL = Number(process.env.FORECAST_TTL ?? 3600);" }, "Successfully modified file."),
+        tool("g3", "run_shell_command", { command: "npm test -- forecast" }, "Tests: 12 passed, 12 total"),
+      ],
+      tokens: { input: 12_900, output: 310, cached: 10_400, thoughts: 90, tool: 0, total: 13_300 },
+    }),
+    reply("m4", {
+      content: "The TTL now reads `FORECAST_TTL` (seconds) and falls back to one hour. All 12 forecast tests pass.",
+      tokens: { input: 13_600, output: 95, cached: 12_100, thoughts: 0, tool: 0, total: 13_695 },
+    }),
+    { $set: { lastUpdated: at(0), summary: "Make forecast cache TTL configurable" } },
+  ]);
 }
 
 console.log(`Demo home written to ${root}`);
