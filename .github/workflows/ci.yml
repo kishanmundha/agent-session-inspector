@@ -30,3 +30,4 @@ jobs:
       - run: pnpm lint
       # next build also type-checks.
       - run: pnpm build
+      - run: node scripts/build-cli.mjs

@@ -58,6 +58,57 @@ rm -rf ~/.agent-session-inspector ~/.local/bin/agent-session-inspector
 The install script needs bash, so it covers macOS, Linux and WSL. On Windows
 use `npx`.
 
+## Terminal reports
+
+The same numbers are available without the web UI. Each command reads the
+transcripts, prints a report and exits:
+
+```bash
+npx agent-session-inspector usage      # tokens and estimated cost per day
+npx agent-session-inspector stats      # sessions, messages, tools and time, by agent
+npx agent-session-inspector sessions   # recent sessions with cost and health
+```
+
+```
+$ npx agent-session-inspector usage --by model --all
+Token usage · all time · by model
+
+Model                      Sessions  Input  Output  Cache read  Cache write   Total  Est. cost
+─────────────────────────  ────────  ─────  ──────  ──────────  ───────────  ──────  ─────────
+claude-opus-5-5                   1   2.5K    3.4K      318.0K        23.1K  347.0K      $0.26  ████████████████
+claude-sonnet-5                   1   2.0K    2.5K      235.1K        19.1K  258.8K      $0.12  ███████▊
+gpt-5.1                           1  11.6K    1.6K       27.3K            0   40.5K      $0.03  ██▏
+─────────────────────────  ────────  ─────  ──────  ──────────  ───────────  ──────  ─────────
+Total                             3  16.1K    7.5K      580.4K        42.2K  646.3K      $0.41
+```
+
+Reports cover the last 30 days unless `--days <n>` or `--all` says otherwise.
+`--agent`, `--project` and `--model` narrow them, and `--json` prints the data
+for scripts. `usage` groups by day by default; `--by` takes `week`, `month`,
+`project`, `model` or `agent`. `sessions --sort cost` lists the most expensive
+sessions first. `<command> --help` lists every option.
+
+#### Scripting
+
+The tables are for reading: values are rounded, and piping one drops the rules
+and bars but keeps the rounding. For automation use `--json`, which prints exact
+numbers under stable names:
+
+```bash
+npx agent-session-inspector usage --days 1 --json | jq '.total.costUSD'
+npx agent-session-inspector sessions --sort cost --json | jq -r '.sessions[].id'
+```
+
+Every report carries `schemaVersion` (currently `1`) and `days` (`null` for all
+time). New fields may appear within a version; a field is renamed or removed
+only with a new one. Costs are US dollars, or `null` where no price is known.
+
+| Command    | Fields                                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------------------------- |
+| `usage`    | `by`, `rows[]`, `total`, `unpricedModels`. A row has `key`, `sessions`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `totalTokens`, `costUSD`; `total` has the same without `key`. |
+| `stats`    | `totals`, `messagesPerSession`, `agents[]`, `projects[]`, `tools[]`, `skills[]`, `mcpServers[]`, `unpricedModels`. |
+| `sessions` | `sort`, `total` (matches before `--limit`), `sessions[]`. A session has `agent`, `id`, `title`, `project`, `model`, `createdAt`, `updatedAt`, `userMessages`, `toolCalls`, `inputTokens`, `outputTokens`, `estimatedCostUSD`, `health`. |
+
 ## Supported agents
 
 | Agent                         | Reads from                                     | Session titles        | Logs |

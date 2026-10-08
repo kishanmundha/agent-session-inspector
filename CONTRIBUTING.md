@@ -19,8 +19,27 @@ To run it in Docker with the transcript directories mounted read-only:
 pnpm deploy:docker
 ```
 
-CI runs `pnpm lint` and `pnpm build` (which also type-checks) on every pull
-request, so run both before opening one.
+CI runs `pnpm lint`, `pnpm build` (which also type-checks) and the report
+commands' bundle on every pull request, so run them before opening one.
+
+## Terminal reports
+
+The `usage`, `stats` and `sessions` commands live in `src/cli` and reuse the
+providers and the aggregation in `src/lib`. They ship as one file that
+`scripts/build-cli.mjs` bundles with esbuild. To build and run them from a
+checkout:
+
+```bash
+pnpm cli usage --days 7
+```
+
+pnpm prints its own status lines to stdout before the report, which breaks a
+pipe into `jq`. Pass `--silent` (the short `-s` is not enough) when piping
+`--json` output:
+
+```bash
+pnpm --silent cli usage --days 1 --json | jq '.total.costUSD'
+```
 
 ## Demo data
 

@@ -7,17 +7,30 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import net from "node:net";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const NAME = "agent-session-inspector";
 const MIN_NODE = [22, 13];
 const PKG_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SERVER = path.join(PKG_DIR, "app", "server.js");
 
+// Report commands print to the terminal instead of starting the server; they
+// live in the bundle scripts/build-cli.mjs writes to <package>/cli/.
+const CLI = path.join(PKG_DIR, "cli", "cli.mjs");
+const COMMANDS = ["usage", "stats", "sessions"];
+
 const HELP = `Usage: ${NAME} [options]
+       ${NAME} <command> [options]
 
 Browse Claude Code, Codex, Copilot, Cursor, Gemini CLI, OpenCode and Hermes
-session transcripts in a local web UI.
+session transcripts in a local web UI, or print a report in the terminal.
+
+Commands:
+  usage               Tokens and estimated cost by day, model, project or agent
+  stats               Sessions, messages, tool calls and time, by agent
+  sessions            Recent sessions with their cost and health
+
+  Run a command with --help for its options.
 
 Options:
   -p, --port <port>   Port to listen on (default: 3000, or the next free one)
@@ -118,12 +131,32 @@ function openBrowser(url) {
     .unref();
 }
 
-const opts = parseArgs(process.argv.slice(2));
+const argv = process.argv.slice(2);
+const command = COMMANDS.includes(argv[0]) ? argv[0] : null;
+if (!command && argv[0] && !argv[0].startsWith("-")) {
+  fail(`unknown command ${argv[0]}\n\n${HELP}`);
+}
+const opts = command ? null : parseArgs(argv);
 
 // npx only warns about package.json "engines", and the app needs node:sqlite.
 const [major, minor] = process.versions.node.split(".").map(Number);
 if (major < MIN_NODE[0] || (major === MIN_NODE[0] && minor < MIN_NODE[1])) {
   fail(`Node.js ${MIN_NODE.join(".")} or newer is required (found ${process.version}).`);
+}
+
+// node:sqlite still announces itself as experimental on Node 22; not useful here.
+const emitWarning = process.emitWarning;
+process.emitWarning = (warning, ...rest) => {
+  if (String(warning).includes("SQLite is an experimental feature")) return;
+  emitWarning.call(process, warning, ...rest);
+};
+
+if (command) {
+  if (!existsSync(CLI)) {
+    fail(`no command bundle found at ${CLI}\nRun \`pnpm cli ${command}\` from a checkout.`);
+  }
+  const { run } = await import(pathToFileURL(CLI).href);
+  process.exit(run(command, argv.slice(1)));
 }
 
 if (!existsSync(SERVER)) {
@@ -141,13 +174,6 @@ process.env.NODE_ENV = "production";
 process.env.NEXT_TELEMETRY_DISABLED = "1";
 process.env.PORT = String(port);
 process.env.HOSTNAME = opts.host;
-
-// node:sqlite still announces itself as experimental on Node 22; not useful here.
-const emitWarning = process.emitWarning;
-process.emitWarning = (warning, ...rest) => {
-  if (String(warning).includes("SQLite is an experimental feature")) return;
-  emitWarning.call(process, warning, ...rest);
-};
 
 // server.js is CommonJS and starts listening on load.
 createRequire(import.meta.url)(SERVER);

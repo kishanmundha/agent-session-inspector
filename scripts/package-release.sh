@@ -31,6 +31,8 @@ cp -R .next/static "$APP/.next/static"
 mkdir -p "$STAGE/bin"
 cp "bin/$NAME.mjs" "$STAGE/bin/$NAME.mjs"
 chmod +x "$STAGE/bin/$NAME.mjs"
+# The report commands (usage, stats, sessions) run from their own bundle.
+node scripts/build-cli.mjs "$STAGE/cli/cli.mjs"
 echo "$VERSION" > "$STAGE/VERSION"
 cp README.md LICENSE "$STAGE/"
 
@@ -74,7 +76,7 @@ node -e '
 	console.log(JSON.stringify({
 		name, version, description, keywords, author, license, homepage, bugs, repository, engines,
 		bin: { [name]: `bin/${name}.mjs` },
-		files: ["app", "bin", "VERSION"],
+		files: ["app", "bin", "cli", "VERSION"],
 	}, null, 2));
 ' "$ROOT/package.json" "$NAME" "$VERSION" > "$STAGE/package.json"
 

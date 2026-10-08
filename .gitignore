@@ -43,5 +43,8 @@ next-env.d.ts
 # release packaging
 /dist
 
+# report commands bundle (scripts/build-cli.mjs)
+/cli
+
 # archify
 /.archify/
