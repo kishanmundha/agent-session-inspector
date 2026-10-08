@@ -5,9 +5,14 @@
 [![node](https://img.shields.io/node/v/agent-session-inspector)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/agent-session-inspector)](LICENSE)
 
-A local web UI for reading coding-agent transcripts (Claude Code, Codex, GitHub
-Copilot, Cursor, Gemini CLI, OpenCode, Hermes): what the agent did, how long it
-took, and where the tokens went.
+See exactly where a coding-agent session's tokens and dollars went. A local
+inspector for Claude Code, Codex, GitHub Copilot, Cursor, Gemini CLI, OpenCode
+and Hermes transcripts: every prompt, thought, tool call and injected piece of
+context in order, each with its own token count and cost.
+
+It answers the questions a usage total cannot: why one session cost $12, which
+turn blew up the context, how much of it was system prompt and tool results
+rather than conversation, and which tool kept failing.
 
 > **Your sessions never leave your machine.** The app collects nothing: no
 > telemetry, no analytics, no account, no cloud. It reads the transcript files
@@ -57,6 +62,79 @@ rm -rf ~/.agent-session-inspector ~/.local/bin/agent-session-inspector
 
 The install script needs bash, so it covers macOS, Linux and WSL. On Windows
 use `npx`.
+
+## Features
+
+### Inspect one session
+
+**Step-by-step timeline.** Prompts, reasoning, tool calls and their results in
+order, with per-step token counts and cost. What the agent was given shows up
+too: system prompt, tool catalog, MCP instructions and skill listings appear as
+events with their size. Expand any event to see its content, or open the raw
+record.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/timeline-dark.png">
+  <img alt="Event timeline showing user prompt, thinking, and Grep/Read tool calls" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/timeline.png">
+</picture>
+
+**Token Optimizer.** What the session cost by token class, model and turn, where
+the context went (system prompt vs. tool results vs. replies), which tools ran
+most, and hints for trimming expensive sessions.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer-dark.png">
+  <img alt="Token Optimizer: estimated cost by token class and model, and a cost-by-turn chart" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer.png">
+</picture>
+
+**Session health.** A score out of 100 and a grade for how smoothly the session
+ran, with links to the failed tools, retry loops and interrupted turns that cost
+it points. See [Session health](#session-health).
+
+**Edits per turn.** A session's Edits tab lists each prompt with the files the
+agent wrote, edited or patched in response, linked to the event in the timeline.
+
+### Find the session worth inspecting
+
+**Full-text search.** `⌘K` / `Ctrl+K` searches every transcript of every agent:
+prompts, replies, reasoning, tool arguments and tool results, as well as titles,
+repos and branches. Each hit shows the matching line and what kind of event it
+came from.
+
+**All sessions in one place.** Every session of every supported agent on the
+machine, filterable by agent. Each card shows turns, tool calls, health grade,
+cost and tokens in/out at a glance.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/sessions-dark.png">
+  <img alt="Session list with agent filters, search and per-session health, cost and token counts" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/sessions.png">
+</picture>
+
+**Analytics across sessions.** Cost, messages, tool calls and active time for
+the selected range, with an activity calendar and filters for project, agent
+and model.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/analytics-dark.png">
+  <img alt="Analytics tab: cost, session and token totals above an activity calendar" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/analytics.png">
+</picture>
+
+**Projects.** Sessions are grouped by the repository they ran in, so work
+started from a subfolder or a git worktree lands in the same project. The
+Projects tab lists each one with its sessions, cost and tokens, and picking a
+project filters Analytics, Usage and Sessions together. Outside a repository,
+the working directory is the project; the dated scratch folders the Codex app
+creates for project-less chats count as one project.
+
+**Activity.** One day at a time: how many sessions were working at once in each
+15-minute slot, the agent time and cost of each session, and the day's split by
+project, model and agent.
+
+**Skills and MCP tools.** The Analytics tab counts which skills were loaded and
+which MCP servers and tools were called, for the selected range.
+
+> Screenshots use synthetic demo data. To reproduce them locally, see
+> [CONTRIBUTING.md](CONTRIBUTING.md#demo-data).
 
 ## Terminal reports
 
@@ -164,64 +242,15 @@ You don't have to take this on trust. The code is open, and the browser's
 Network tab shows every request going to `localhost` and nowhere else; the app
 works the same with the network disconnected.
 
-## Features
+## How it compares
 
-**Analytics across sessions.** Cost, messages, tool calls and active time for
-the selected range, with an activity calendar and filters for project, agent
-and model.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/analytics-dark.png">
-  <img alt="Analytics tab: cost, session and token totals above an activity calendar" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/analytics.png">
-</picture>
-
-**All sessions in one place.** Every session of every supported agent on the
-machine, filterable by agent and searchable by title, repo, branch or id.
-Each card shows turns, tool calls, health grade, cost and tokens in/out at a
-glance.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/sessions-dark.png">
-  <img alt="Session list with agent filters, search and per-session health, cost and token counts" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/sessions.png">
-</picture>
-
-**Step-by-step timeline.** Prompts, reasoning, tool calls and their results in
-order, with per-step token counts and cost. Expand any event to see its content, or open
-the raw record.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/timeline-dark.png">
-  <img alt="Event timeline showing user prompt, thinking, and Grep/Read tool calls" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/timeline.png">
-</picture>
-
-**Token Optimizer.** What the session cost by token class, model and turn, where
-the context went (system prompt vs. tool results vs. replies), which tools ran
-most, and hints for trimming expensive sessions.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer-dark.png">
-  <img alt="Token Optimizer: estimated cost by token class and model, and a cost-by-turn chart" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer.png">
-</picture>
-
-**Projects.** Sessions are grouped by the repository they ran in, so work
-started from a subfolder or a git worktree lands in the same project. The
-Projects tab lists each one with its sessions, cost and tokens, and picking a
-project filters Analytics, Usage and Sessions together. Outside a repository,
-the working directory is the project; the dated scratch folders the Codex app
-creates for project-less chats count as one project.
-
-**Activity.** One day at a time: how many sessions were working at once in each
-15-minute slot, the agent time and cost of each session, and the day's split by
-project, model and agent.
-
-**Edits per turn.** A session's Edits tab lists each prompt with the files the
-agent wrote, edited or patched in response, linked to the event in the timeline.
-
-**Skills and MCP tools.** The Analytics tab counts which skills were loaded and
-which MCP servers and tools were called, for the selected range.
-
-> Screenshots use synthetic demo data. To reproduce them locally, see
-> [CONTRIBUTING.md](CONTRIBUTING.md#demo-data).
+[AgentsView](https://github.com/kenn-io/agentsview) and
+[ccusage](https://github.com/ryoppippi/ccusage) read the same transcript files.
+AgentsView is an archive and search tool across all your sessions; ccusage
+prints usage and cost reports in the terminal. This project is for the step
+after that: opening one session to see what the agent was given, what it did
+with it, and what each step cost. It keeps no database and makes no outbound
+requests.
 
 ## How it works
 
