@@ -1,4 +1,4 @@
-import type { AgentEvent } from "@/lib/providers/types";
+import type { AgentEvent, CostLine } from "@/lib/providers/types";
 
 /**
  * Where a session's cost built up, read off the `costUSD` the server stamps on
@@ -18,6 +18,8 @@ export interface CostTurn {
   costUSD: number;
   /** Priced requests in the turn. */
   requests: number;
+  /** The tokens behind `costUSD`: a row per model, token class and rate. */
+  lines: CostLine[];
   /** The session's cost up to and including this turn. */
   totalUSD: number;
   /** The context was compacted during the turn. */
@@ -29,6 +31,8 @@ export interface CostTimeline {
   turns: CostTurn[];
   /** Keyed by prompt event id. */
   turnByPrompt: Map<string, CostTurn>;
+  /** The turn each event belongs to, by event id; none before the first prompt. */
+  turnOf: Map<string, number>;
   /** The session's cost up to and including each priced event, by event id. */
   runningUSD: Map<string, number>;
   /** The dearest single request, to scale the others against. */
@@ -43,6 +47,7 @@ export interface CostTimeline {
 export function costTimeline(events: AgentEvent[]): CostTimeline {
   const turns: CostTurn[] = [];
   const turnByPrompt = new Map<string, CostTurn>();
+  const turnOf = new Map<string, number>();
   const runningUSD = new Map<string, number>();
   let maxEventUSD = 0;
   let totalUSD = 0;
@@ -60,17 +65,23 @@ export function costTimeline(events: AgentEvent[]): CostTimeline {
         timestamp: event.timestamp,
         costUSD: 0,
         requests: 0,
+        lines: [],
         totalUSD,
         compacted: false,
       };
       turns.push(current);
       turnByPrompt.set(event.id, current);
+      turnOf.set(event.id, prompts);
       continue;
     }
+    if (current) turnOf.set(event.id, current.turn);
     if (current && event.type.startsWith("session.compaction")) current.compacted = true;
 
     const cost = event.data.costUSD;
-    if (typeof cost !== "number" || cost <= 0) continue;
+    const priced = typeof cost === "number" && cost > 0;
+    const lines = Array.isArray(event.data.costLines) ? (event.data.costLines as CostLine[]) : [];
+    // Usage with no price still belongs on its turn's receipt.
+    if (!priced && !current) continue;
     if (!current) {
       current = {
         turn: 0,
@@ -78,11 +89,14 @@ export function costTimeline(events: AgentEvent[]): CostTimeline {
         timestamp: event.timestamp,
         costUSD: 0,
         requests: 0,
+        lines: [],
         totalUSD,
         compacted: false,
       };
       turns.push(current);
     }
+    for (const line of lines) addLine(current.lines, line);
+    if (!priced) continue;
     totalUSD += cost;
     current.costUSD += cost;
     current.requests += 1;
@@ -96,8 +110,22 @@ export function costTimeline(events: AgentEvent[]): CostTimeline {
   return {
     turns: first === -1 ? [] : turns.slice(first),
     turnByPrompt,
+    turnOf,
     runningUSD,
     maxEventUSD,
     totalUSD,
   };
+}
+
+/** Folds a request's line into the turn's row for the same model, class and rate. */
+function addLine(lines: CostLine[], line: CostLine) {
+  const row = lines.find(
+    (l) => l.model === line.model && l.kind === line.kind && l.rate === line.rate,
+  );
+  if (!row) {
+    lines.push({ ...line });
+    return;
+  }
+  row.tokens += line.tokens;
+  if (row.usd !== null && line.usd !== null) row.usd += line.usd;
 }

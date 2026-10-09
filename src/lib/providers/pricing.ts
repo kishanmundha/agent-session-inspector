@@ -177,17 +177,19 @@ class CostAccumulator {
   /** Keyed by model, class and rate, so a mid-session price change gets its own row. */
   private lines = new Map<string, CostLine>();
 
-  add(usage: BilledUsage, timestamp?: string): number | null {
+  /** Returns the usage as priced lines, for the caller to keep per event. */
+  add(usage: BilledUsage, timestamp?: string): CostLine[] {
     const model = usage.model || UNKNOWN_MODEL;
     let cost: number | null = null;
-    for (const part of costOf(usage, timestamp)) {
+    const parts = costOf(usage, timestamp).map((part) => ({ model, ...part }));
+    for (const part of parts) {
       const lineKey = `${model}|${part.kind}|${part.rate}`;
       const line = this.lines.get(lineKey);
       if (line) {
         line.tokens += part.tokens;
         if (line.usd !== null && part.usd !== null) line.usd += part.usd;
       } else {
-        this.lines.set(lineKey, { model, ...part });
+        this.lines.set(lineKey, { ...part });
       }
       if (part.usd === null) continue;
       cost = (cost ?? 0) + part.usd;
@@ -210,7 +212,7 @@ class CostAccumulator {
     row.cacheReadTokens += usage.cacheReadTokens ?? 0;
     row.cacheWriteTokens += (usage.cacheWriteTokens ?? 0) + (usage.cacheWrite1hTokens ?? 0);
     if (cost !== null && row.costUSD !== null) row.costUSD += cost;
-    return cost;
+    return parts;
   }
 
   summary(): CostSummary {
@@ -245,8 +247,9 @@ class CostAccumulator {
 }
 
 /**
- * Prices a whole session and stamps `costUSD` on each event that carries
- * usage, so the timeline can show where the money went. Usage a fork inherited
+ * Prices a whole session and stamps `costUSD`, and the `costLines` behind it,
+ * on each event that carries usage, so the timeline can show where the money
+ * went. Usage a fork inherited
  * is priced apart, under `inherited`, and left out of the session's total.
  */
 export function priceEvents(events: AgentEvent[]): CostSummary {
@@ -257,11 +260,12 @@ export function priceEvents(events: AgentEvent[]): CostSummary {
     if (usages.length === 0) continue;
     const acc = isInherited(event) ? (inherited ??= new CostAccumulator()) : own;
     let eventCost: number | null = null;
-    for (const usage of usages) {
-      const cost = acc.add(usage, event.timestamp);
-      if (cost !== null) eventCost = (eventCost ?? 0) + cost;
+    const lines = usages.flatMap((usage) => acc.add(usage, event.timestamp));
+    for (const line of lines) {
+      if (line.usd !== null) eventCost = (eventCost ?? 0) + line.usd;
     }
     if (eventCost !== null) event.data.costUSD = eventCost;
+    event.data.costLines = lines;
   }
   const summary = own.summary();
   if (inherited) summary.inherited = inherited.summary();

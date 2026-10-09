@@ -1,16 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { niceCeil } from "@/components/home/usage-charts";
 import { costTimeline } from "@/lib/cost-timeline";
 import { firstLine, formatCost } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { CLASS_LABEL, formatRate } from "./cost-dialog";
 import type { AgentEvent } from "./types";
+
+/** Receipt order: what was sent, then what came back. */
+const KINDS = Object.keys(CLASS_LABEL);
 
 /**
  * Where the cost built up: a bar per turn for what the turn cost, under a line
- * for the session's running total. The caption doubles as the readout, and a
- * bar opens its prompt in the timeline.
+ * for the session's running total. A bar shows the turn's receipt while it is
+ * hovered, and opens its prompt in the timeline.
  */
 export function CostByTurn({
   events,
@@ -35,6 +39,9 @@ export function CostByTurn({
   const name = (turn: number) => (turn === 0 ? "Before the first prompt" : `Turn ${turn}`);
   const middle = Math.floor((turns.length - 1) / 2);
   const shown = active === null ? null : turns[active];
+  const models = shown ? [...new Set(shown.lines.map((l) => l.model))] : [];
+  // Where the hovered bar sits, 0 to 100, to hang its receipt under it.
+  const at = active === null ? 0 : ((active + 0.5) / turns.length) * 100;
 
   // Drawn in a box one unit wide per turn, so each step lands on its bar.
   const line =
@@ -114,6 +121,80 @@ export function CostByTurn({
                 vectorEffect="non-scaling-stroke"
               />
             </svg>
+            {shown && (
+              // Shifted left by as much as it is pushed right, so it never leaves the plot.
+              <div
+                role="status"
+                className="pointer-events-none absolute top-full z-20 mt-2 w-80 max-w-full rounded-lg border border-border bg-popover p-3 text-xs text-popover-foreground shadow-lg"
+                style={{ left: `${at}%`, transform: `translateX(-${at}%)` }}
+              >
+                <div className="flex items-baseline justify-between gap-3 tabular-nums">
+                  <span className="font-semibold">
+                    {name(shown.turn)} · {formatCost(shown.costUSD)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {share(shown.costUSD)} of the session
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-muted-foreground">
+                  {firstLine(shown.prompt) ?? "Requests made before the first prompt."}
+                </p>
+                <table className="mt-2 w-full border-t border-border tabular-nums">
+                  <thead>
+                    <tr className="text-[10px] text-muted-foreground">
+                      <th className="pt-1.5 pb-0.5 text-left font-normal">Token type</th>
+                      <th className="pt-1.5 pb-0.5 text-right font-normal">Tokens</th>
+                      <th className="pt-1.5 pb-0.5 text-right font-normal">Rate / 1M</th>
+                      <th className="pt-1.5 pb-0.5 text-right font-normal">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {models.map((model) => (
+                      <Fragment key={model}>
+                        {models.length > 1 && (
+                          <tr>
+                            <th
+                              colSpan={4}
+                              scope="rowgroup"
+                              className="max-w-0 truncate pt-1.5 text-left font-mono font-semibold"
+                            >
+                              {model}
+                            </th>
+                          </tr>
+                        )}
+                        {shown.lines
+                          .filter((line) => line.model === model)
+                          .sort((a, b) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind))
+                          .map((line) => (
+                            <tr key={`${line.kind}-${line.rate}`}>
+                              <td className="py-0.5">{CLASS_LABEL[line.kind]}</td>
+                              <td className="py-0.5 pl-2 text-right font-mono">
+                                {line.tokens.toLocaleString()}
+                              </td>
+                              <td className="py-0.5 pl-2 text-right font-mono text-muted-foreground">
+                                {line.rate === null ? "—" : formatRate(line.rate)}
+                              </td>
+                              <td className="py-0.5 pl-2 text-right font-mono">
+                                {line.usd === null ? (
+                                  <span className="font-sans text-muted-foreground">no price</span>
+                                ) : (
+                                  formatCost(line.usd)
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="mt-2 border-t border-border pt-1.5 tabular-nums text-muted-foreground">
+                  {models.length === 1 && <span className="font-mono">{models[0]} · </span>}
+                  {shown.requests} {shown.requests === 1 ? "request" : "requests"} ·{" "}
+                  {formatCost(shown.totalUSD)} so far
+                  {shown.compacted && " · context compacted"}
+                </p>
+              </div>
+            )}
           </div>
           <div className="mt-1.5 flex justify-between text-[10px] text-muted-foreground">
             <span>{name(turns[0].turn)}</span>
@@ -128,43 +209,31 @@ export function CostByTurn({
         </div>
       </div>
 
-      <div className="mt-3 space-y-1 text-xs" aria-live="polite">
+      <div className="mt-3 space-y-1 text-xs">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
           <span className="font-medium tabular-nums">
-            {shown ? name(shown.turn) : "Whole session"} ·{" "}
-            {formatCost(shown ? shown.costUSD : totalUSD)}
-            {!shown && partial && "+"}
+            Whole session · {formatCost(totalUSD)}
+            {partial && "+"}
           </span>
-          {shown ? (
-            <span className="tabular-nums text-muted-foreground">
-              {share(shown.costUSD)} of the session · {shown.requests}{" "}
-              {shown.requests === 1 ? "request" : "requests"} ·{" "}
-              {formatCost(shown.totalUSD)} so far
-              {shown.compacted && " · context compacted"}
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="size-2.5 rounded-[3px] bg-emerald-500/60" aria-hidden />
+            cost of the turn (left axis)
+          </span>
+          <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span className="w-3 border-t-2 border-foreground" aria-hidden />
+            running total (right axis)
+          </span>
+          {turns.some((t) => t.compacted) && (
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <span className="size-1.5 rotate-45 bg-amber-500" aria-hidden />
+              context compacted
             </span>
-          ) : (
-            <>
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="size-2.5 rounded-[3px] bg-emerald-500/60" aria-hidden />
-                cost of the turn (left axis)
-              </span>
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="w-3 border-t-2 border-foreground" aria-hidden />
-                running total (right axis)
-              </span>
-              {turns.some((t) => t.compacted) && (
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  <span className="size-1.5 rotate-45 bg-amber-500" aria-hidden />
-                  context compacted
-                </span>
-              )}
-            </>
           )}
         </div>
         <p className="truncate text-muted-foreground">
-          {shown
-            ? (firstLine(shown.prompt) ?? "Requests made before the first prompt.")
-            : `${name(dearest.turn)} cost the most: ${formatCost(dearest.costUSD)}, ${share(dearest.costUSD)} of the session. Click a bar to open its turn in the timeline.`}
+          {name(dearest.turn)} cost the most: {formatCost(dearest.costUSD)},{" "}
+          {share(dearest.costUSD)} of the session. Hover a bar for its tokens and prices; click it
+          to open the turn in the timeline.
         </p>
       </div>
     </section>

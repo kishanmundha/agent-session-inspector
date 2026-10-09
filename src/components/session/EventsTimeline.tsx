@@ -2628,16 +2628,24 @@ export function EventsTimeline({
   });
 
   const groups = useMemo(() => {
-    const g: { date: string; fullDate: string; events: AgentEvent[] }[] = [];
-    for (const ev of shown) {
+    // A run of events from one day and one turn; `start` is its offset in `shown`.
+    const g: {
+      date: string;
+      fullDate: string;
+      turn?: number;
+      start: number;
+      events: AgentEvent[];
+    }[] = [];
+    shown.forEach((ev, start) => {
       const d = formatDate(ev.timestamp);
+      const turn = cost.turnOf.get(ev.id);
       const last = g[g.length - 1];
-      if (!last || last.date !== d)
-        g.push({ date: d, fullDate: formatFullDate(ev.timestamp), events: [ev] });
+      if (!last || last.date !== d || last.turn !== turn)
+        g.push({ date: d, fullDate: formatFullDate(ev.timestamp), turn, start, events: [ev] });
       else last.events.push(ev);
-    }
+    });
     return g;
-  }, [shown]);
+  }, [shown, cost]);
 
   // Everything set inside the filter panel, shown on its button.
   const panelFilterCount =
@@ -2942,9 +2950,10 @@ export function EventsTimeline({
       <div className="pr-2">
         {tail && loadMore}
         {groups.map((group) => (
-          <div key={group.date} className="relative">
-            {/* The rule stays where the day starts; only the pill follows the
-                scroll, so the day in view is always named under the toolbar. */}
+          <div key={`${group.date}|${group.turn}`} className="relative">
+            {/* The rule stays where the day or turn starts; only the pill
+                follows the scroll, so the day and turn in view are always
+                named under the toolbar. */}
             <div className="absolute inset-x-0 top-[27px] h-px bg-border" aria-hidden />
             <div
               className="pointer-events-none sticky z-[5] flex justify-center py-4"
@@ -2954,17 +2963,29 @@ export function EventsTimeline({
             >
               <span
                 className="pointer-events-auto rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm"
-                title={group.fullDate}
+                title={
+                  group.turn === undefined
+                    ? group.fullDate
+                    : `${group.fullDate} · prompt ${group.turn} and everything the agent did to answer it`
+                }
               >
                 {group.date}
+                {group.turn !== undefined && (
+                  <>
+                    <span className="mx-1.5 opacity-50" aria-hidden>
+                      ·
+                    </span>
+                    <span className="text-foreground">Turn {group.turn}</span>
+                  </>
+                )}
               </span>
             </div>
             {group.events.map((event, i) => {
               const parallel = parallelGroups.get(event.id);
               // The event that came before this one in time, whichever way the list runs.
-              const earlier = group.events[order === "asc" ? i - 1 : i + 1];
-              const opensGroup =
-                parallel && parallelGroups.get(group.events[i - 1]?.id) !== parallel;
+              const at = group.start + i;
+              const earlier = shown[order === "asc" ? at - 1 : at + 1];
+              const opensGroup = parallel && parallelGroups.get(shown[at - 1]?.id) !== parallel;
               return (
                 <Fragment key={event.id}>
                   {opensGroup && (

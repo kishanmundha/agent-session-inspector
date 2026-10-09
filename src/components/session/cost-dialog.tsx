@@ -22,7 +22,7 @@ import { formatCost } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CostLine, CostSummary } from "./types";
 
-const CLASS_LABEL: Record<CostLine["kind"], string> = {
+export const CLASS_LABEL: Record<CostLine["kind"], string> = {
   input: "Uncached input",
   cacheWrite: "Cache write",
   cacheWrite1h: "Cache write (1h)",
@@ -44,7 +44,7 @@ const GLOSSARY: [string, string][] = [
 ];
 
 /** Rates keep enough decimals to show sub-cent prices such as $0.075. */
-function formatRate(rate: number) {
+export function formatRate(rate: number) {
   return `$${rate.toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
