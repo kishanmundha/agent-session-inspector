@@ -26,6 +26,9 @@ export interface CostTurn {
   compacted: boolean;
 }
 
+/** The token classes a request is billed for, with both cache-write lifetimes as one. */
+export type RequestClass = "input" | "cacheWrite" | "cacheRead" | "output";
+
 /** One request to a model: what it sent, what came back and what that cost. */
 export interface CostRequest {
   /** Position among the session's requests, from 1. */
@@ -42,6 +45,8 @@ export interface CostRequest {
   outputTokens: number;
   /** Everything the request sent: the three input classes together. */
   contextTokens: number;
+  /** What each class cost; null where the request had none of it, or no price. */
+  usd: Record<RequestClass, number | null>;
   /** Null when no model in the request has a price. */
   costUSD: number | null;
 }
@@ -160,6 +165,11 @@ function requestOf(
 ): CostRequest {
   const tokens = (...kinds: CostLine["kind"][]) =>
     lines.reduce((sum, l) => (kinds.includes(l.kind) ? sum + l.tokens : sum), 0);
+  const usd = (...kinds: CostLine["kind"][]) =>
+    lines.reduce<number | null>(
+      (sum, l) => (kinds.includes(l.kind) && l.usd !== null ? (sum ?? 0) + l.usd : sum),
+      null,
+    );
   const inputTokens = tokens("input");
   const cacheWriteTokens = tokens("cacheWrite", "cacheWrite1h");
   const cacheReadTokens = tokens("cacheRead");
@@ -174,6 +184,12 @@ function requestOf(
     cacheReadTokens,
     outputTokens: tokens("output"),
     contextTokens: inputTokens + cacheWriteTokens + cacheReadTokens,
+    usd: {
+      input: usd("input"),
+      cacheWrite: usd("cacheWrite", "cacheWrite1h"),
+      cacheRead: usd("cacheRead"),
+      output: usd("output"),
+    },
     costUSD,
   };
 }
