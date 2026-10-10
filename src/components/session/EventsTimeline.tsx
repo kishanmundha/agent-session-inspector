@@ -1,7 +1,9 @@
 "use client";
 
 import { Fragment, useState, useMemo, useEffect, useRef } from "react";
+import Link from "next/link";
 import {
+  ArrowUpRight,
   ArrowDownNarrowWide,
   ArrowUpNarrowWide,
   Braces,
@@ -46,6 +48,8 @@ interface Props {
   } | null;
   /** Event a copied link points at: scrolled to, opened and outlined. */
   targetEventId?: string;
+  /** The session this one was forked from, for a fork that still has its parent's id. */
+  forkParentHref?: string;
   /** Following the session: the newest events stay in view as they arrive. */
   live?: boolean;
   onLiveChange?: (live: boolean) => void;
@@ -2159,8 +2163,17 @@ function EventCard({
 
           {costUSD !== null && costUSD > 0 && (
             <span
-              className="hidden shrink-0 font-mono text-[11px] tabular-nums text-emerald-700 dark:text-emerald-400 sm:inline"
-              title="Estimated cost of this request at API list prices"
+              className={cn(
+                "hidden shrink-0 font-mono text-[11px] tabular-nums sm:inline",
+                event.data.inherited === true
+                  ? "text-muted-foreground line-through decoration-muted-foreground/50"
+                  : "text-emerald-700 dark:text-emerald-400",
+              )}
+              title={
+                event.data.inherited === true
+                  ? "Estimated cost of this request in the forked session it was copied from; not part of this session's cost"
+                  : "Estimated cost of this request at API list prices"
+              }
             >
               {formatCost(costUSD)}
             </span>
@@ -2323,11 +2336,30 @@ function getTypeChipClass(type: string) {
 export function EventsTimeline({
   events,
   focusRequest,
-  targetEventId,
+  targetEventId: linkedEventId,
+  forkParentHref,
   live = false,
   onLiveChange,
   running = false,
 }: Props) {
+  // A fork numbers its copy of an event differently from its parent, so a link
+  // followed from one session into the other falls back to the transcript
+  // record the event was read from, the part of the id before the last colon.
+  const targetEventId = useMemo(() => {
+    if (!linkedEventId || events.some((event) => event.id === linkedEventId)) return linkedEventId;
+    const cut = linkedEventId.lastIndexOf(":");
+    if (cut === -1) return linkedEventId;
+    const record = linkedEventId.slice(0, cut + 1);
+    return events.findLast((event) => event.id.startsWith(record))?.id ?? linkedEventId;
+  }, [events, linkedEventId]);
+  // The last event the fork copied in: where it left its parent.
+  const forkPointHref = useMemo(() => {
+    const last = events.findLast((event) => event.data.inherited === true);
+    return forkParentHref && last
+      ? `${forkParentHref}?event=${encodeURIComponent(last.id)}`
+      : undefined;
+  }, [events, forkParentHref]);
+
   // The view mode is mirrored to `?mode=`, so a refresh keeps it.
   const [modeParam, setModeParam] = useQueryParam("mode", "normal");
   const [mode, setMode] = useState<ViewMode>(
@@ -2610,12 +2642,15 @@ export function EventsTimeline({
     return () => cancelAnimationFrame(frame);
   }, [tail, events.length]);
 
+  const targetLoaded = targetIndex !== -1;
   useEffect(() => {
     if (!targetEventId) return;
     document
       .querySelector(`[data-event-id="${CSS.escape(targetEventId)}"]`)
       ?.scrollIntoView({ block: "center" });
-  }, [targetEventId]);
+    // Run again once the event is on the page: a link followed from another
+    // session sets the target before that session's events have loaded.
+  }, [targetEventId, targetLoaded]);
 
   useHotkeys({
     f: () => setMode((m) => VIEW_MODES[(VIEW_MODES.indexOf(m) + 1) % VIEW_MODES.length]),
@@ -2633,15 +2668,25 @@ export function EventsTimeline({
       date: string;
       fullDate: string;
       turn?: number;
+      /** History a fork copied from its parent. */
+      inherited: boolean;
       start: number;
       events: AgentEvent[];
     }[] = [];
     shown.forEach((ev, start) => {
       const d = formatDate(ev.timestamp);
       const turn = cost.turnOf.get(ev.id);
+      const inherited = ev.data.inherited === true;
       const last = g[g.length - 1];
-      if (!last || last.date !== d || last.turn !== turn)
-        g.push({ date: d, fullDate: formatFullDate(ev.timestamp), turn, start, events: [ev] });
+      if (!last || last.date !== d || last.turn !== turn || last.inherited !== inherited)
+        g.push({
+          date: d,
+          fullDate: formatFullDate(ev.timestamp),
+          turn,
+          inherited,
+          start,
+          events: [ev],
+        });
       else last.events.push(ev);
     });
     return g;
@@ -2950,7 +2995,10 @@ export function EventsTimeline({
       <div className="pr-2">
         {tail && loadMore}
         {groups.map((group) => (
-          <div key={`${group.date}|${group.turn}`} className="relative">
+          <div
+            key={`${group.date}|${group.inherited ? "inherited" : group.turn}`}
+            className="relative"
+          >
             {/* The rule stays where the day or turn starts; only the pill
                 follows the scroll, so the day and turn in view are always
                 named under the toolbar. */}
@@ -2964,12 +3012,37 @@ export function EventsTimeline({
               <span
                 className="pointer-events-auto rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm"
                 title={
-                  group.turn === undefined
-                    ? group.fullDate
-                    : `${group.fullDate} · prompt ${group.turn} and everything the agent did to answer it`
+                  group.inherited
+                    ? `${group.fullDate} · history copied from the forked session; its cost was billed there and is not part of this session`
+                    : group.turn === undefined
+                      ? group.fullDate
+                      : `${group.fullDate} · prompt ${group.turn} and everything the agent did to answer it`
                 }
               >
                 {group.date}
+                {group.inherited && (
+                  <>
+                    <span className="mx-1.5 opacity-50" aria-hidden>
+                      ·
+                    </span>
+                    Inherited
+                    {forkPointHref && (
+                      <>
+                        <span className="mx-1.5 opacity-50" aria-hidden>
+                          ·
+                        </span>
+                        <Link
+                          href={forkPointHref}
+                          title="Open the session this one was forked from, at the last event it copied"
+                          className="inline-flex items-center gap-0.5 text-foreground underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                        >
+                          Open fork point
+                          <ArrowUpRight className="size-3" aria-hidden />
+                        </Link>
+                      </>
+                    )}
+                  </>
+                )}
                 {group.turn !== undefined && (
                   <>
                     <span className="mx-1.5 opacity-50" aria-hidden>

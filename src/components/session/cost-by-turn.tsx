@@ -26,7 +26,7 @@ export function CostByTurn({
   partial: boolean;
   onOpenEvent: (eventId: string) => void;
 }) {
-  const { turns, totalUSD } = useMemo(() => costTimeline(events), [events]);
+  const { turns, totalUSD, inheritedUSD } = useMemo(() => costTimeline(events), [events]);
   const [hovered, setHovered] = useState<number | null>(null);
   // One turn has no shape to show.
   if (turns.length < 2 || totalUSD <= 0) return null;
@@ -235,6 +235,12 @@ export function CostByTurn({
           {share(dearest.costUSD)} of the session. Hover a bar for its tokens and prices; click it
           to open the turn in the timeline.
         </p>
+        {inheritedUSD > 0 && (
+          <p className="text-muted-foreground">
+            Not charted: {formatCost(inheritedUSD)} of history copied from the forked session,
+            shown as Inherited in the timeline. The parent session was billed for it.
+          </p>
+        )}
       </div>
     </section>
   );

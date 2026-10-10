@@ -38,6 +38,8 @@ export interface CostTimeline {
   /** The dearest single request, to scale the others against. */
   maxEventUSD: number;
   totalUSD: number;
+  /** What the history a fork copied in cost its parent; no part of `totalUSD`. */
+  inheritedUSD: number;
 }
 
 /**
@@ -51,11 +53,15 @@ export function costTimeline(events: AgentEvent[]): CostTimeline {
   const runningUSD = new Map<string, number>();
   let maxEventUSD = 0;
   let totalUSD = 0;
+  let inheritedUSD = 0;
   let prompts = 0;
   let current: CostTurn | null = null;
 
   for (const event of events) {
-    if (event.data.inherited === true) continue;
+    if (event.data.inherited === true) {
+      if (typeof event.data.costUSD === "number") inheritedUSD += event.data.costUSD;
+      continue;
+    }
     if (event.type === "user.message") {
       prompts += 1;
       current = {
@@ -114,6 +120,7 @@ export function costTimeline(events: AgentEvent[]): CostTimeline {
     runningUSD,
     maxEventUSD,
     totalUSD,
+    inheritedUSD,
   };
 }
 

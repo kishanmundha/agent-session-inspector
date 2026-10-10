@@ -369,6 +369,11 @@ function Session({ provider, id }: { provider: string; id: string }) {
                   events={data.events}
                   focusRequest={eventFocusRequest ?? queryFocus}
                   targetEventId={targetEventId || undefined}
+                  forkParentHref={
+                    data.meta.forkedFrom
+                      ? `/sessions/${provider}/${encodeURIComponent(data.meta.forkedFrom)}`
+                      : undefined
+                  }
                   live={live}
                   onLiveChange={setLive}
                   running={running}
