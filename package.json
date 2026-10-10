@@ -1,6 +1,6 @@
 {
   "name": "agent-session-inspector",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "See where a coding-agent session's tokens and dollars went: a local inspector for Claude Code, Codex, GitHub Copilot, Cursor, Gemini CLI, OpenCode and Hermes sessions, with a step-by-step timeline, per-step cost and analytics.",
   "keywords": [
     "agent",
