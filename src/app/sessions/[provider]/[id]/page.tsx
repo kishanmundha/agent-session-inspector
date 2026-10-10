@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Bookmark,
+  CircleDollarSign,
   ClipboardList,
   FilePen,
   FileText,
@@ -24,6 +25,7 @@ import { SearchTrigger } from "@/components/common/command-palette";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { AboutDialog } from "@/components/home/about-dialog";
 import { EventsTimeline } from "@/components/session/EventsTimeline";
+import { SessionCost } from "@/components/session/session-cost";
 import { SessionEdits } from "@/components/session/session-edits";
 import { SessionHeader } from "@/components/session/session-header";
 import { ShortcutsTrigger, SidebarTrigger } from "@/components/session/session-shell";
@@ -33,6 +35,7 @@ import {
   PathList,
 } from "@/components/session/checkpoints-list";
 import type { EventFocusRequest, SessionData } from "@/components/session/types";
+import { costTimeline } from "@/lib/cost-timeline";
 import { editsByTurn } from "@/lib/edits";
 import { firstLine } from "@/lib/format";
 import { isRunning } from "@/lib/session-state";
@@ -45,6 +48,7 @@ const SESSION_TABS = [
   "edits",
   "research",
   "workspace",
+  "cost",
   "optimizer",
 ] as const;
 
@@ -171,6 +175,17 @@ function Session({ provider, id }: { provider: string; id: string }) {
       counts.set(e.type, (counts.get(e.type) ?? 0) + 1);
     }
     return Array.from(counts, ([name, value]) => ({ name, value }));
+  }, [data]);
+
+  // How full the context window is: what the latest request sent, and the peak.
+  const context = useMemo(() => {
+    const { requests } = costTimeline(data?.events ?? []);
+    // A provider that reports one total for the session has no context to read off it.
+    if (requests.length < 2) return undefined;
+    return {
+      latest: requests[requests.length - 1].contextTokens,
+      peak: Math.max(...requests.map((r) => r.contextTokens)),
+    };
   }, [data]);
 
   const editCount = useMemo(
@@ -303,6 +318,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
             revealable={data.revealable}
             stats={data.stats}
             cost={data.cost}
+            context={context}
             activeMs={activeMs}
             running={running}
             onFocusEvents={focusEvents}
@@ -344,6 +360,10 @@ function Session({ provider, id }: { provider: string; id: string }) {
                   <TabsTrigger value="workspace" className="px-3">
                     <ClipboardList className="size-4" aria-hidden />
                     Metadata
+                  </TabsTrigger>
+                  <TabsTrigger value="cost" className="px-3">
+                    <CircleDollarSign className="size-4" aria-hidden />
+                    Cost
                   </TabsTrigger>
                   <TabsTrigger value="optimizer" className="px-3">
                     <Lightbulb className="size-4" aria-hidden />
@@ -418,15 +438,16 @@ function Session({ provider, id }: { provider: string; id: string }) {
                 </div>
               </TabsContent>
 
+              <TabsContent value="cost" className="pt-2">
+                <SessionCost cost={data.cost} events={data.events} onOpenEvent={openEvent} />
+              </TabsContent>
+
               <TabsContent value="optimizer" className="pt-2">
                 <TokenOptimizer
                   analysis={data.tokenAnalysis}
                   stats={data.stats}
-                  cost={data.cost}
-                  events={data.events}
                   eventTypeCounts={eventTypeCounts}
                   onFocusHint={focusEvents}
-                  onOpenEvent={openEvent}
                 />
               </TabsContent>
             </Tabs>

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -9,26 +8,9 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { BarList } from "@/components/common/bar-list";
-import { CostByTurn } from "./cost-by-turn";
-import { CostDialog } from "./cost-dialog";
-import { formatCost, formatTokens } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type {
-  AgentEvent,
-  CostSummary,
-  SessionStats,
-  TokenAnalysis,
-  TokenHint,
-} from "./types";
+import type { SessionStats, TokenAnalysis, TokenHint } from "./types";
 
 const SEVERITY = {
   high: {
@@ -53,183 +35,16 @@ const SEVERITY = {
 
 const SEVERITY_ORDER = ["high", "medium", "low"] as const;
 
-/** Where the money went: by token class, then by model. */
-function CostSection({ cost }: { cost: CostSummary }) {
-  const [detailOpen, setDetailOpen] = useState(false);
-  if (cost.byModel.length === 0) return null;
-
-  const classes = [
-    {
-      label: "Output",
-      note: "replies + reasoning",
-      usd: cost.breakdown.output,
-      bar: "bg-sky-400 dark:bg-sky-500",
-    },
-    {
-      label: "Cache writes",
-      note: "new context stored",
-      usd: cost.breakdown.cacheWrite,
-      bar: "bg-amber-400 dark:bg-amber-500",
-    },
-    {
-      label: "Cache reads",
-      note: "context re-sent each turn",
-      usd: cost.breakdown.cacheRead,
-      bar: "bg-emerald-400 dark:bg-emerald-500",
-    },
-    {
-      label: "Uncached input",
-      usd: cost.breakdown.input,
-      bar: "bg-red-400 dark:bg-red-500",
-    },
-  ].filter((c) => c.usd > 0);
-
-  const cacheRead = cost.byModel.reduce((sum, m) => sum + m.cacheReadTokens, 0);
-  const allInput = cost.byModel.reduce(
-    (sum, m) => sum + m.inputTokens + m.cacheWriteTokens + m.cacheReadTokens,
-    0,
-  );
-  const partial = cost.unpricedModels.length > 0;
-
-  return (
-    <section className="rounded-xl border border-border bg-card p-5">
-      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className="text-sm font-semibold text-foreground">Estimated cost</h2>
-        <span className="font-mono text-lg font-bold tabular-nums text-foreground">
-          {formatCost(cost.totalUSD)}
-          {partial && "+"}
-        </span>
-      </div>
-
-      {cost.totalUSD > 0 && (
-        <>
-          <div className="mb-4 flex h-2.5 overflow-hidden rounded-full bg-muted">
-            {classes.map(({ label, usd, bar }) => (
-              <div
-                key={label}
-                className={bar}
-                style={{ width: `${(usd / cost.totalUSD) * 100}%` }}
-              />
-            ))}
-          </div>
-          <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-            {classes.map(({ label, note, usd, bar }) => (
-              <div key={label} className="flex items-center gap-2 text-xs">
-                <span className={cn("size-2 shrink-0 rounded-full", bar)} aria-hidden />
-                <span className="min-w-0 flex-1 truncate text-foreground">
-                  {label}
-                  {note && (
-                    <span className="ml-1 hidden text-muted-foreground sm:inline">
-                      ({note})
-                    </span>
-                  )}
-                </span>
-                <span className="font-mono font-semibold tabular-nums text-foreground">
-                  {formatCost(usd)}
-                </span>
-                <span className="w-9 text-right tabular-nums text-muted-foreground">
-                  {Math.round((usd / cost.totalUSD) * 100)}%
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      <div className="mt-4 border-t border-border pt-1.5">
-        <Table className="text-xs">
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              {["Model", "Input", "Cache write", "Cache read", "Output", "Cost"].map(
-                (label, i) => (
-                  <TableHead
-                    key={label}
-                    className={cn("h-8 px-0 text-muted-foreground", i > 0 && "pl-3 text-right")}
-                  >
-                    {label}
-                  </TableHead>
-                ),
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody className="font-mono tabular-nums">
-            {cost.byModel.map((m) => (
-              <TableRow key={m.model} className="border-border/60">
-                <TableCell className="px-0 py-1.5 text-foreground">{m.model}</TableCell>
-                <TableCell className="py-1.5 pr-0 pl-3 text-right">
-                  {formatTokens(m.inputTokens) ?? "—"}
-                </TableCell>
-                <TableCell className="py-1.5 pr-0 pl-3 text-right">
-                  {formatTokens(m.cacheWriteTokens) ?? "—"}
-                </TableCell>
-                <TableCell className="py-1.5 pr-0 pl-3 text-right">
-                  {formatTokens(m.cacheReadTokens) ?? "—"}
-                </TableCell>
-                <TableCell className="py-1.5 pr-0 pl-3 text-right">
-                  {formatTokens(m.outputTokens) ?? "—"}
-                </TableCell>
-                <TableCell className="py-1.5 pr-0 pl-3 text-right font-semibold text-foreground">
-                  {m.costUSD === null ? (
-                    <span className="font-sans font-normal text-muted-foreground">
-                      no price
-                    </span>
-                  ) : (
-                    formatCost(m.costUSD)
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        {allInput > 0 && cacheRead > 0 && (
-          <>
-            {Math.round((cacheRead / allInput) * 100)}% of input was served from
-            cache.{" "}
-          </>
-        )}
-        API-equivalent estimate at list prices on the day of each request, not a
-        bill: subscription and request-based plans charge differently.{" "}
-        <Button
-          variant="link"
-          onClick={() => setDetailOpen(true)}
-          aria-haspopup="dialog"
-          className="inline h-auto rounded-sm p-0 text-xs text-foreground underline underline-offset-2 hover:text-brand"
-        >
-          See the rates and arithmetic
-        </Button>
-        {partial && (
-          <>
-            {" "}
-            No price is known for {cost.unpricedModels.join(", ")}, so the total
-            leaves {cost.unpricedModels.length > 1 ? "them" : "it"} out; add one in{" "}
-            <code className="font-mono">~/.agent-session-inspector/pricing.json</code>.
-          </>
-        )}
-      </p>
-      <CostDialog cost={cost} open={detailOpen} onOpenChange={setDetailOpen} />
-    </section>
-  );
-}
-
 export function TokenOptimizer({
   analysis,
   stats,
-  cost,
-  events,
   eventTypeCounts,
   onFocusHint,
-  onOpenEvent,
 }: {
   analysis: TokenAnalysis;
   stats: SessionStats;
-  cost: CostSummary;
-  events: AgentEvent[];
   eventTypeCounts: { name: string; value: number }[];
   onFocusHint: (focus: NonNullable<TokenHint["focus"]>) => void;
-  onOpenEvent: (eventId: string) => void;
 }) {
   const breakdown = [
     {
@@ -260,13 +75,78 @@ export function TokenOptimizer({
 
   return (
     <div className="space-y-6">
-      <CostSection cost={cost} />
+      <section>
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+          <Lightbulb className="size-4 text-brand" aria-hidden />
+          Optimization hints
+          {sortedHints.length > 0 && (
+            <span className="rounded-sm bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
+              {sortedHints.length}
+            </span>
+          )}
+        </h2>
 
-      <CostByTurn
-        events={events}
-        partial={cost.unpricedModels.length > 0}
-        onOpenEvent={onOpenEvent}
-      />
+        {sortedHints.length === 0 ? (
+          <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
+            <CheckCircle2
+              className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+              aria-hidden
+            />
+            <p className="text-sm text-foreground">
+              No issues detected in this session&rsquo;s context usage.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {sortedHints.map((hint) => {
+              const cfg = SEVERITY[hint.severity];
+              return (
+                <article
+                  key={`${hint.category}-${hint.title}`}
+                  className={cn("rounded-xl border p-4", cfg.card)}
+                >
+                  <div className="flex items-start gap-3">
+                    <cfg.Icon
+                      className={cn("mt-0.5 size-4 shrink-0", cfg.icon)}
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          {hint.category}
+                        </span>
+                        <span className="sr-only">{cfg.label}</span>
+                        {hint.saving && (
+                          <span className="rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-foreground">
+                            save ~{hint.saving}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-sm font-semibold text-foreground">
+                        {hint.title}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {hint.description}
+                      </p>
+                      {hint.focus && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => hint.focus && onFocusHint(hint.focus)}
+                          className="mt-2.5"
+                        >
+                          View related events
+                          <ArrowRight data-icon="inline-end" aria-hidden />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="mb-4 text-sm font-semibold text-foreground">
@@ -384,79 +264,6 @@ export function TokenOptimizer({
             emptyLabel="No events recorded."
           />
         </div>
-      </section>
-
-      <section>
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-          <Lightbulb className="size-4 text-brand" aria-hidden />
-          Optimization hints
-          {sortedHints.length > 0 && (
-            <span className="rounded-sm bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
-              {sortedHints.length}
-            </span>
-          )}
-        </h2>
-
-        {sortedHints.length === 0 ? (
-          <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900 dark:bg-emerald-950/30">
-            <CheckCircle2
-              className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-              aria-hidden
-            />
-            <p className="text-sm text-foreground">
-              No issues detected in this session&rsquo;s context usage.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {sortedHints.map((hint) => {
-              const cfg = SEVERITY[hint.severity];
-              return (
-                <article
-                  key={`${hint.category}-${hint.title}`}
-                  className={cn("rounded-xl border p-4", cfg.card)}
-                >
-                  <div className="flex items-start gap-3">
-                    <cfg.Icon
-                      className={cn("mt-0.5 size-4 shrink-0", cfg.icon)}
-                      aria-hidden
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          {hint.category}
-                        </span>
-                        <span className="sr-only">{cfg.label}</span>
-                        {hint.saving && (
-                          <span className="rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-foreground">
-                            save ~{hint.saving}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-sm font-semibold text-foreground">
-                        {hint.title}
-                      </p>
-                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                        {hint.description}
-                      </p>
-                      {hint.focus && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => hint.focus && onFocusHint(hint.focus)}
-                          className="mt-2.5"
-                        >
-                          View related events
-                          <ArrowRight data-icon="inline-end" aria-hidden />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
       </section>
     </div>
   );

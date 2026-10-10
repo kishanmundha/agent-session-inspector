@@ -84,6 +84,7 @@ export function SessionHeader({
   revealable = false,
   stats,
   cost,
+  context,
   activeMs,
   running = false,
   onFocusEvents,
@@ -95,6 +96,8 @@ export function SessionHeader({
   revealable?: boolean;
   stats?: SessionStats;
   cost?: CostSummary;
+  /** Tokens the latest request sent, and the most any request in the session sent. */
+  context?: { latest: number; peak: number };
   /** First-to-last event span. Real working time, unlike created→updated. */
   activeMs?: number | null;
   /** The agent wrote to the transcript in the last few minutes. */
@@ -265,6 +268,17 @@ export function SessionHeader({
                 sub="in + out + cache"
                 accent
               />
+              {context && (
+                <StatCard
+                  label="Context"
+                  value={tokens(context.latest)}
+                  sub={
+                    context.peak > context.latest
+                      ? `sent by the last request · peak ${tokens(context.peak)}`
+                      : "sent by the last request"
+                  }
+                />
+              )}
               {cost && (cost.inherited || cost.byModel.some((m) => m.costUSD !== null)) && (
                 <StatCard
                   label="Est. cost"

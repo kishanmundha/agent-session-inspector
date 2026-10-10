@@ -78,9 +78,11 @@ record.
   <img alt="Event timeline showing user prompt, thinking, and Grep/Read tool calls" src="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/timeline.png">
 </picture>
 
-**Token Optimizer.** What the session cost by token class, model and turn, where
-the context went (system prompt vs. tool results vs. replies), which tools ran
-most, and hints for trimming expensive sessions.
+**Cost and Token Optimizer.** The Cost tab shows what the session cost by token
+class, model and turn, with a table of every model request (context size,
+uncached input, cache write, cache read, output) grouped by turn. The Token
+Optimizer tab shows hints for trimming expensive sessions, where the context
+went (system prompt vs. tool results vs. replies) and which tools ran most.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/kishanmundha/agent-session-inspector/main/docs/screenshots/token-optimizer-dark.png">
@@ -294,7 +296,7 @@ Each session, and each request in the timeline, shows an estimated cost in
 dollars. Adapters attach `data.billedUsage` to the events that carry usage, with
 uncached input, cache reads, cache writes and output kept as separate,
 non-overlapping counts, and `pricing.ts` multiplies them by the model's list
-price. The Token Optimizer tab splits the total by token class and by model.
+price. The Cost tab splits the total by token class and by model.
 
 The figure is an API-equivalent estimate, not a bill: subscription and
 request-based plans charge differently, and requests an agent makes outside the

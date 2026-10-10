@@ -26,9 +26,31 @@ export interface CostTurn {
   compacted: boolean;
 }
 
+/** One request to a model: what it sent, what came back and what that cost. */
+export interface CostRequest {
+  /** Position among the session's requests, from 1. */
+  n: number;
+  /** The turn it was made in; 0 before the first prompt. */
+  turn: number;
+  eventId: string;
+  timestamp: string;
+  models: string[];
+  /** Sent at full price: not in the cache, and not stored in it. */
+  inputTokens: number;
+  cacheWriteTokens: number;
+  cacheReadTokens: number;
+  outputTokens: number;
+  /** Everything the request sent: the three input classes together. */
+  contextTokens: number;
+  /** Null when no model in the request has a price. */
+  costUSD: number | null;
+}
+
 export interface CostTimeline {
   /** Every turn from the first that cost anything, oldest first. */
   turns: CostTurn[];
+  /** Every request that reported usage, oldest first. */
+  requests: CostRequest[];
   /** Keyed by prompt event id. */
   turnByPrompt: Map<string, CostTurn>;
   /** The turn each event belongs to, by event id; none before the first prompt. */
@@ -48,6 +70,7 @@ export interface CostTimeline {
  */
 export function costTimeline(events: AgentEvent[]): CostTimeline {
   const turns: CostTurn[] = [];
+  const requests: CostRequest[] = [];
   const turnByPrompt = new Map<string, CostTurn>();
   const turnOf = new Map<string, number>();
   const runningUSD = new Map<string, number>();
@@ -102,6 +125,9 @@ export function costTimeline(events: AgentEvent[]): CostTimeline {
       turns.push(current);
     }
     for (const line of lines) addLine(current.lines, line);
+    if (lines.length > 0) {
+      requests.push(requestOf(event, lines, requests.length + 1, current.turn, priced ? cost : null));
+    }
     if (!priced) continue;
     totalUSD += cost;
     current.costUSD += cost;
@@ -115,12 +141,40 @@ export function costTimeline(events: AgentEvent[]): CostTimeline {
   const first = turns.findIndex((turn) => turn.costUSD > 0);
   return {
     turns: first === -1 ? [] : turns.slice(first),
+    requests,
     turnByPrompt,
     turnOf,
     runningUSD,
     maxEventUSD,
     totalUSD,
     inheritedUSD,
+  };
+}
+
+function requestOf(
+  event: AgentEvent,
+  lines: CostLine[],
+  n: number,
+  turn: number,
+  costUSD: number | null,
+): CostRequest {
+  const tokens = (...kinds: CostLine["kind"][]) =>
+    lines.reduce((sum, l) => (kinds.includes(l.kind) ? sum + l.tokens : sum), 0);
+  const inputTokens = tokens("input");
+  const cacheWriteTokens = tokens("cacheWrite", "cacheWrite1h");
+  const cacheReadTokens = tokens("cacheRead");
+  return {
+    n,
+    turn,
+    eventId: event.id,
+    timestamp: event.timestamp,
+    models: [...new Set(lines.map((l) => l.model))],
+    inputTokens,
+    cacheWriteTokens,
+    cacheReadTokens,
+    outputTokens: tokens("output"),
+    contextTokens: inputTokens + cacheWriteTokens + cacheReadTokens,
+    costUSD,
   };
 }
 
