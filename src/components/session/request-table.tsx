@@ -233,11 +233,11 @@ export function RequestTable({
 
       {/* The table scrolls sideways, so it needs its own vertical scroll for the header to stick. */}
       <div className="[&>[data-slot=table-container]]:max-h-[70vh] [&>[data-slot=table-container]]:overflow-y-auto">
-        <Table className="min-w-[46rem] table-fixed text-xs">
+        <Table className="min-w-[47rem] table-fixed text-xs">
           <colgroup>
             <col />
             {COLUMNS.map((label) => (
-              <col key={label} className={label === "Cost" ? "w-20" : "w-24"} />
+              <col key={label} className={label === "Cost" ? "w-20" : label === "Uncached input" ? "w-28" : "w-24"} />
             ))}
           </colgroup>
           <TableHeader>
