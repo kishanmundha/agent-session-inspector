@@ -125,7 +125,7 @@ writeJsonl(
         prompt: "Nice. Does the same bug exist in the order summary on the checkout page?",
         steps: [
           { tool: "Read", input: { file_path: `${checkoutCwd}/src/checkout/summary.tsx` }, result: "import { cartTotal } from '../cart/total';\n\nexport function OrderSummary({ items, shipping }) {\n  const subtotal = cartTotal(items);\n  const total = subtotal + shipping;\n  return <Money value={total} />;\n}" },
-          { tool: "Bash", input: { command: "pnpm test src/checkout", description: "Run checkout tests" }, seconds: 9, result: "Tests:       7 passed, 7 total" },
+          { tool: "Bash", input: { command: "pnpm test src/checkout", description: "Run checkout tests" }, seconds: 9, result: [{ type: "text", text: "Tests:       7 passed, 7 total" }] },
           { text: "The checkout summary calls `cartTotal`, so it picks up the fix automatically. Shipping is already stored in cents, so there's nothing else to change there." },
         ],
       },
@@ -148,6 +148,8 @@ writeJsonl(
         prompt: "Add a simple per-IP rate limit (60 requests/minute) to GET /forecast.",
         steps: [
           { tool: "Glob", input: { pattern: "src/routes/**/*.ts" }, result: "src/routes/forecast.ts\nsrc/routes/health.ts" },
+          // A result of typed parts: the image is counted on the timeline, not shown.
+          { tool: "Read", input: { file_path: `${apiCwd}/docs/rate-limit.png` }, result: [{ type: "text", text: "Diagram of the token bucket: 60 requests refill every minute." }, { type: "image", source: { type: "base64", media_type: "image/png", data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==" } }] },
           { tool: "Read", input: { file_path: `${apiCwd}/src/routes/forecast.ts` }, result: "router.get('/forecast', async (req, res) => {\n  const data = await getForecast(req.query.city);\n  res.json(data);\n});" },
           { tool: "Write", input: { file_path: `${apiCwd}/src/middleware/rate-limit.ts`, content: "export function rateLimit(limit: number, windowMs: number) { /* ... */ }" }, result: "File created successfully." },
           { tool: "Edit", input: { file_path: `${apiCwd}/src/routes/forecast.ts`, old_string: "router.get('/forecast',", new_string: "router.get('/forecast', rateLimit(60, 60_000)," }, result: "The file src/routes/forecast.ts has been updated." },

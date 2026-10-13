@@ -9,7 +9,15 @@ import type {
   SessionProvider,
 } from "./types";
 import { quickStatsFromEvents } from "./analysis";
-import { capText, createFileCache, readJsonl, walkFiles } from "./fs-utils";
+import {
+  argumentChars,
+  capText,
+  createFileCache,
+  readJsonl,
+  readJsonlRecord,
+  toolResult,
+  walkFiles,
+} from "./fs-utils";
 import { LOCAL_RUNTIME } from "./pricing";
 
 /** The shell tool reports a failed command only in its output text. */
@@ -111,6 +119,8 @@ function parseFile(filePath: string): ParsedSession {
 
   /** call_id → tool name, so tool outputs can be labelled like every other provider. */
   const toolNames = new Map<string, string>();
+  /** Position of the line being read, so its events can be traced back. */
+  let lineIndex = 0;
 
   const push = (timestamp: string, type: string, data: Record<string, unknown>) => {
     events.push({
@@ -119,10 +129,12 @@ function parseFile(filePath: string): ParsedSession {
       id: `codex-${seq++}`,
       timestamp,
       parentId: null,
+      source: String(lineIndex),
     });
   };
 
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
+    lineIndex = index;
     const ts = line.timestamp ?? lastTimestamp;
     if (line.timestamp) {
       if (!firstTimestamp) firstTimestamp = line.timestamp;
@@ -346,14 +358,15 @@ function parseFile(filePath: string): ParsedSession {
             const invocation = p.invocation as
               | { server?: string; tool?: string; arguments?: unknown }
               | undefined;
-            const capped = capText(p.result);
+            // `{ Ok: { content: [parts] } }` on success, `{ Err: message }` otherwise.
+            const outcome = p.result as { Ok?: { content?: unknown }; Err?: unknown } | undefined;
             push(ts, "external_tool.completed", {
               toolName: invocation ? `${invocation.server}__${invocation.tool}` : "mcp tool",
               toolCallId: p.call_id,
               arguments: invocation?.arguments,
-              resultChars: capped.chars,
-              success: Boolean((p.result as Record<string, unknown> | undefined)?.Ok),
-              result: { content: capped.text },
+              argumentChars: argumentChars(invocation?.arguments),
+              success: Boolean(outcome?.Ok),
+              ...toolResult(outcome?.Ok?.content ?? outcome?.Ok ?? outcome?.Err ?? p.result),
             });
             break;
           }
@@ -452,20 +465,19 @@ function parseFile(filePath: string): ParsedSession {
               toolCallId: p.call_id,
               status: p.status,
               arguments: args,
+              argumentChars: argumentChars(rawArgs),
             });
             break;
           }
           case "custom_tool_call_output":
           case "function_call_output":
           case "local_shell_call_output": {
-            const capped = capText(flattenContent(p.output));
+            const output = toolResult(p.output);
             push(ts, "tool.execution_complete", {
               toolName: toolNames.get(String(p.call_id)) ?? "exec",
               toolCallId: p.call_id,
-              success: !FAILED_EXIT.test(capped.text),
-              resultChars: capped.chars,
-              truncated: capped.truncated,
-              result: { content: capped.text },
+              success: !FAILED_EXIT.test(output.result.content),
+              ...output,
             });
             break;
           }
@@ -552,6 +564,12 @@ export const codexProvider: SessionProvider = {
       },
       storagePath: filePath,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
+  },
+
+  getRecord(id, source) {
+    if (id.includes("/") || id.includes("..")) return null;
+    const filePath = rolloutFiles().find((f) => path.basename(f).endsWith(`-${id}.jsonl`));
+    return filePath ? readJsonlRecord(filePath, source) : null;
   },
 
   listLogs() {

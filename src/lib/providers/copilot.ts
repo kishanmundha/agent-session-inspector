@@ -13,7 +13,16 @@ import type {
   SessionProvider,
 } from "./types";
 import { quickStatsFromEvents } from "./analysis";
-import { readJsonl, statOf, safeReaddir, safeReadFile } from "./fs-utils";
+import {
+  argumentChars,
+  capText,
+  readJsonl,
+  readJsonlRecord,
+  statOf,
+  safeReaddir,
+  safeReadFile,
+  toolResult,
+} from "./fs-utils";
 
 export const COPILOT_DIR = path.join(os.homedir(), ".copilot");
 const SESSION_STATE_DIR = path.join(COPILOT_DIR, "session-state");
@@ -122,8 +131,19 @@ function normalize(raw: AgentEvent): AgentEvent {
 
   if (raw.type === "tool.execution_complete" || raw.type === "external_tool.completed") {
     const result = data.result as Record<string, unknown> | undefined;
-    data.resultChars = String(result?.content ?? "").length;
+    // A failed call carries its message in `error` and no result at all.
+    const error = (data.error as { message?: unknown } | undefined)?.message;
+    const shaped = toolResult(result?.content ?? error);
+    const detail = result?.detailedContent;
+    if (typeof detail === "string" && detail.trim() && detail !== result?.content) {
+      shaped.result.detail = capText(detail).text;
+    }
+    Object.assign(data, shaped);
     data.toolName = data.toolName ?? data.name;
+  }
+
+  if (raw.type === "tool.execution_start" || raw.type === "external_tool.requested") {
+    data.argumentChars = argumentChars(data.arguments);
   }
 
   if (raw.type === "session.shutdown") {
@@ -152,7 +172,9 @@ function normalize(raw: AgentEvent): AgentEvent {
 function readEvents(id: string): AgentEvent[] {
   const eventsPath = path.join(SESSION_STATE_DIR, id, "events.jsonl");
   const events = readJsonl<AgentEvent>(eventsPath)
-    .filter((e) => e && typeof e.type === "string")
+    // Numbered before filtering, so `source` is the record's place in the file.
+    .map((e, index) => (e && typeof e.type === "string" ? { ...e, source: String(index) } : null))
+    .filter((e) => e !== null)
     .map(normalize);
 
   // The stats layer treats shutdown totals as cumulative (latest wins);
@@ -252,6 +274,11 @@ export const copilotProvider: SessionProvider = {
       },
       storagePath: sessionDir,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
+  },
+
+  getRecord(id, source) {
+    if (id.includes("/") || id.includes("..")) return null;
+    return readJsonlRecord(path.join(SESSION_STATE_DIR, id, "events.jsonl"), source);
   },
 
   listLogs(): LogFile[] {

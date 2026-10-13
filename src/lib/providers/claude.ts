@@ -11,11 +11,14 @@ import type {
 } from "./types";
 import { quickStatsFromEvents } from "./analysis";
 import {
+  argumentChars,
   capText,
   createFileCache,
   readJsonl,
+  readJsonlRecord,
   safeReaddir,
   statOf,
+  toolResult,
 } from "./fs-utils";
 
 export const CLAUDE_DIR = path.join(os.homedir(), ".claude");
@@ -329,6 +332,8 @@ export function parseClaudeTranscript(
   // sessionId. A file with no record of its own is not a fork, just renamed.
   const hasOwnRecords = records.some((rec) => rec.sessionId === id);
   let inherited = false;
+  /** Position of the record being read, so its events can be traced back. */
+  let recordIndex = 0;
 
   const push = (
     timestamp: string,
@@ -343,10 +348,12 @@ export function parseClaudeTranscript(
       id: uuid ? `${uuid}:${seq++}` : `claude-${seq++}`,
       timestamp,
       parentId: parentUuid ?? null,
+      source: String(recordIndex),
     });
   };
 
-  for (const rec of records) {
+  for (const [index, rec] of records.entries()) {
+    recordIndex = index;
     const ts = rec.timestamp ?? lastTimestamp;
     if (rec.timestamp) {
       if (!firstTimestamp) firstTimestamp = rec.timestamp;
@@ -498,10 +505,6 @@ export function parseClaudeTranscript(
           if (block.type === "text") {
             pushText(block.text);
           } else if (block.type === "tool_result") {
-            const raw = block.content ?? rec.toolUseResult;
-            const { text, chars, truncated } = capText(
-              typeof raw === "string" ? raw : raw,
-            );
             const toolName = toolNames.get(block.tool_use_id ?? "") ?? "tool";
             push(
               ts,
@@ -510,9 +513,7 @@ export function parseClaudeTranscript(
                 toolName,
                 toolCallId: block.tool_use_id,
                 success: block.is_error !== true,
-                resultChars: chars,
-                truncated,
-                result: { content: text },
+                ...toolResult(block.content ?? rec.toolUseResult),
               },
               rec.uuid,
               rec.parentUuid,
@@ -594,6 +595,7 @@ export function parseClaudeTranscript(
                 toolName: name,
                 toolCallId: block.id,
                 arguments: block.input ?? {},
+                argumentChars: argumentChars(block.input),
                 model: message.model,
                 ...attachUsage(),
               },
@@ -714,6 +716,11 @@ export const claudeProvider: SessionProvider = {
       },
       storagePath: found.filePath,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
+  },
+
+  getRecord(id, source) {
+    const found = findSessionFile(id);
+    return found ? readJsonlRecord(found.filePath, source) : null;
   },
 
   listLogs() {

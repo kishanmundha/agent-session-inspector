@@ -23,6 +23,8 @@ export type {
   SessionStats,
   TokenAnalysis,
   TokenHint,
+  ToolImage,
+  ToolResult,
 } from "@/lib/providers/types";
 
 import type {

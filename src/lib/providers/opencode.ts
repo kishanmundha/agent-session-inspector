@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import type { AgentEvent, BilledUsage, SessionDetail, SessionMeta, SessionProvider } from "./types";
 import { quickStatsFromEvents } from "./analysis";
-import { capText, isoFromMs, parseJson, tildePath } from "./fs-utils";
+import { argumentChars, capText, isoFromMs, parseJson, tildePath, toolResult } from "./fs-utils";
 import { LOCAL_RUNTIME } from "./pricing";
 import { createDatabaseCache, readDatabase, rows } from "./sqlite-utils";
 
@@ -189,21 +189,17 @@ function parse(session: SessionRow, messages: DataRow[], parts: DataRow[]): Pars
             toolName,
             toolCallId: part.callID,
             arguments: args,
+            argumentChars: argumentChars(state.input),
             model: messageModel,
             ...takeUsage(),
           }, row.id);
           // A call still pending or running has no result yet.
           if (state.status !== "completed" && state.status !== "error") break;
-          const { text, chars, truncated } = capText(
-            state.status === "error" ? state.error : state.output,
-          );
           push(isoFromMs(state.time?.end) || ts, "tool.execution_complete", {
             toolName,
             toolCallId: part.callID,
             success: state.status === "completed",
-            resultChars: chars,
-            truncated,
-            result: { content: text },
+            ...toolResult(state.status === "error" ? state.error : state.output),
           }, row.id);
           break;
         }

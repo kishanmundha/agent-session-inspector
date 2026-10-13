@@ -1,6 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import type { ToolImage, ToolResult } from "./types";
 
 export function safeReadFile(filePath: string): string {
   try {
@@ -40,6 +41,12 @@ export function readJsonl<T>(filePath: string): T[] {
     }
   }
   return out;
+}
+
+/** The record `readJsonl` returns at `index`, read fresh from disk. */
+export function readJsonlRecord(filePath: string, index: string): unknown {
+  if (!/^\d+$/.test(index)) return null;
+  return readJsonl<unknown>(filePath)[Number(index)] ?? null;
 }
 
 /** Recursively collect files matching a predicate, bounded by depth. */
@@ -166,6 +173,109 @@ export function capText(value: unknown): { text: string; chars: number; truncate
   const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
   if (text.length <= TEXT_CAP) return { text, chars: text.length, truncated: false };
   return { text: `${text.slice(0, TEXT_CAP)}…`, chars: text.length, truncated: true };
+}
+
+const TEXT_PARTS = /^(text|input_text|output_text)$/;
+const DATA_URI = /^data:([^;,]+)?(?:;[^,]*)?,/;
+
+/** Decoded size of a base64 payload. */
+function base64Bytes(data: string): number {
+  const padding = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((data.length * 3) / 4) - padding);
+}
+
+/** An image part in the Anthropic or OpenAI shape; null for anything else. */
+function imageOf(part: Record<string, unknown>): ToolImage | null {
+  if (part.type === "image") {
+    const source = (part.source ?? {}) as { media_type?: string; data?: string };
+    return {
+      mediaType: source.media_type,
+      bytes: typeof source.data === "string" ? base64Bytes(source.data) : undefined,
+    };
+  }
+  if (part.type === "input_image" || part.type === "image_url") {
+    const url = part.image_url as string | { url?: string } | undefined;
+    const href = typeof url === "string" ? url : (url?.url ?? "");
+    const uri = DATA_URI.exec(href);
+    if (!uri) return {};
+    return { mediaType: uri[1], bytes: base64Bytes(href.slice(uri[0].length)) };
+  }
+  return null;
+}
+
+/** A string that holds a JSON document, indented; null when it is prose. */
+function indentJson(text: string): string | null {
+  const trimmed = text.trim();
+  if (!/^[{[]/.test(trimmed) || !/[}\]]$/.test(trimmed)) return null;
+  const parsed = parseJson<unknown>(trimmed);
+  return parsed && typeof parsed === "object" ? JSON.stringify(parsed, null, 2) : null;
+}
+
+/**
+ * Reduces whatever a tool returned to readable text. Agents record a string,
+ * a list of typed parts, or a bare object; images are counted, not shipped.
+ * Spread the outcome into the event: `resultChars` is the size of the text the
+ * model was given, before the display cap and without the images.
+ */
+export function toolResult(raw: unknown): {
+  result: ToolResult;
+  resultChars: number;
+  truncated: boolean;
+} {
+  const images: ToolImage[] = [];
+  let format: ToolResult["format"] = "text";
+  let text: string;
+  let chars: number;
+
+  if (typeof raw === "string" || raw == null) {
+    text = raw ?? "";
+    chars = text.length;
+  } else if (Array.isArray(raw)) {
+    const texts: string[] = [];
+    for (const part of raw) {
+      if (typeof part === "string") {
+        texts.push(part);
+        continue;
+      }
+      const p = (part ?? {}) as Record<string, unknown>;
+      const image = imageOf(p);
+      if (image) images.push(image);
+      else if (typeof p.text === "string" && (!p.type || TEXT_PARTS.test(String(p.type)))) texts.push(p.text);
+      else if (p.type === "tool_reference") texts.push(`[tool reference: ${String(p.tool_name ?? "")}]`);
+      else texts.push(JSON.stringify(p));
+    }
+    text = texts.join("\n");
+    chars = text.length;
+  } else {
+    text = JSON.stringify(raw, null, 2);
+    chars = JSON.stringify(raw).length;
+    format = "json";
+  }
+
+  if (format === "text") {
+    const indented = indentJson(text);
+    if (indented !== null) {
+      text = indented;
+      format = "json";
+    }
+  }
+
+  const capped = capText(text);
+  return {
+    result: {
+      content: capped.text,
+      format,
+      ...(images.length > 0 ? { images } : {}),
+    },
+    resultChars: chars,
+    truncated: capped.truncated,
+  };
+}
+
+/** Size of a tool call's arguments as the model wrote them. */
+export function argumentChars(args: unknown): number {
+  if (typeof args === "string") return args.length;
+  return args == null ? 0 : (JSON.stringify(args)?.length ?? 0);
 }
 
 /** Epoch milliseconds as the ISO timestamp events carry; empty when unusable. */

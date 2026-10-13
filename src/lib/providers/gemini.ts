@@ -4,6 +4,7 @@ import path from "path";
 import type { AgentEvent, BilledUsage, SessionDetail, SessionMeta, SessionProvider } from "./types";
 import { quickStatsFromEvents } from "./analysis";
 import {
+  argumentChars,
   capText,
   createFileCache,
   parseJson,
@@ -11,6 +12,7 @@ import {
   safeReadFile,
   safeReaddir,
   walkFiles,
+  toolResult,
 } from "./fs-utils";
 
 const GEMINI_DIR = path.join(os.homedir(), ".gemini");
@@ -166,9 +168,10 @@ function parseFile(filePath: string): ParsedSession | null {
   let firstPrompt = "";
   let lastTimestamp = metadata.startTime ?? "";
 
+  // Every event of a message is traced back to that message by its id.
   const push = (timestamp: string, type: string, data: Record<string, unknown>, parentId: string) => {
     if (timestamp > lastTimestamp) lastTimestamp = timestamp;
-    events.push({ type, data, id: `${parentId}:${events.length}`, timestamp, parentId });
+    events.push({ type, data, id: `${parentId}:${events.length}`, timestamp, parentId, source: parentId });
   };
 
   for (const message of messages) {
@@ -251,21 +254,19 @@ function parseFile(filePath: string): ParsedSession | null {
         toolName,
         toolCallId: call.id,
         arguments: args,
+        argumentChars: argumentChars(call.args),
         model: message.model,
         ...takeUsage(),
       }, message.id);
       // A call awaiting approval or still running has no result yet.
       if (!FINISHED.test(call.status ?? "")) continue;
-      const result = capText(toolOutput(call));
       push(callTime, "tool.execution_complete", {
         toolName,
         toolCallId: call.id,
         // The user turning a call down is not the tool failing.
         success: call.status !== "error",
         cancelled: call.status === "cancelled" || undefined,
-        resultChars: result.chars,
-        truncated: result.truncated,
-        result: { content: result.text },
+        ...toolResult(toolOutput(call)),
       }, message.id);
     }
     // Usage with nothing to show still has to be counted.
@@ -365,6 +366,11 @@ export const geminiProvider: SessionProvider = {
       },
       storagePath: filePath,
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
+  },
+
+  getRecord(id, source) {
+    const filePath = listAll().find(({ meta }) => meta.id === id)?.filePath;
+    return (filePath && replay(filePath).messages.find((message) => message.id === source)) || null;
   },
 
   listLogs() {

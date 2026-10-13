@@ -3,7 +3,7 @@ import os from "os";
 import path from "path";
 import type { AgentEvent, BilledUsage, SessionDetail, SessionMeta, SessionProvider } from "./types";
 import { quickStatsFromEvents } from "./analysis";
-import { capText, isoFromMs, parseJson, tildePath } from "./fs-utils";
+import { argumentChars, capText, isoFromMs, parseJson, tildePath, toolResult } from "./fs-utils";
 import { LOCAL_RUNTIME } from "./pricing";
 import { createDatabaseCache, readDatabase, rows } from "./sqlite-utils";
 
@@ -134,18 +134,16 @@ function parse(session: SessionRow, messages: MessageRow[]): ParsedSession {
           toolName,
           toolCallId,
           arguments: args,
+          argumentChars: argumentChars(call.function?.arguments),
           model: session.model,
         });
       }
     } else if (message.role === "tool") {
-      const { text, chars, truncated } = capText(content);
       push(ts, "tool.execution_complete", {
         toolName: message.tool_name ?? toolNames.get(message.tool_call_id ?? "") ?? "tool",
         toolCallId: message.tool_call_id,
         success: !toolFailed(content),
-        resultChars: chars,
-        truncated,
-        result: { content: text },
+        ...toolResult(content),
       });
     } else if (content) {
       const { text, chars, truncated } = capText(content);

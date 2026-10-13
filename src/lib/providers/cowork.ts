@@ -8,6 +8,7 @@ import {
   createFileCache,
   isoFromMs,
   parseJson,
+  readJsonlRecord,
   safeReadFile,
   safeReaddir,
   statOf,
@@ -151,6 +152,11 @@ export const coworkProvider: SessionProvider = {
       },
       storagePath: session.descriptorPath.slice(0, -".json".length),
     } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
+  },
+
+  getRecord(id, source) {
+    const session = sessions().find((s) => s.id === id);
+    return session ? readJsonlRecord(session.transcript, source) : null;
   },
 
   listLogs() {

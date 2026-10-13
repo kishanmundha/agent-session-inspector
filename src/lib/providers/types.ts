@@ -310,6 +310,31 @@ export interface AgentEvent {
   id: string;
   timestamp: string;
   parentId: string | null;
+  /**
+   * Where the adapter read the event from, in whatever form its own
+   * `getRecord` understands. Absent when the original cannot be looked up.
+   */
+  source?: string;
+}
+
+/** An image a tool handed back; the pixels stay on disk. */
+export interface ToolImage {
+  mediaType?: string;
+  /** Decoded size; absent when the transcript only links to the image. */
+  bytes?: number;
+}
+
+/**
+ * What a tool returned, as `data.result` of a completed call. Every adapter
+ * reduces its own format to this, so `content` is always readable text.
+ */
+export interface ToolResult {
+  /** Plain text, capped for display. `json` content is already indented. */
+  content: string;
+  format: "text" | "json";
+  images?: ToolImage[];
+  /** A second rendering some tools add, usually a diff. */
+  detail?: string;
 }
 
 /**
@@ -427,4 +452,6 @@ export interface SessionProvider {
   getSession(id: string): Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost"> | null;
   listLogs(): LogFile[];
   getLogContent(name: string): string;
+  /** The transcript record an event's `source` names, exactly as stored. */
+  getRecord?(id: string, source: string): unknown;
 }

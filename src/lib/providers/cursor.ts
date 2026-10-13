@@ -6,6 +6,7 @@ import type { AgentEvent, BilledUsage, SessionDetail, SessionMeta, SessionProvid
 import { quickStatsFromEvents } from "./analysis";
 import {
   appDataDir,
+  argumentChars,
   capText,
   createFileCache,
   isoFromMs,
@@ -15,6 +16,7 @@ import {
   statOf,
   tildePath,
   walkFiles,
+  toolResult,
 } from "./fs-utils";
 import { createDatabaseCache, readDatabase, rows } from "./sqlite-utils";
 
@@ -162,21 +164,19 @@ function parseComposer(composer: Composer, bubbles: Bubble[]): ParsedSession | n
         toolName: tool.name,
         toolCallId: tool.toolCallId,
         arguments: args,
+        argumentChars: argumentChars(tool.rawArgs || tool.params),
         model,
         ...takeUsage(),
       }, id);
       // A call awaiting approval or still running has no result yet.
       if (FINISHED.test(tool.status ?? "")) {
-        const result = capText(tool.result);
         push(isoFromMs(bubble.completedAtMs) || ts, "tool.execution_complete", {
           toolName: tool.name,
           toolCallId: tool.toolCallId,
           // The user turning a call down is not the tool failing.
           success: tool.status !== "error",
           cancelled: tool.status === "cancelled" || undefined,
-          resultChars: result.chars,
-          truncated: result.truncated,
-          result: { content: result.text },
+          ...toolResult(tool.result),
         }, id);
       }
     }
@@ -348,7 +348,7 @@ function parseTranscript(filePath: string): ParsedSession | null {
           const value = args[key];
           if (typeof value === "string" && EDIT_TOOLS.test(toolName)) files.add(value);
         }
-        push("tool.execution_start", { toolName, arguments: args }, index);
+        push("tool.execution_start", { toolName, arguments: args, argumentChars: argumentChars(part.input) }, index);
         continue;
       }
       if (part.type !== "text" || !part.text?.trim()) continue;

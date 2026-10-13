@@ -2,6 +2,7 @@
 
 import { Fragment, useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   ArrowUpRight,
   ArrowDownNarrowWide,
@@ -30,12 +31,12 @@ import { InputTokensIcon, OutputTokensIcon } from "@/components/common/token-ico
 import { SearchInput } from "@/components/common/search-input";
 import { Segmented } from "@/components/common/segmented";
 import { costTimeline, type CostTurn } from "@/lib/cost-timeline";
-import { formatCost } from "@/lib/format";
+import { formatBytes, formatCost } from "@/lib/format";
 import { useHotkeys } from "@/lib/use-hotkeys";
 import { useQueryParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
 
-import type { AgentEvent } from "./types";
+import type { AgentEvent, ToolResult } from "./types";
 
 interface Props {
   events: AgentEvent[];
@@ -506,13 +507,124 @@ function AssistantMessageCard({ data }: { data: Record<string, unknown> }) {
   );
 }
 
+/** Text size with the token estimate the other cards use: four chars a token. */
+function sizeLabel(chars: number) {
+  return `${chars.toLocaleString()} chars · ~${formatCompactNumber(Math.round(chars / 4))} tokens`;
+}
+
+const TOOL_BLOCK_CLS =
+  "max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-sm border border-border bg-muted p-2 font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]";
+
+/** Heading of one part of a tool card, with its size and a copy button. */
+function ToolSectionHeading({ label, note, copyValue }: { label: string; note?: string; copyValue: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-amber-600 dark:text-amber-500">{label}</span>
+      {note && <span className="text-[11px] tabular-nums text-muted-foreground">{note}</span>}
+      <CopyButton value={copyValue} label={`Copy ${label.toLowerCase()}`} className="-my-1" />
+    </div>
+  );
+}
+
+/** Arguments one per key, so a command or a file body keeps its line breaks. */
+function ToolArguments({ args, chars }: { args: Record<string, unknown>; chars?: number }) {
+  const entries = Object.entries(args);
+  if (entries.length === 0) return null;
+  const size = chars ?? JSON.stringify(args).length;
+
+  return (
+    <div>
+      <ToolSectionHeading label="Arguments" note={sizeLabel(size)} copyValue={JSON.stringify(args, null, 2)} />
+      <dl className="mt-1 space-y-1.5">
+        {entries.map(([key, value]) => {
+          const text = typeof value === "string" ? value : JSON.stringify(value, null, 2) ?? "";
+          const block = text.includes("\n") || text.length > 100;
+          return (
+            <div key={key} className={block ? "space-y-0.5" : "flex items-baseline gap-2"}>
+              <dt className="shrink-0 font-mono text-[11px] text-muted-foreground">{key}</dt>
+              <dd className="min-w-0">
+                {block ? (
+                  <pre className={TOOL_BLOCK_CLS}>{text}</pre>
+                ) : (
+                  <span className="break-words font-mono text-xs text-foreground [overflow-wrap:anywhere]">
+                    {text}
+                  </span>
+                )}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+    </div>
+  );
+}
+
+/** What a tool returned: its text as written, plus what was left out of it. */
+function ToolResultView({
+  result,
+  chars,
+  truncated,
+}: {
+  result: ToolResult;
+  chars?: number;
+  truncated?: boolean;
+}) {
+  const [showDetail, setShowDetail] = useState(false);
+  const content = typeof result.content === "string" ? result.content : "";
+  const images = result.images ?? [];
+  const imageBytes = images.reduce((sum, image) => sum + (image.bytes ?? 0), 0);
+  const size = chars ?? content.length;
+  const note = [
+    size > 0 ? sizeLabel(size) : images.length === 0 ? "empty" : null,
+    result.format === "json" ? "JSON" : null,
+    images.length > 0
+      ? `${images.length} image${images.length === 1 ? "" : "s"}${imageBytes > 0 ? ` (${formatBytes(imageBytes)})` : ""}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div>
+      <ToolSectionHeading label="Result" note={note} copyValue={content} />
+      <div className="mt-1 space-y-1.5">
+        {content && <pre className={TOOL_BLOCK_CLS}>{content}</pre>}
+        {truncated && (
+          <p className="text-[11px] text-amber-700 dark:text-amber-400">
+            Showing the first {content.length.toLocaleString()} of {size.toLocaleString()} chars.
+            The whole result is in the original record, under Raw.
+          </p>
+        )}
+        {images.map((image, i) => (
+          <p key={i} className="text-[11px] text-muted-foreground">
+            Image {i + 1}: {image.mediaType ?? "unknown type"}
+            {image.bytes ? `, ${formatBytes(image.bytes)}` : ""} (not loaded)
+          </p>
+        ))}
+        {result.detail && (
+          <div>
+            <Button
+              variant="link"
+              size="xs"
+              onClick={() => setShowDetail(!showDetail)}
+              aria-expanded={showDetail}
+              className="h-auto px-0 font-normal text-muted-foreground"
+            >
+              {showDetail ? "▼" : "▶"} Detail
+            </Button>
+            {showDetail && <pre className={cn(TOOL_BLOCK_CLS, "mt-1")}>{result.detail}</pre>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ToolExecutionCard({ data, type }: { data: Record<string, unknown>; type: string }) {
   const toolName = data.toolName as string;
-  const args = data.arguments as Record<string, unknown>;
-  const result = data.result as Record<string, unknown>;
+  const args = data.arguments as Record<string, unknown> | undefined;
+  const result = data.result as ToolResult | undefined;
   const success = data.success as boolean;
-  const [showArgs, setShowArgs] = useState(false);
-  const [showResult, setShowResult] = useState(false);
 
   return (
     <div className="space-y-2">
@@ -528,29 +640,15 @@ function ToolExecutionCard({ data, type }: { data: Record<string, unknown>; type
           </span>
         )}
       </div>
-      {args && Object.keys(args).length > 0 && (
-        <div>
-          <Button variant="link" size="xs" onClick={() => setShowArgs(!showArgs)} className="h-auto px-0 font-normal text-amber-600 dark:text-amber-500">
-            {showArgs ? "▼" : "▶"} Arguments
-          </Button>
-          {showArgs && (
-            <pre className="mt-1 p-2 bg-muted rounded-sm text-xs text-foreground overflow-auto max-h-48 font-mono border border-border">
-              {JSON.stringify(args, null, 2)}
-            </pre>
-          )}
-        </div>
+      {args && typeof args === "object" && (
+        <ToolArguments args={args} chars={data.argumentChars as number | undefined} />
       )}
       {result && (
-        <div>
-          <Button variant="link" size="xs" onClick={() => setShowResult(!showResult)} className="h-auto px-0 font-normal text-amber-600 dark:text-amber-500">
-            {showResult ? "▼" : "▶"} Result
-          </Button>
-          {showResult && (
-            <pre className="mt-1 p-2 bg-muted rounded-sm text-xs text-foreground overflow-auto max-h-48 font-mono border border-border">
-              {JSON.stringify(result, null, 2)}
-            </pre>
-          )}
-        </div>
+        <ToolResultView
+          result={result}
+          chars={data.resultChars as number | undefined}
+          truncated={data.truncated === true}
+        />
       )}
     </div>
   );
@@ -788,7 +886,7 @@ function ExternalToolCard({ data, type }: { data: Record<string, unknown>; type:
   const toolCallId = data.toolCallId as string | undefined;
   const workingDirectory = data.workingDirectory as string | undefined;
   const argumentsObj = data.arguments as Record<string, unknown> | undefined;
-  const [showArgs, setShowArgs] = useState(false);
+  const result = data.result as ToolResult | undefined;
 
   return (
     <div className="space-y-2.5">
@@ -824,17 +922,15 @@ function ExternalToolCard({ data, type }: { data: Record<string, unknown>; type:
         </div>
       )}
 
-      {type === "external_tool.requested" && argumentsObj && Object.keys(argumentsObj).length > 0 && (
-        <div>
-          <Button variant="link" size="xs" onClick={() => setShowArgs(!showArgs)} className="h-auto px-0 font-normal text-lime-700 dark:text-lime-400">
-            {showArgs ? "▼" : "▶"} Arguments
-          </Button>
-          {showArgs && (
-            <pre className="mt-1 p-2 bg-background/70 rounded-sm text-xs text-foreground overflow-auto max-h-40 font-mono border border-lime-200 dark:border-lime-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-              {JSON.stringify(argumentsObj, null, 2)}
-            </pre>
-          )}
-        </div>
+      {argumentsObj && typeof argumentsObj === "object" && (
+        <ToolArguments args={argumentsObj} chars={data.argumentChars as number | undefined} />
+      )}
+      {type === "external_tool.completed" && result && (
+        <ToolResultView
+          result={result}
+          chars={data.resultChars as number | undefined}
+          truncated={data.truncated === true}
+        />
       )}
     </div>
   );
@@ -1575,6 +1671,15 @@ function lineDelta(input?: Record<string, unknown>): { added: number; removed: n
   return found ? { added, removed } : null;
 }
 
+/** How much text a completed call returned, for a collapsed row; empty when none. */
+function resultSize(data: Record<string, unknown>): string {
+  const chars = typeof data.resultChars === "number" ? data.resultChars : 0;
+  return chars > 0 ? `${formatCompactNumber(chars)} chars` : "";
+}
+
+/** A result this long is a real share of the context window. */
+const LARGE_RESULT_CHARS = 20_000;
+
 /**
  * One-line description of an event, so the timeline can stay collapsed by
  * default and still be readable at a glance.
@@ -1621,7 +1726,7 @@ function eventSummary(event: AgentEvent): {
     case "tool.execution_complete":
       return {
         label: (d.toolName as string) || "Tool",
-        preview: d.success === false ? "failed" : "completed",
+        preview: [d.success === false ? "failed" : "completed", resultSize(d)].filter(Boolean).join(" · "),
       };
     case "external_tool.requested":
     case "external_tool.completed":
@@ -1630,7 +1735,7 @@ function eventSummary(event: AgentEvent): {
         preview:
           event.type === "external_tool.requested"
             ? firstArg(d.arguments as Record<string, unknown> | undefined)
-            : "completed",
+            : ["completed", resultSize(d)].filter(Boolean).join(" · "),
       };
     case "session.start":
     case "session.resume": {
@@ -1866,6 +1971,84 @@ const DEFAULT_OPEN_TYPES = new Set([
   "assistant.thinking",
 ]);
 
+/** Past this much text a record is only shown in part; copying still takes all of it. */
+const ORIGINAL_PREVIEW_CHARS = 200_000;
+
+/**
+ * The transcript records an event was read from, fetched when asked for. The
+ * event above is what the app made of them: capped, and with images left out.
+ */
+function OriginalRecord({ sources }: { sources: string[] }) {
+  const params = useParams<{ provider?: string; id?: string }>();
+  const [state, setState] = useState<{ status: "idle" | "loading" | "failed" } | { status: "loaded"; text: string }>({
+    status: "idle",
+  });
+  if (sources.length === 0 || !params.provider || !params.id) return null;
+
+  async function load() {
+    setState({ status: "loading" });
+    try {
+      const id = encodeURIComponent(decodeURIComponent(params.id ?? ""));
+      const records = await Promise.all(
+        sources.map(async (source) => {
+          const res = await fetch(
+            `/api/sessions/${params.provider}/${id}/record?source=${encodeURIComponent(source)}`,
+          );
+          if (!res.ok) throw new Error(String(res.status));
+          return ((await res.json()) as { record: unknown }).record;
+        }),
+      );
+      setState({
+        status: "loaded",
+        text: JSON.stringify(records.length === 1 ? records[0] : records, null, 2),
+      });
+    } catch {
+      setState({ status: "failed" });
+    }
+  }
+
+  return (
+    <div className="mt-2.5">
+      <div className="mb-1.5 flex items-center gap-2">
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Original record</p>
+        {state.status === "loaded" ? (
+          <>
+            <span className="text-[11px] tabular-nums text-muted-foreground">
+              {state.text.length.toLocaleString()} chars
+            </span>
+            <CopyButton value={state.text} label="Copy the original record" className="-my-1" />
+          </>
+        ) : (
+          <Button
+            variant="link"
+            size="xs"
+            onClick={load}
+            disabled={state.status === "loading"}
+            className="h-auto px-0 font-normal"
+          >
+            {state.status === "loading" ? "Loading…" : "Load from transcript"}
+          </Button>
+        )}
+        {state.status === "failed" && (
+          <span className="text-[11px] text-destructive">Could not read the record.</span>
+        )}
+      </div>
+      {state.status === "loaded" && (
+        <>
+          <pre className="max-h-96 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted p-2.5 font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">
+            {state.text.slice(0, ORIGINAL_PREVIEW_CHARS)}
+          </pre>
+          {state.text.length > ORIGINAL_PREVIEW_CHARS && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Showing the first {ORIGINAL_PREVIEW_CHARS.toLocaleString()} chars; Copy takes the whole record.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function EventCard({
   event,
   prevTimestamp,
@@ -1928,7 +2111,13 @@ function EventCard({
         <ToolExecutionCard
           data={
             result
-              ? { ...event.data, result: result.data.result, success: result.data.success }
+              ? {
+                  ...event.data,
+                  result: result.data.result,
+                  success: result.data.success,
+                  resultChars: result.data.resultChars,
+                  truncated: result.data.truncated,
+                }
               : event.data
           }
           type={result ? "tool.execution_complete" : "tool.execution_start"}
@@ -2045,6 +2234,10 @@ function EventCard({
 
   const content = renderContent();
   const rawJson = JSON.stringify(merged && result ? [event, result] : event, null, 2);
+  // A call and its result usually sit in different records of the transcript.
+  const sources = [...new Set([event.source, merged ? result?.source : undefined])].filter(
+    (source): source is string => typeof source === "string",
+  );
   const failed = result?.data.success === false;
   const took = result ? durationMs(event.timestamp, result.timestamp) : null;
   // Every row is expandable: even without a rendered detail there is always the
@@ -2112,6 +2305,20 @@ function EventCard({
               {summary.delta.removed > 0 && (
                 <span className="ml-1 text-red-700 dark:text-red-400">−{summary.delta.removed}</span>
               )}
+            </span>
+          )}
+
+          {merged && result && resultSize(result.data) && (
+            <span
+              className={cn(
+                "hidden shrink-0 font-mono text-[11px] tabular-nums md:inline",
+                (result.data.resultChars as number) >= LARGE_RESULT_CHARS
+                  ? "text-amber-700 dark:text-amber-400"
+                  : "text-muted-foreground",
+              )}
+              title={`The result is ${sizeLabel(result.data.resultChars as number)}`}
+            >
+              {resultSize(result.data)}
             </span>
           )}
 
@@ -2286,6 +2493,7 @@ function EventCard({
                 <pre className="max-h-64 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted p-2.5 font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">
                   {rawJson}
                 </pre>
+                <OriginalRecord sources={sources} />
               </div>
             )}
           </div>

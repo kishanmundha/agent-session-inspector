@@ -5,6 +5,7 @@ import type { AgentEvent, BilledUsage, SessionDetail, SessionMeta, SessionProvid
 import { quickStatsFromEvents } from "./analysis";
 import {
   appDataDir,
+  argumentChars,
   capText,
   createFileCache,
   isoFromMs,
@@ -13,6 +14,7 @@ import {
   safeReadFile,
   safeReaddir,
   tildePath,
+  toolResult,
 } from "./fs-utils";
 
 /** Copilot Chat lives in the editor's own storage, one folder per build. */
@@ -250,35 +252,34 @@ function parseFile(filePath: string): ParsedSession | null {
         const detail = part.toolSpecificData;
         if (call?.at && call.at > at) at = call.at;
         const toolName = call?.name ?? part.toolId ?? "tool";
+        const args =
+          parseJson<Record<string, unknown>>(call?.arguments) ??
+          (detail?.kind === "terminal"
+            ? { command: detail.commandLine?.original }
+            : detail?.kind === "subagent"
+              ? { description: detail.description, agent: detail.agentName, prompt: detail.prompt }
+              : { description: textOf(part.invocationMessage) });
         push(at, "tool.execution_start", {
           toolName,
           toolCallId: callId,
-          arguments:
-            parseJson<Record<string, unknown>>(call?.arguments) ??
-            (detail?.kind === "terminal"
-              ? { command: detail.commandLine?.original }
-              : detail?.kind === "subagent"
-                ? { description: detail.description, agent: detail.agentName, prompt: detail.prompt }
-                : { description: textOf(part.invocationMessage) }),
+          arguments: args,
+          argumentChars: argumentChars(call?.arguments ?? args),
           model: requestModel,
         }, requestId);
 
         const finishedAt = detail?.terminalCommandState?.timestamp;
         if (finishedAt && finishedAt > at) at = finishedAt;
         const exitCode = detail?.terminalCommandState?.exitCode;
-        const { text, chars, truncated } = capText(
-          (callId && results.get(callId)) ||
-            detail?.result ||
-            detail?.terminalCommandOutput?.text?.replace(ANSI, "") ||
-            textOf(part.pastTenseMessage),
-        );
         push(at, "tool.execution_complete", {
           toolName,
           toolCallId: callId,
           success: typeof exitCode !== "number" || exitCode === 0,
-          resultChars: chars,
-          truncated,
-          result: { content: text },
+          ...toolResult(
+            (callId && results.get(callId)) ||
+              detail?.result ||
+              detail?.terminalCommandOutput?.text?.replace(ANSI, "") ||
+              textOf(part.pastTenseMessage),
+          ),
         }, requestId);
       } else if (EDIT_PARTS.has(part.kind)) {
         const file = part.uri?.fsPath ?? part.uri?.path;

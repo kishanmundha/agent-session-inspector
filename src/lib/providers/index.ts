@@ -261,6 +261,16 @@ export function getSession(providerId: string, id: string): SessionDetail | null
 }
 
 /**
+ * The transcript record behind an event, exactly as the agent stored it.
+ * Undefined when the provider cannot look records up, null when it is gone.
+ */
+export function getRecord(providerId: string, id: string, source: string): unknown {
+  const provider = getProvider(providerId);
+  if (!provider?.getRecord) return undefined;
+  return provider.getRecord(id, source) ?? null;
+}
+
+/**
  * What changes when a transcript grows, without parsing it again: the session
  * page polls this to learn when a running session has something new.
  */
