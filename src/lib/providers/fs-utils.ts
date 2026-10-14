@@ -120,15 +120,25 @@ export function findGitRoot(cwd: string): string | null {
 }
 
 /**
+ * The platform this process runs on. Read off `globalThis` because the bundler
+ * replaces `process.platform` (and `os.platform()`) with the platform of the
+ * machine that ran the build, which for a release is the Linux CI runner.
+ */
+export function runtimePlatform(): NodeJS.Platform {
+  return (globalThis as { process?: NodeJS.Process }).process?.platform ?? "linux";
+}
+
+/**
  * Where a desktop app keeps its data on this platform: `Application Support`
  * on macOS, `%APPDATA%` on Windows, `~/.config` elsewhere.
  */
 export function appDataDir(appName: string): string {
   const home = os.homedir();
-  if (process.platform === "darwin") {
+  const platform = runtimePlatform();
+  if (platform === "darwin") {
     return path.join(home, "Library", "Application Support", appName);
   }
-  if (process.platform === "win32") {
+  if (platform === "win32") {
     return path.join(process.env.APPDATA ?? path.join(home, "AppData", "Roaming"), appName);
   }
   return path.join(process.env.XDG_CONFIG_HOME ?? path.join(home, ".config"), appName);

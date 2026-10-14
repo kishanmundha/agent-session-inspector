@@ -1,11 +1,12 @@
 import { spawn } from "child_process";
 import path from "path";
-import { statOf } from "@/lib/providers/fs-utils";
+import { runtimePlatform, statOf } from "@/lib/providers/fs-utils";
 
 /** The file manager command that shows `target`: a folder opened, a file selected. */
 function command(target: string, isDirectory: boolean): [string, string[]] {
-  if (process.platform === "darwin") return ["open", isDirectory ? [target] : ["-R", target]];
-  if (process.platform === "win32") {
+  const platform = runtimePlatform();
+  if (platform === "darwin") return ["open", isDirectory ? [target] : ["-R", target]];
+  if (platform === "win32") {
     return ["explorer.exe", [isDirectory ? target : `/select,${target}`]];
   }
   return ["xdg-open", [isDirectory ? target : path.dirname(target)]];
