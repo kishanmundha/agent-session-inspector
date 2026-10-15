@@ -397,6 +397,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
                   live={live}
                   onLiveChange={setLive}
                   running={running}
+                  clientVersion={data.meta.client_name}
                 />
               </TabsContent>
 

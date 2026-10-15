@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
+import { EventAboutDialog, fetchOriginalRecords } from "./event-about-dialog";
 import { InputTokensIcon, OutputTokensIcon } from "@/components/common/token-icons";
 import { SearchInput } from "@/components/common/search-input";
 import { Segmented } from "@/components/common/segmented";
@@ -56,6 +57,8 @@ interface Props {
   onLiveChange?: (live: boolean) => void;
   /** The agent is still writing to this session. */
   running?: boolean;
+  /** Client version the session names, for agents that stamp it only once. */
+  clientVersion?: string;
 }
 
 // Per event type: display label plus light/dark-aware colour classes.
@@ -329,47 +332,6 @@ const CATEGORY_VISUAL: Record<string, { dotCls: string; typeCls: string; chipCls
 
 /** Events rendered per page; the rest load on demand. */
 const PAGE_SIZE = 150;
-
-const EVENT_TYPE_HELP: Record<string, string> = {
-  "session.start": "Session initialization event. Captures the runtime context and selected model when a session begins.",
-  "session.resume": "Session resumed from previous state. Indicates context reload and continuation.",
-  "session.shutdown": "Session end summary. Usually includes usage, token totals, premium requests, and API timing.",
-  "session.auto_mode_resolved": "Auto-mode model selection result. Shows predicted task profile and chosen model settings.",
-  "session.binary_asset": "Binary payload captured in the session (typically screenshots/images). Can consume significant context/storage.",
-  "session.usage_checkpoint": "Interim usage accounting snapshot (AIU/premium usage/cache state) while session is active.",
-  "session.model_change": "Model configuration switched during the session (model/effort/context tier).",
-  "session.compaction_start": "Context compaction started. Conversation is being summarized/compressed to reduce token load.",
-  "session.compaction_complete": "Compaction finished, with success/failure metadata and request identifiers.",
-  "user.message": "User input message that drives the next assistant turn.",
-  "assistant.message": "Assistant output message, optionally with model/tool-request and token metadata.",
-  "assistant.turn_start": "Start of a single assistant reasoning/execution turn.",
-  "assistant.turn_end": "End of the assistant turn after reasoning/tools/output.",
-  "tool.execution_start": "A local tool invocation started with tool name and arguments.",
-  "tool.execution_complete": "A local tool invocation completed with status and result payload.",
-  "external_tool.requested": "Request sent to an external tool bridge/service.",
-  "external_tool.completed": "External tool request lifecycle completed.",
-  "permission.requested": "Runtime requested user permission for an action (e.g., file/system/network).",
-  "permission.completed": "Permission flow resolved (approved/denied).",
-  "hook.start": "Lifecycle hook execution started (for example, prompt submission hooks).",
-  "hook.end": "Lifecycle hook execution completed with success/failure state.",
-  "subagent.deselected": "Subagent focus was cleared and control returned to the main agent context.",
-  "system.message": "System-level instruction/context block injected into the conversation runtime.",
-  "assistant.thinking": "Extended reasoning the model produced before answering. Billed as output tokens.",
-  "session.error": "API or transport error. Each retry re-sends the full request context.",
-  "context.attachment": "Context the runtime injected automatically: file snapshots, reminders, tool or skill listings.",
-  "file.patch_applied": "A patch the agent applied to the workspace, with the files it touched.",
-  "web.search": "Web search issued by the model; results are added to the conversation context.",
-  "session.turn_context": "Per-turn runtime configuration: model, effort, sandbox and approval policy.",
-  "session.world_state": "Snapshot of the workspace the runtime handed to the model.",
-  "session.mode_change": "Interaction or permission mode switched during the session.",
-  "session.turn_aborted": "The turn was interrupted before it completed.",
-  "session.rollback": "Conversation was rolled back by a number of turns.",
-  "subagent.activity": "Activity reported by a subagent working under the main agent.",
-  "subagent.message": "Message passed between agents.",
-  "subagent.session_start": "A subagent thread started inside this session.",
-  "session.plan_changed": "The agent created or updated its working plan.",
-  "system.notification": "Runtime notification injected into the conversation, such as a background shell finishing.",
-};
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], {
@@ -1988,16 +1950,7 @@ function OriginalRecord({ sources }: { sources: string[] }) {
   async function load() {
     setState({ status: "loading" });
     try {
-      const id = encodeURIComponent(decodeURIComponent(params.id ?? ""));
-      const records = await Promise.all(
-        sources.map(async (source) => {
-          const res = await fetch(
-            `/api/sessions/${params.provider}/${id}/record?source=${encodeURIComponent(source)}`,
-          );
-          if (!res.ok) throw new Error(String(res.status));
-          return ((await res.json()) as { record: unknown }).record;
-        }),
-      );
+      const records = await fetchOriginalRecords(params.provider ?? "", params.id ?? "", sources);
       setState({
         status: "loaded",
         text: JSON.stringify(records.length === 1 ? records[0] : records, null, 2),
@@ -2060,6 +2013,7 @@ function EventCard({
   runningUSD,
   costShare = 0,
   turn,
+  clientVersion,
 }: {
   event: AgentEvent;
   prevTimestamp?: string;
@@ -2079,11 +2033,13 @@ function EventCard({
   turn?: CostTurn;
   /** Bumped by the toolbar; `open` forces every row open, `closed` closes them. */
   expandAll: { nonce: number; mode: "open" | "closed" } | null;
+  clientVersion?: string;
 }) {
   const cfg = EVENT_CONFIG[event.type] || DEFAULT_CONFIG;
   const gap = prevTimestamp ? durationMs(prevTimestamp, event.timestamp) : null;
   const [showRaw, setShowRaw] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
+  /** null until the About dialog is first opened. */
+  const [showAbout, setShowAbout] = useState<boolean | null>(null);
 
   // Local open state, re-seeded whenever the toolbar issues a new expand/collapse.
   const [openState, setOpenState] = useState({
@@ -2103,7 +2059,6 @@ function EventCard({
   const typeParts = splitEventType(event.type);
   const categoryVisual = CATEGORY_VISUAL[typeParts.category];
   const visual = categoryVisual ?? cfg;
-  const helpText = EVENT_TYPE_HELP[event.type] ?? `Event in "${typeParts.category}" category with "${typeParts.subCategory}" sub-category.`;
 
   function renderContent() {
     if (merged) {
@@ -2441,8 +2396,8 @@ function EventCard({
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={() => setShowHelp(!showHelp)}
-                aria-expanded={showHelp}
+                onClick={() => setShowAbout(true)}
+                aria-haspopup="dialog"
                 className="text-muted-foreground"
               >
                 <Info className="size-3.5" aria-hidden />
@@ -2475,16 +2430,9 @@ function EventCard({
               </CopyButton>
             </div>
 
-            {/* Both panels open below the action bar, so toggling either one
-                never shifts the button that controls it. They are ordered to
-                match the buttons above them. */}
-            {showHelp && (
-              <div className="border-t border-border bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                {helpText}
-              </div>
-            )}
-
-            {/* Raw JSON supplements the rendered detail rather than replacing it. */}
+            {/* Raw JSON supplements the rendered detail rather than replacing
+                it. It opens below the action bar, so toggling it never shifts
+                the button that controls it. */}
             {showRaw && (
               <div className="border-t border-border px-3 py-2.5">
                 <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -2499,6 +2447,18 @@ function EventCard({
           </div>
         )}
       </div>
+
+      {/* Mounted on first use only: a long timeline has hundreds of rows. */}
+      {showAbout !== null && (
+        <EventAboutDialog
+          open={showAbout}
+          onOpenChange={setShowAbout}
+          event={event}
+          result={merged ? result : undefined}
+          sources={sources}
+          clientVersion={clientVersion}
+        />
+      )}
     </div>
   );
 }
@@ -2549,6 +2509,7 @@ export function EventsTimeline({
   live = false,
   onLiveChange,
   running = false,
+  clientVersion,
 }: Props) {
   // A fork numbers its copy of an event differently from its parent, so a link
   // followed from one session into the other falls back to the transcript
@@ -3289,6 +3250,7 @@ export function EventsTimeline({
                         : 0
                     }
                     turn={cost.turnByPrompt.get(event.id)}
+                    clientVersion={clientVersion}
                   />
                 </Fragment>
               );
