@@ -1,6 +1,6 @@
-import fs from "fs";
-import path from "path";
-import os from "os";
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import type {
   AgentEvent,
   BilledUsage,
@@ -8,8 +8,8 @@ import type {
   SessionDetail,
   SessionMeta,
   SessionProvider,
-} from "./types";
-import { quickStatsFromEvents } from "./analysis";
+} from './types';
+import { quickStatsFromEvents } from './analysis';
 import {
   argumentChars,
   capText,
@@ -19,10 +19,10 @@ import {
   safeReaddir,
   statOf,
   toolResult,
-} from "./fs-utils";
+} from './fs-utils';
 
-export const CLAUDE_DIR = path.join(os.homedir(), ".claude");
-const PROJECTS_DIR = path.join(CLAUDE_DIR, "projects");
+export const CLAUDE_DIR = path.join(os.homedir(), '.claude');
+const PROJECTS_DIR = path.join(CLAUDE_DIR, 'projects');
 
 interface ClaudeUsage {
   input_tokens?: number;
@@ -78,6 +78,8 @@ interface ClaudeRecord {
   totalCostUSD?: number;
   totalAPIDuration?: number;
   attachment?: { type?: string } & Record<string, unknown>;
+  /** Marks a record Claude Code wrote itself, in the user's voice. */
+  isMeta?: boolean;
   message?: {
     role?: string;
     model?: string;
@@ -94,44 +96,45 @@ interface ClaudeRecord {
  * as a fallback when no record in the transcript carries a real `cwd`.
  */
 function decodeProjectDir(dirName: string): string {
-  return dirName.replace(/^-/, "/").replace(/-/g, "/");
+  return dirName.replace(/^-/, '/').replace(/-/g, '/');
 }
 
-const FILE_ARG_KEYS = ["file_path", "notebook_path", "path", "filePath"];
+const FILE_ARG_KEYS = ['file_path', 'notebook_path', 'path', 'filePath'];
 const EDIT_TOOLS = /^(Edit|Write|MultiEdit|NotebookEdit|Update)$/;
 
 /** Human labels for the attachment kinds Claude Code injects. */
 const ATTACHMENT_LABELS: Record<string, string> = {
-  deferred_tools_delta: "Tool catalog",
-  deferred_tools_record: "Tool catalog",
-  tool_definitions: "Tool definitions",
-  environment: "Environment",
-  model: "Model identity",
-  session_context: "Session context",
-  date: "Date",
-  date_change: "Date",
-  batching_reminder_sent: "Reminder",
-  silent_turn_reminder: "Reminder",
-  agent_listing_delta: "Agent listing",
-  mcp_instructions_delta: "MCP instructions",
-  skill_listing: "Skill listing",
-  auto_mode: "Auto mode",
-  total_tokens_reminder: "Token budget",
-  edited_text_file: "File edited outside the session",
-  nested_memory: "Memory file",
-  hook_additional_context: "Hook context",
-  queued_command: "Queued command",
-  task_reminder: "Task reminder",
-  command_permissions: "Command permissions",
-  remote_session_change: "Remote session",
-  file: "Attached file",
-  image: "Image",
+  deferred_tools_delta: 'Tool catalog',
+  deferred_tools_record: 'Tool catalog',
+  tool_definitions: 'Tool definitions',
+  environment: 'Environment',
+  model: 'Model identity',
+  session_context: 'Session context',
+  date: 'Date',
+  date_change: 'Date',
+  batching_reminder_sent: 'Reminder',
+  silent_turn_reminder: 'Reminder',
+  agent_listing_delta: 'Agent listing',
+  mcp_instructions_delta: 'MCP instructions',
+  skill_listing: 'Skill listing',
+  auto_mode: 'Auto mode',
+  total_tokens_reminder: 'Token budget',
+  edited_text_file: 'File edited outside the session',
+  nested_memory: 'Memory file',
+  hook_additional_context: 'Hook context',
+  queued_command: 'Queued command',
+  task_reminder: 'Task reminder',
+  command_permissions: 'Command permissions',
+  remote_session_change: 'Remote session',
+  file: 'Attached file',
+  image: 'Image',
+  synthetic: 'Injected context',
 };
 
 function joinText(value: unknown): string {
-  if (Array.isArray(value)) return value.map((v) => joinText(v)).join("\n");
-  if (typeof value === "string") return value;
-  return value == null ? "" : JSON.stringify(value, null, 2);
+  if (Array.isArray(value)) return value.map((v) => joinText(v)).join('\n');
+  if (typeof value === 'string') return value;
+  return value == null ? '' : JSON.stringify(value, null, 2);
 }
 
 function toNames(value: unknown): string[] {
@@ -146,109 +149,117 @@ function toNames(value: unknown): string[] {
 function describeAttachment(
   attachment: { type?: string } & Record<string, unknown>,
 ): Record<string, unknown> {
-  const type = attachment.type ?? "unknown";
+  const type = attachment.type ?? 'unknown';
   let subject: string | undefined;
   let items: string[] = [];
   let itemsLabel: string | undefined;
-  let body = "";
+  let body = '';
 
   switch (type) {
-    case "total_tokens_reminder":
-    case "batching_reminder_sent":
-    case "silent_turn_reminder":
-    case "model":
+    case 'total_tokens_reminder':
+    case 'batching_reminder_sent':
+    case 'silent_turn_reminder':
+    case 'synthetic':
+    case 'model':
       body = joinText(attachment.text);
       break;
-    case "date":
-    case "date_change":
+    case 'date':
+    case 'date_change':
       subject = (attachment.date as string) ?? (attachment.newDate as string);
       break;
-    case "environment":
+    case 'environment':
       body = joinText(attachment.snapshot);
       break;
-    case "session_context":
-      body = Object.values((attachment.context as Record<string, unknown>) ?? {})
+    case 'session_context':
+      body = Object.values(
+        (attachment.context as Record<string, unknown>) ?? {},
+      )
         .map((v) => joinText(v))
-        .join("\n\n");
+        .join('\n\n');
       break;
-    case "deferred_tools_record": {
+    case 'deferred_tools_record': {
       const entries = (attachment.entries as { name?: string }[]) ?? [];
-      items = entries.map((entry) => String(entry?.name ?? "tool"));
-      itemsLabel = "tools";
+      items = entries.map((entry) => String(entry?.name ?? 'tool'));
+      itemsLabel = 'tools';
       body = joinText(entries);
       break;
     }
-    case "edited_text_file":
+    case 'edited_text_file':
       subject = attachment.filename as string;
       body = joinText(attachment.snippet);
       break;
-    case "file": {
-      subject = (attachment.displayPath as string) ?? (attachment.filename as string);
+    case 'file': {
+      subject =
+        (attachment.displayPath as string) ?? (attachment.filename as string);
       const content = attachment.content as Record<string, unknown> | undefined;
       const file = content?.file as Record<string, unknown> | undefined;
       body = joinText(file?.content ?? content);
       break;
     }
-    case "nested_memory": {
-      subject = (attachment.displayPath as string) ?? (attachment.path as string);
+    case 'nested_memory': {
+      subject =
+        (attachment.displayPath as string) ?? (attachment.path as string);
       const content = attachment.content as Record<string, unknown> | undefined;
       body = joinText(content?.content ?? content);
       break;
     }
-    case "hook_additional_context":
+    case 'hook_additional_context':
       subject = attachment.hookName as string;
       body = joinText(attachment.content);
       break;
-    case "queued_command":
+    case 'queued_command':
       subject = attachment.commandMode as string;
       body = joinText(attachment.prompt);
       break;
-    case "task_reminder":
+    case 'task_reminder':
       subject =
-        typeof attachment.itemCount === "number"
-          ? `${attachment.itemCount} item${attachment.itemCount === 1 ? "" : "s"}`
+        typeof attachment.itemCount === 'number'
+          ? `${attachment.itemCount} item${attachment.itemCount === 1 ? '' : 's'}`
           : undefined;
       body = joinText(attachment.content);
       break;
-    case "command_permissions":
+    case 'command_permissions':
       items = toNames(attachment.allowedTools);
-      itemsLabel = "allowed";
+      itemsLabel = 'allowed';
       break;
-    case "skill_listing":
+    case 'skill_listing':
       items = toNames(attachment.names);
-      itemsLabel = "skills";
-      subject = attachment.isInitial ? "initial listing" : "updated";
+      itemsLabel = 'skills';
+      subject = attachment.isInitial ? 'initial listing' : 'updated';
       body = joinText(attachment.content);
       break;
-    case "agent_listing_delta":
+    case 'agent_listing_delta':
       items = toNames(attachment.addedTypes);
-      itemsLabel = "agents";
+      itemsLabel = 'agents';
       body = joinText(attachment.addedLines);
       break;
-    case "mcp_instructions_delta":
+    case 'mcp_instructions_delta':
       items = toNames(attachment.addedNames);
-      itemsLabel = "servers";
+      itemsLabel = 'servers';
       body = joinText(attachment.addedBlocks);
       break;
-    case "deferred_tools_delta": {
+    case 'deferred_tools_delta': {
       items = toNames(attachment.addedNames);
-      itemsLabel = "tools added";
+      itemsLabel = 'tools added';
       const removed = toNames(attachment.removedNames).length;
       subject = removed ? `${removed} removed` : undefined;
       body = joinText(attachment.addedLines);
       break;
     }
-    case "auto_mode":
+    case 'auto_mode':
       items = Object.entries(attachment)
-        .filter(([key, value]) => key !== "type" && value === true)
+        .filter(([key, value]) => key !== 'type' && value === true)
         .map(([key]) => key);
-      itemsLabel = "flags";
+      itemsLabel = 'flags';
       break;
-    case "remote_session_change":
+    case 'remote_session_change':
       subject = (attachment.url as string) ?? undefined;
-      body = [attachment.commit, attachment.pr].filter(Boolean).map(String).join("\n");
+      body = [attachment.commit, attachment.pr]
+        .filter(Boolean)
+        .map(String)
+        .join('\n');
       break;
-    case "image":
+    case 'image':
       break;
     default:
       body = joinText(attachment);
@@ -257,7 +268,7 @@ function describeAttachment(
   const capped = capText(body);
   return {
     attachmentType: type,
-    label: ATTACHMENT_LABELS[type] ?? type.replace(/_/g, " "),
+    label: ATTACHMENT_LABELS[type] ?? type.replace(/_/g, ' '),
     subject,
     items: items.slice(0, 200),
     itemCount: items.length,
@@ -273,19 +284,24 @@ function systemPromptOf(attachment: Record<string, unknown>): string {
   const sections = Array.isArray(attachment.systemPrompt)
     ? attachment.systemPrompt.map((s) => joinText(s).trim())
     : [joinText(attachment.systemPrompt).trim()];
-  return sections.filter(Boolean).join("\n\n");
+  return sections.filter(Boolean).join('\n\n');
 }
 
 /** Tool schemas sent alongside the system prompt; listed by name, sized in full. */
-function describeToolDefinitions(tools: unknown[], chars: number): Record<string, unknown> {
-  const names = tools.map((tool) => String((tool as { name?: string })?.name ?? "tool"));
+function describeToolDefinitions(
+  tools: unknown[],
+  chars: number,
+): Record<string, unknown> {
+  const names = tools.map((tool) =>
+    String((tool as { name?: string })?.name ?? 'tool'),
+  );
   return {
-    attachmentType: "tool_definitions",
+    attachmentType: 'tool_definitions',
     label: ATTACHMENT_LABELS.tool_definitions,
     items: names.slice(0, 200),
     itemCount: names.length,
-    itemsLabel: "tools",
-    content: "",
+    itemsLabel: 'tools',
+    content: '',
     charLength: chars,
     truncated: false,
   };
@@ -293,10 +309,18 @@ function describeToolDefinitions(tools: unknown[], chars: number): Record<string
 
 /** CLAUDE.md / AGENTS.md files loaded into the system prompt. */
 function instructionFilesText(attachment: Record<string, unknown>): string {
-  const files = (attachment.files as { path?: string; type?: string; content?: string }[]) ?? [];
+  const files =
+    (attachment.files as {
+      path?: string;
+      type?: string;
+      content?: string;
+    }[]) ?? [];
   return files
-    .map((file) => `# ${file.path ?? "instructions"}${file.type ? ` (${file.type})` : ""}\n${file.content ?? ""}`)
-    .join("\n\n");
+    .map(
+      (file) =>
+        `# ${file.path ?? 'instructions'}${file.type ? ` (${file.type})` : ''}\n${file.content ?? ''}`,
+    )
+    .join('\n\n');
 }
 
 export interface ParsedSession {
@@ -311,8 +335,8 @@ export interface ParsedSession {
  */
 export function parseClaudeTranscript(
   filePath: string,
-  provider: ProviderId = "claude",
-  id = path.basename(filePath, ".jsonl"),
+  provider: ProviderId = 'claude',
+  id = path.basename(filePath, '.jsonl'),
 ): ParsedSession {
   const records = readJsonl<ClaudeRecord>(filePath);
   const events: AgentEvent[] = [];
@@ -321,12 +345,12 @@ export function parseClaudeTranscript(
   const toolNames = new Map<string, string>();
   /** Streamed messages repeat their usage on every block record; count once. */
   const usageSeen = new Set<string>();
-  let lastSystemPrompt = "";
-  let lastToolDefinitions = "";
+  let lastSystemPrompt = '';
+  let lastToolDefinitions = '';
 
   const meta: SessionMeta = { provider, id };
-  let firstTimestamp = "";
-  let lastTimestamp = "";
+  let firstTimestamp = '';
+  let lastTimestamp = '';
   let seq = 0;
   // A fork starts as a copy of its parent's records, which keep the parent's
   // sessionId. A file with no record of its own is not a fork, just renamed.
@@ -368,41 +392,53 @@ export function parseClaudeTranscript(
     if (rec.entrypoint) meta.host_type = rec.entrypoint;
 
     switch (rec.type) {
-      case "custom-title":
+      case 'custom-title':
         if (rec.customTitle) {
           meta.title = rec.customTitle;
           meta.user_named = true;
         }
         continue;
-      case "ai-title":
+      case 'ai-title':
         if (rec.aiTitle && !meta.user_named) meta.title = rec.aiTitle;
         continue;
       // Session bookkeeping records with no place on a timeline.
-      case "last-prompt":
-      case "atis-latch":
-      case "bridge-session":
-      case "queue-operation":
-      case "file-history-snapshot":
+      case 'last-prompt':
+      case 'atis-latch':
+      case 'bridge-session':
+      case 'queue-operation':
+      case 'file-history-snapshot':
         continue;
 
-      case "mode":
-      case "permission-mode":
-        push(ts, "session.mode_change", {
-          mode: rec.mode ?? rec.permissionMode,
-        }, rec.uuid, rec.parentUuid);
+      case 'mode':
+      case 'permission-mode':
+        push(
+          ts,
+          'session.mode_change',
+          {
+            mode: rec.mode ?? rec.permissionMode,
+          },
+          rec.uuid,
+          rec.parentUuid,
+        );
         continue;
 
-      case "cost-state":
-        push(ts, "session.usage_checkpoint", {
-          totalCostUSD: rec.totalCostUSD,
-          apiDurationMs: rec.totalAPIDuration,
-          sessionTotals: { apiDurationMs: rec.totalAPIDuration ?? 0 },
-        }, rec.uuid, rec.parentUuid);
+      case 'cost-state':
+        push(
+          ts,
+          'session.usage_checkpoint',
+          {
+            totalCostUSD: rec.totalCostUSD,
+            apiDurationMs: rec.totalAPIDuration,
+            sessionTotals: { apiDurationMs: rec.totalAPIDuration ?? 0 },
+          },
+          rec.uuid,
+          rec.parentUuid,
+        );
         continue;
 
-      case "attachment": {
+      case 'attachment': {
         const attachment = rec.attachment ?? {};
-        if (attachment.type === "prompt_snapshot") {
+        if (attachment.type === 'prompt_snapshot') {
           // The snapshot is re-recorded whenever any part of it changes, so
           // only emit the parts that differ from what was last shown.
           const prompt = systemPromptOf(attachment);
@@ -414,12 +450,18 @@ export function parseClaudeTranscript(
             const { text, chars, truncated } = capText(
               prefix ? `${prefix}\n\n${prompt}` : prompt,
             );
-            push(ts, "system.message", {
-              role: "system_prompt",
-              content: text,
-              charLength: chars,
-              truncated,
-            }, rec.uuid, rec.parentUuid);
+            push(
+              ts,
+              'system.message',
+              {
+                role: 'system_prompt',
+                content: text,
+                charLength: chars,
+                truncated,
+              },
+              rec.uuid,
+              rec.parentUuid,
+            );
           }
           if (Array.isArray(attachment.tools)) {
             const serialized = JSON.stringify(attachment.tools);
@@ -427,7 +469,7 @@ export function parseClaudeTranscript(
               lastToolDefinitions = serialized;
               push(
                 ts,
-                "context.attachment",
+                'context.attachment',
                 describeToolDefinitions(attachment.tools, serialized.length),
                 rec.uuid,
                 rec.parentUuid,
@@ -436,79 +478,151 @@ export function parseClaudeTranscript(
           }
           continue;
         }
-        if (attachment.type === "instructions") {
-          const { text, chars, truncated } = capText(instructionFilesText(attachment));
-          push(ts, "system.message", {
-            role: "instructions",
-            content: text,
-            charLength: chars,
-            truncated,
-          }, rec.uuid, rec.parentUuid);
+        if (attachment.type === 'instructions') {
+          const { text, chars, truncated } = capText(
+            instructionFilesText(attachment),
+          );
+          push(
+            ts,
+            'system.message',
+            {
+              role: 'instructions',
+              content: text,
+              charLength: chars,
+              truncated,
+            },
+            rec.uuid,
+            rec.parentUuid,
+          );
           continue;
         }
-        push(ts, "context.attachment", describeAttachment(attachment), rec.uuid, rec.parentUuid);
+        push(
+          ts,
+          'context.attachment',
+          describeAttachment(attachment),
+          rec.uuid,
+          rec.parentUuid,
+        );
         continue;
       }
 
-      case "system": {
-        if (rec.subtype === "api_error") {
-          push(ts, "session.error", {
-            message: rec.error?.message ?? "API error",
-            detail: rec.error?.formatted ?? "",
-            level: rec.level,
-            error: rec.error,
-          }, rec.uuid, rec.parentUuid);
-        } else if (rec.subtype === "stop_hook_summary") {
-          push(ts, "hook.end", {
-            hookType: "Stop",
-            hookCount: rec.hookCount,
-            success: (rec.hookErrors?.length ?? 0) === 0,
-          }, rec.uuid, rec.parentUuid);
-        } else if (rec.subtype === "compact_boundary") {
-          push(ts, "session.compaction_start", {
-            trigger: rec.compactMetadata?.trigger,
-            preTokens: rec.compactMetadata?.preTokens,
-          }, rec.uuid, rec.parentUuid);
-        } else if (rec.subtype === "turn_duration") {
-          push(ts, "assistant.turn_end", {
-            durationMs: rec.durationMs,
-          }, rec.uuid, rec.parentUuid);
+      case 'system': {
+        if (rec.subtype === 'api_error') {
+          push(
+            ts,
+            'session.error',
+            {
+              message: rec.error?.message ?? 'API error',
+              detail: rec.error?.formatted ?? '',
+              level: rec.level,
+              error: rec.error,
+            },
+            rec.uuid,
+            rec.parentUuid,
+          );
+        } else if (rec.subtype === 'stop_hook_summary') {
+          push(
+            ts,
+            'hook.end',
+            {
+              hookType: 'Stop',
+              hookCount: rec.hookCount,
+              success: (rec.hookErrors?.length ?? 0) === 0,
+            },
+            rec.uuid,
+            rec.parentUuid,
+          );
+        } else if (rec.subtype === 'compact_boundary') {
+          push(
+            ts,
+            'session.compaction_start',
+            {
+              trigger: rec.compactMetadata?.trigger,
+              preTokens: rec.compactMetadata?.preTokens,
+            },
+            rec.uuid,
+            rec.parentUuid,
+          );
+        } else if (rec.subtype === 'turn_duration') {
+          push(
+            ts,
+            'assistant.turn_end',
+            {
+              durationMs: rec.durationMs,
+            },
+            rec.uuid,
+            rec.parentUuid,
+          );
         } else {
           const { text, chars, truncated } = capText(rec.content);
-          push(ts, "system.message", {
-            role: rec.subtype ?? "system",
-            content: text,
-            charLength: chars,
-            truncated,
-          }, rec.uuid, rec.parentUuid);
+          push(
+            ts,
+            'system.message',
+            {
+              role: rec.subtype ?? 'system',
+              content: text,
+              charLength: chars,
+              truncated,
+            },
+            rec.uuid,
+            rec.parentUuid,
+          );
         }
         continue;
       }
 
-      case "user": {
+      case 'user': {
         const content = rec.message?.content;
         // An interruption is logged as if the user had typed it. Same concept
         // as Codex's turn_aborted; use one vocabulary for both.
         const pushText = (raw: unknown) => {
+          // `isMeta` marks text Claude Code injected in the user's voice: the
+          // dimension notice that follows an image, a local-command caveat.
+          // Same concept as OpenCode's synthetic parts; it is no prompt, and
+          // counting it as one would split the turn it belongs to.
+          if (rec.isMeta === true) {
+            push(
+              ts,
+              'context.attachment',
+              describeAttachment({ type: 'synthetic', text: raw }),
+              rec.uuid,
+              rec.parentUuid,
+            );
+            return;
+          }
           const { text } = capText(raw);
           if (INTERRUPTED.test(text)) {
-            push(ts, "session.turn_aborted", { reason: "interrupted", message: text }, rec.uuid, rec.parentUuid);
+            push(
+              ts,
+              'session.turn_aborted',
+              { reason: 'interrupted', message: text },
+              rec.uuid,
+              rec.parentUuid,
+            );
           } else {
-            push(ts, "user.message", { content: text }, rec.uuid, rec.parentUuid);
+            push(
+              ts,
+              'user.message',
+              { content: text },
+              rec.uuid,
+              rec.parentUuid,
+            );
           }
         };
-        if (typeof content === "string") {
+        if (typeof content === 'string') {
           pushText(content);
           continue;
         }
         for (const block of content ?? []) {
-          if (block.type === "text") {
+          if (block.type === 'text') {
             pushText(block.text);
-          } else if (block.type === "tool_result") {
-            const toolName = toolNames.get(block.tool_use_id ?? "") ?? "tool";
+          } else if (block.type === 'tool_result') {
+            const toolName = toolNames.get(block.tool_use_id ?? '') ?? 'tool';
             push(
               ts,
-              toolName.startsWith("mcp__") ? "external_tool.completed" : "tool.execution_complete",
+              toolName.startsWith('mcp__')
+                ? 'external_tool.completed'
+                : 'tool.execution_complete',
               {
                 toolName,
                 toolCallId: block.tool_use_id,
@@ -518,29 +632,37 @@ export function parseClaudeTranscript(
               rec.uuid,
               rec.parentUuid,
             );
-          } else if (block.type === "image") {
-            push(ts, "context.attachment", describeAttachment({ type: "image" }), rec.uuid, rec.parentUuid);
+          } else if (block.type === 'image') {
+            push(
+              ts,
+              'context.attachment',
+              describeAttachment({ type: 'image' }),
+              rec.uuid,
+              rec.parentUuid,
+            );
           }
         }
         continue;
       }
 
-      case "assistant": {
+      case 'assistant': {
         const message = rec.message;
         if (!message) continue;
         // "<synthetic>" marks a message Claude Code wrote itself (an API error,
         // an expired login), not a model that ran.
-        if (message.model && message.model !== "<synthetic>") meta.model = message.model;
+        if (message.model && message.model !== '<synthetic>')
+          meta.model = message.model;
 
         const usage = message.usage;
-        const messageKey = message.id ?? rec.requestId ?? rec.uuid ?? "";
+        const messageKey = message.id ?? rec.requestId ?? rec.uuid ?? '';
         let usageData: Record<string, unknown> = {};
         if (usage && messageKey && !usageSeen.has(messageKey)) {
           usageSeen.add(messageKey);
           usageData = {
             outputTokens: usage.output_tokens ?? 0,
             inputTokens:
-              (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+              (usage.input_tokens ?? 0) +
+              (usage.cache_creation_input_tokens ?? 0),
             cacheReadTokens: usage.cache_read_input_tokens ?? 0,
             billedUsage: {
               model: message.model,
@@ -549,10 +671,11 @@ export function parseClaudeTranscript(
               cacheReadTokens: usage.cache_read_input_tokens ?? 0,
               // Older transcripts have no TTL split; those writes were 5-minute.
               cacheWriteTokens: usage.cache_creation
-                ? usage.cache_creation.ephemeral_5m_input_tokens ?? 0
-                : usage.cache_creation_input_tokens ?? 0,
-              cacheWrite1hTokens: usage.cache_creation?.ephemeral_1h_input_tokens ?? 0,
-              fast: usage.speed === "fast",
+                ? (usage.cache_creation.ephemeral_5m_input_tokens ?? 0)
+                : (usage.cache_creation_input_tokens ?? 0),
+              cacheWrite1hTokens:
+                usage.cache_creation?.ephemeral_1h_input_tokens ?? 0,
+              fast: usage.speed === 'fast',
             } satisfies BilledUsage,
           };
         }
@@ -566,31 +689,45 @@ export function parseClaudeTranscript(
         };
 
         for (const block of blocks) {
-          if (block.type === "text") {
-            push(ts, "assistant.message", {
-              content: capText(block.text).text,
-              model: message.model,
-              effort: rec.effort,
-              requestId: rec.requestId,
-              ...attachUsage(),
-            }, rec.uuid, rec.parentUuid);
-          } else if (block.type === "thinking") {
-            push(ts, "assistant.thinking", {
-              content: capText(block.thinking).text,
-              charLength: (block.thinking ?? "").length,
-              model: message.model,
-              ...attachUsage(),
-            }, rec.uuid, rec.parentUuid);
-          } else if (block.type === "tool_use") {
-            const name = block.name ?? "tool";
+          if (block.type === 'text') {
+            push(
+              ts,
+              'assistant.message',
+              {
+                content: capText(block.text).text,
+                model: message.model,
+                effort: rec.effort,
+                requestId: rec.requestId,
+                ...attachUsage(),
+              },
+              rec.uuid,
+              rec.parentUuid,
+            );
+          } else if (block.type === 'thinking') {
+            push(
+              ts,
+              'assistant.thinking',
+              {
+                content: capText(block.thinking).text,
+                charLength: (block.thinking ?? '').length,
+                model: message.model,
+                ...attachUsage(),
+              },
+              rec.uuid,
+              rec.parentUuid,
+            );
+          } else if (block.type === 'tool_use') {
+            const name = block.name ?? 'tool';
             if (block.id) toolNames.set(block.id, name);
             for (const key of FILE_ARG_KEYS) {
               const v = block.input?.[key];
-              if (typeof v === "string" && EDIT_TOOLS.test(name)) files.add(v);
+              if (typeof v === 'string' && EDIT_TOOLS.test(name)) files.add(v);
             }
             push(
               ts,
-              name.startsWith("mcp__") ? "external_tool.requested" : "tool.execution_start",
+              name.startsWith('mcp__')
+                ? 'external_tool.requested'
+                : 'tool.execution_start',
               {
                 toolName: name,
                 toolCallId: block.id,
@@ -606,11 +743,17 @@ export function parseClaudeTranscript(
         }
         // Usage-only records (no renderable block) still need to be counted.
         if (!usageAttached && Object.keys(usageData).length > 0) {
-          push(ts, "assistant.message", {
-            content: "",
-            model: message.model,
-            ...usageData,
-          }, rec.uuid, rec.parentUuid);
+          push(
+            ts,
+            'assistant.message',
+            {
+              content: '',
+              model: message.model,
+              ...usageData,
+            },
+            rec.uuid,
+            rec.parentUuid,
+          );
         }
         continue;
       }
@@ -621,7 +764,7 @@ export function parseClaudeTranscript(
   // timeline opens with the same context header every provider gets.
   if (firstTimestamp) {
     events.unshift({
-      type: "session.start",
+      type: 'session.start',
       data: {
         sessionId: id,
         selectedModel: meta.model,
@@ -644,7 +787,8 @@ export function parseClaudeTranscript(
 
 function parseFile(filePath: string, projectDir: string): ParsedSession {
   const parsed = parseClaudeTranscript(filePath);
-  if (!parsed.meta.cwd) parsed.meta.cwd = decodeProjectDir(path.basename(projectDir));
+  if (!parsed.meta.cwd)
+    parsed.meta.cwd = decodeProjectDir(path.basename(projectDir));
   return parsed;
 }
 
@@ -661,7 +805,7 @@ function sessionFiles(): { filePath: string; projectDir: string }[] {
     const projectDir = path.join(PROJECTS_DIR, project);
     if (!statOf(projectDir)?.isDirectory()) continue;
     for (const entry of safeReaddir(projectDir)) {
-      if (!entry.endsWith(".jsonl")) continue;
+      if (!entry.endsWith('.jsonl')) continue;
       out.push({ filePath: path.join(projectDir, entry), projectDir });
     }
   }
@@ -669,16 +813,19 @@ function sessionFiles(): { filePath: string; projectDir: string }[] {
 }
 
 function findSessionFile(id: string) {
-  if (id.includes("/") || id.includes("..")) return null;
-  return sessionFiles().find((f) => path.basename(f.filePath, ".jsonl") === id) ?? null;
+  if (id.includes('/') || id.includes('..')) return null;
+  return (
+    sessionFiles().find((f) => path.basename(f.filePath, '.jsonl') === id) ??
+    null
+  );
 }
 
 export const claudeProvider: SessionProvider = {
   info: {
-    id: "claude",
-    label: "Claude Code",
-    shortLabel: "Claude",
-    rootDir: "~/.claude/projects",
+    id: 'claude',
+    label: 'Claude Code',
+    shortLabel: 'Claude',
+    rootDir: '~/.claude/projects',
     supportsLogs: false,
   },
 
@@ -712,10 +859,10 @@ export const claudeProvider: SessionProvider = {
           null,
           2,
         ),
-        language: "json",
+        language: 'json',
       },
       storagePath: found.filePath,
-    } satisfies Omit<SessionDetail, "stats" | "tokenAnalysis" | "cost">;
+    } satisfies Omit<SessionDetail, 'stats' | 'tokenAnalysis' | 'cost'>;
   },
 
   getRecord(id, source) {
@@ -728,6 +875,6 @@ export const claudeProvider: SessionProvider = {
   },
 
   getLogContent() {
-    return "";
+    return '';
   },
 };
