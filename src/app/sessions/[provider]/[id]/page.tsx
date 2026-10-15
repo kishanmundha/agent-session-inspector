@@ -229,6 +229,13 @@ function Session({ provider, id }: { provider: string; id: string }) {
     return () => cancelAnimationFrame(frame);
   }, [opened, tabParam]);
 
+  // Leaving the timeline drops `?event=`, so coming back to it later does not
+  // scroll to an event the user already moved on from.
+  function changeTab(tab: (typeof SESSION_TABS)[number]) {
+    if (tab !== "events") setTargetEventId("");
+    setActiveTab(tab);
+  }
+
   function retry() {
     setLoading(true);
     setError(null);
@@ -325,7 +332,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
           />
 
           <main id="main" className="mx-auto max-w-6xl px-4 pt-2 pb-5 sm:px-6">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="gap-0">
+            <Tabs value={activeTab} onValueChange={changeTab} className="gap-0">
               <div className="sticky top-[var(--cv-topbar-h)] z-20 -mx-4 overflow-x-auto scrollbar-none bg-background/85 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:-mx-6 sm:px-6">
                 <TabsList className="w-max">
                   <TabsTrigger value="events" className="px-3">
