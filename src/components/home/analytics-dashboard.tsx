@@ -7,6 +7,7 @@ import { BarList } from "@/components/common/bar-list";
 import { EmptyState } from "@/components/common/empty-state";
 import { downloadCsv } from "@/lib/download";
 import { OptionSelect } from "@/components/common/option-select";
+import { RangeCostDialog } from "@/components/common/range-cost-dialog";
 import { Panel } from "@/components/common/panel";
 import { Segmented } from "@/components/common/segmented";
 import { Skeleton } from "@/components/common/skeleton";
@@ -25,9 +26,11 @@ import {
   METRICS,
   METRIC_LABELS,
   RANGES,
+  addDays,
   computeAnalytics,
   daysToCsv,
   modelsOf,
+  startOfDay,
   type AnalyticsFilter,
   type Metric,
   type SessionRow,
@@ -35,6 +38,7 @@ import {
 import { formatCost, formatCount, formatDuration, formatTokens } from "@/lib/format";
 import { PROVIDER_ORDER, SUPPORTED_AGENTS, providerStyle } from "@/lib/provider-meta";
 import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
+import { anyValue, oneOf, useStoredState } from "@/lib/use-stored-state";
 import { cn } from "@/lib/utils";
 import { CalendarHeatmap, HourHeatmap, WeeklyBars } from "./analytics-charts";
 
@@ -97,14 +101,43 @@ export function AnalyticsDashboard({
   projectOptions: { value: string; label: string }[];
 }) {
   const { sessions, error } = useAnalyticsSessions(reloadToken);
-  const [range, setRange] = useState("90");
-  const [provider, setProvider] = useState("all");
-  const [model, setModel] = useState("all");
-  const [calendarMetric, setCalendarMetric] = useState<Metric>("messages");
-  const [hourMetric, setHourMetric] = useState<Metric>("messages");
-  const [topKey, setTopKey] = useState<TopKey>("messages");
-  const [projectKey, setProjectKey] = useState<ProjectKey>("messages");
-  const [mcpKey, setMcpKey] = useState<McpKey>("servers");
+  const [costOpen, setCostOpen] = useState(false);
+  const [range, setRange] = useStoredState<string>(
+    "analytics-range",
+    "90",
+    oneOf(RANGES.map((r) => r.value)),
+  );
+  const [storedProvider, setProvider] = useStoredState<string>("analytics-provider", "all", anyValue);
+  const [storedModel, setModel] = useStoredState<string>("analytics-model", "all", anyValue);
+  // A remembered agent or model with no sessions any more reads as "all".
+  const provider =
+    !sessions || sessions.some((s) => s.provider === storedProvider) ? storedProvider : "all";
+  const model = !sessions || modelsOf(sessions).includes(storedModel) ? storedModel : "all";
+  const [calendarMetric, setCalendarMetric] = useStoredState<Metric>(
+    "analytics-calendar-metric",
+    "messages",
+    oneOf(METRICS),
+  );
+  const [hourMetric, setHourMetric] = useStoredState<Metric>(
+    "analytics-hour-metric",
+    "messages",
+    oneOf(METRICS),
+  );
+  const [topKey, setTopKey] = useStoredState<TopKey>(
+    "analytics-top",
+    "messages",
+    oneOf(TOP_OPTIONS.map((o) => o.value)),
+  );
+  const [projectKey, setProjectKey] = useStoredState<ProjectKey>(
+    "analytics-projects",
+    "messages",
+    oneOf(PROJECT_OPTIONS.map((o) => o.value)),
+  );
+  const [mcpKey, setMcpKey] = useStoredState<McpKey>(
+    "analytics-mcp",
+    "servers",
+    oneOf(MCP_OPTIONS.map((o) => o.value)),
+  );
 
   const filter: AnalyticsFilter = useMemo(
     () => ({
@@ -115,6 +148,9 @@ export function AnalyticsDashboard({
     }),
     [range, project, provider, model],
   );
+  // Where the range starts, as the dashboard counts it; null for all time.
+  const since =
+    filter.days === null ? null : addDays(startOfDay(new Date()), 1 - filter.days).getTime();
 
   const data = useMemo(
     () => (sessions ? computeAnalytics(sessions, filter) : null),
@@ -259,6 +295,7 @@ export function AnalyticsDashboard({
                   : "at API list prices"
               }
               accent
+              onClick={() => setCostOpen(true)}
             />
             <StatCard label="Sessions" value={totals.sessions.toLocaleString()} />
             <StatCard label="Messages" value={formatCount(totals.messages)} />
@@ -289,6 +326,23 @@ export function AnalyticsDashboard({
               }
             />
           </StatCardGrid>
+
+          <RangeCostDialog
+            sessions={sessions}
+            keep={(session, slice) =>
+              // As in the analytics, the model filter is the session's model.
+              (provider === "all" || session.provider === provider) &&
+              (project === "all" || session.project === project) &&
+              (model === "all" || session.model === model) &&
+              (since === null || slice.t >= since)
+            }
+            scope={{
+              sessions: totals.sessions,
+              period: RANGES.find((r) => r.value === range)?.label.toLowerCase() ?? "all time",
+            }}
+            open={costOpen}
+            onOpenChange={setCostOpen}
+          />
 
           <UnpricedNotice models={data.unpricedModels} />
 

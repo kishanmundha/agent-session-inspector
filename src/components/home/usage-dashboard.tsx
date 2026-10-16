@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, Download, Wallet } from "lucide-react";
 import { EmptyState } from "@/components/common/empty-state";
 import { OptionSelect } from "@/components/common/option-select";
+import { RangeCostDialog } from "@/components/common/range-cost-dialog";
 import { Panel } from "@/components/common/panel";
 import { Segmented } from "@/components/common/segmented";
 import { Skeleton } from "@/components/common/skeleton";
@@ -19,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { RANGES } from "@/lib/analytics";
+import { RANGES, addDays, startOfDay } from "@/lib/analytics";
 import { downloadCsv } from "@/lib/download";
 import { formatCost, formatTokens } from "@/lib/format";
 import { SUPPORTED_AGENTS, PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
@@ -35,6 +36,7 @@ import {
   type UsageFilter,
 } from "@/lib/usage";
 import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
+import { anyValue, oneOf, useStoredState } from "@/lib/use-stored-state";
 import { cn } from "@/lib/utils";
 import {
   OTHER,
@@ -74,11 +76,24 @@ export function UsageDashboard({
   projectOptions: { value: string; label: string }[];
 }) {
   const { sessions, error } = useAnalyticsSessions(reloadToken);
-  const [range, setRange] = useState("30");
-  const [provider, setProvider] = useState("all");
-  const [model, setModel] = useState("all");
-  const [unit, setUnit] = useState<Unit>("costUSD");
-  const [dimension, setDimension] = useState<Dimension>("project");
+  const [costOpen, setCostOpen] = useState(false);
+  const [range, setRange] = useStoredState<string>(
+    "usage-range",
+    "30",
+    oneOf(RANGES.map((r) => r.value)),
+  );
+  const [storedProvider, setProvider] = useStoredState<string>("usage-provider", "all", anyValue);
+  const [storedModel, setModel] = useStoredState<string>("usage-model", "all", anyValue);
+  // A remembered agent or model with no sessions any more reads as "all".
+  const provider =
+    !sessions || sessions.some((s) => s.provider === storedProvider) ? storedProvider : "all";
+  const model = !sessions || usageModelsOf(sessions).includes(storedModel) ? storedModel : "all";
+  const [unit, setUnit] = useStoredState<Unit>(
+    "usage-unit",
+    "costUSD",
+    oneOf(UNIT_OPTIONS.map((o) => o.value)),
+  );
+  const [dimension, setDimension] = useStoredState<Dimension>("usage-dimension", "project", oneOf(DIMENSIONS));
 
   const filter: UsageFilter = useMemo(
     () => ({
@@ -89,6 +104,9 @@ export function UsageDashboard({
     }),
     [range, project, provider, model],
   );
+  // Where the range starts, as the dashboard counts it; null for all time.
+  const since =
+    filter.days === null ? null : addDays(startOfDay(new Date()), 1 - filter.days).getTime();
 
   const data = useMemo(
     () => (sessions ? computeUsage(sessions, filter) : null),
@@ -248,6 +266,7 @@ export function UsageDashboard({
                   : "at API list prices"
               }
               accent
+              onClick={() => setCostOpen(true)}
             />
             <StatCard
               label="Daily burn"
@@ -288,6 +307,22 @@ export function UsageDashboard({
               sub={`${formatCost(totals.costUSD / totals.sessions)} avg`}
             />
           </StatCardGrid>
+
+          <RangeCostDialog
+            sessions={sessions}
+            keep={(session, slice) =>
+              (provider === "all" || session.provider === provider) &&
+              (project === "all" || session.project === project) &&
+              (model === "all" || slice.model === model) &&
+              (since === null || slice.t >= since)
+            }
+            scope={{
+              sessions: totals.sessions,
+              period: RANGES.find((r) => r.value === range)?.label.toLowerCase() ?? "all time",
+            }}
+            open={costOpen}
+            onOpenChange={setCostOpen}
+          />
 
           <UnpricedNotice models={unpriced} />
 

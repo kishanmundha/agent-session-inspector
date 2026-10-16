@@ -169,6 +169,10 @@ export interface AnalyticsSession {
   usage: UsageSlice[];
   /** Models that used tokens but have no price, so the cost is a floor. */
   unpricedModels?: string[];
+  /** Each model's key in the price table, for finding its vendor's price list. */
+  priceKeys?: Record<string, string>;
+  /** Models priced from the user's override file rather than the bundled table. */
+  customPriced?: string[];
   health?: SessionHealth;
 }
 
@@ -184,7 +188,12 @@ export interface UsageSlice {
   cacheWriteTokens: number;
   /** Null when the model has no price. */
   costUSD: number | null;
+  /** The arithmetic behind `costUSD`: one entry per token class and rate. */
+  lines?: SliceLine[];
 }
+
+/** A `CostLine` without the model, which its slice already names; usd is tokens × rate. */
+export type SliceLine = Pick<CostLine, "kind" | "tokens" | "rate">;
 
 /**
  * What a model request is billed for. Unlike the display counters, the token
@@ -287,6 +296,10 @@ export interface CostSummary {
    * correct starting point for that file.
    */
   prices: Record<string, PriceEntry[] | null>;
+  /** Each model's key in `prices`, for finding its vendor's price list. */
+  priceKeys: Record<string, string>;
+  /** Models priced from the user's override file rather than the bundled table. */
+  customPriced: string[];
   /** Where user price overrides are read from, with the home dir as `~`. */
   overridePath: string;
   unpricedModels: string[];

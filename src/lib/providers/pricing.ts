@@ -50,16 +50,25 @@ function normalizeTable(raw: unknown): PriceTable {
 
 const BUNDLED = normalizeTable(bundledPrices);
 
-const loadTable = createFileCache((filePath: string): PriceTable => {
+interface LoadedPrices {
+  table: PriceTable;
+  /** Keys whose price comes from the user's override file. */
+  custom: Set<string>;
+}
+
+const loadPrices = createFileCache((filePath: string): LoadedPrices => {
   const content = safeReadFile(filePath);
-  if (!content) return BUNDLED;
+  if (!content) return { table: BUNDLED, custom: new Set() };
   try {
-    return { ...BUNDLED, ...normalizeTable(JSON.parse(content)) };
+    const overrides = normalizeTable(JSON.parse(content));
+    return { table: { ...BUNDLED, ...overrides }, custom: new Set(Object.keys(overrides)) };
   } catch {
     // A malformed override should not take cost estimates down with it.
-    return BUNDLED;
+    return { table: BUNDLED, custom: new Set() };
   }
 });
+
+const loadTable = (filePath: string) => loadPrices(filePath).table;
 
 /** Snapshot suffixes that do not change the price: -20251001, -2025-08-07, -latest. */
 const SNAPSHOT_SUFFIX = /-(\d{8}|\d{4}-\d{2}-\d{2}|latest)$/;
@@ -84,6 +93,23 @@ export function overrideKeyOf(model: string): string {
 /** Where user price overrides are read from, with the home dir as `~`. */
 export function overridePathLabel(): string {
   return PRICING_OVERRIDE_PATH.replace(os.homedir(), "~");
+}
+
+/**
+ * The key a model is priced under (or would be, once it has a price), and
+ * whether that price comes from the user's override file.
+ */
+export function priceKeyOf(model: string): { key: string; custom: boolean } {
+  const { table, custom } = loadPrices(PRICING_OVERRIDE_PATH);
+  const key = resolveModel(model, table);
+  return { key: key ?? overrideKeyOf(model), custom: key !== null && custom.has(key) };
+}
+
+/** The entries a model is priced with, under the key `pricing.json` uses; null entries when it has none. */
+export function priceEntriesOf(model: string): { key: string; entries: PriceEntry[] | null } {
+  const table = loadTable(PRICING_OVERRIDE_PATH);
+  const key = resolveModel(model, table);
+  return key ? { key, entries: table[key] } : { key: normalizeModelId(model), entries: null };
 }
 
 /** Table key for a transcript model id, or null when the model has no price. */
@@ -219,12 +245,16 @@ class CostAccumulator {
     const byModel = [...this.models.values()].sort(
       (a, b) => (b.costUSD ?? -1) - (a.costUSD ?? -1),
     );
-    const table = loadTable(PRICING_OVERRIDE_PATH);
+    const { table, custom } = loadPrices(PRICING_OVERRIDE_PATH);
     const prices: CostSummary["prices"] = {};
+    const priceKeys: CostSummary["priceKeys"] = {};
+    const customPriced: string[] = [];
     for (const { model } of byModel) {
       if (model === UNKNOWN_MODEL) continue;
       const key = resolveModel(model, table);
       prices[key ?? normalizeModelId(model)] = key ? table[key] : null;
+      priceKeys[model] = key ?? overrideKeyOf(model);
+      if (key && custom.has(key)) customPriced.push(model);
     }
     return {
       totalUSD: byModel.reduce((sum, m) => sum + (m.costUSD ?? 0), 0),
@@ -240,6 +270,8 @@ class CostAccumulator {
           ),
       ),
       prices,
+      priceKeys,
+      customPriced,
       overridePath: overridePathLabel(),
       unpricedModels: byModel.filter((m) => m.costUSD === null).map((m) => m.model),
     };
@@ -315,13 +347,14 @@ export function bucketUsage(events: AgentEvent[], inherited = false): UsageBucke
   return [...buckets.values()];
 }
 
-/** One bucket's cost, or null when its model has no price. */
-export function priceBucket(bucket: UsageBucket): number | null {
+/** One bucket's cost, or null when its model has no price, with the lines behind it. */
+export function priceBucket(bucket: UsageBucket): { cost: number | null; lines: UsageLine[] } {
+  const lines = costOf(bucket, bucket.day || undefined);
   let cost: number | null = null;
-  for (const line of costOf(bucket, bucket.day || undefined)) {
+  for (const line of lines) {
     if (line.usd !== null) cost = (cost ?? 0) + line.usd;
   }
-  return cost;
+  return { cost, lines };
 }
 
 export function priceBuckets(buckets: UsageBucket[] | undefined): CostSummary | null {

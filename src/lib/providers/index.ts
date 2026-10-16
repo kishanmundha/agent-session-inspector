@@ -8,7 +8,7 @@ import { hermesProvider } from "./hermes";
 import { geminiProvider } from "./gemini";
 import { cursorProvider } from "./cursor";
 import { analyzeTokenUsage, computeSessionStats } from "./analysis";
-import { priceBucket, priceBuckets, priceEvents } from "./pricing";
+import { priceBucket, priceBuckets, priceEvents, priceKeyOf } from "./pricing";
 import { settleHealth } from "./health";
 import { findGitRoot, hostPath, ON_HOST, tildePath } from "./fs-utils";
 import { isRunning } from "@/lib/session-state";
@@ -167,14 +167,21 @@ export function listSessions(providerId?: string): SessionMeta[] {
 /** The session's activity and usage with each slot priced at today's table. */
 function pricedActivity(
   meta: SessionMeta,
-): Pick<AnalyticsSession, "activity" | "usage" | "unpricedModels"> {
+): Pick<AnalyticsSession, "activity" | "usage" | "unpricedModels" | "priceKeys" | "customPriced"> {
   const slots = new Map<number, ActivitySlot>();
   for (const slot of meta.activity ?? []) slots.set(slot.t, { ...slot });
   const slices = new Map<string, UsageSlice>();
   const unpriced = new Set<string>();
+  const priceKeys: Record<string, string> = {};
+  const custom = new Set<string>();
   for (const bucket of meta.usage ?? []) {
     const model = bucket.model ?? "unknown";
-    const cost = priceBucket(bucket);
+    const { cost, lines } = priceBucket(bucket);
+    if (bucket.model && !(model in priceKeys)) {
+      const { key, custom: isCustom } = priceKeyOf(model);
+      priceKeys[model] = key;
+      if (isCustom) custom.add(model);
+    }
     if (cost === null) unpriced.add(model);
     // Usage without a timestamp cannot be placed on a day, so it is left out.
     const slot = bucket.t === undefined ? undefined : slots.get(bucket.t);
@@ -193,8 +200,14 @@ function pricedActivity(
         cacheReadTokens: 0,
         cacheWriteTokens: 0,
         costUSD: cost === null ? null : 0,
+        lines: [],
       };
       slices.set(key, slice);
+    }
+    for (const line of lines) {
+      const same = slice.lines!.find((l) => l.kind === line.kind && l.rate === line.rate);
+      if (same) same.tokens += line.tokens;
+      else slice.lines!.push({ kind: line.kind, tokens: line.tokens, rate: line.rate });
     }
     slice.inputTokens += bucket.inputTokens;
     slice.outputTokens += bucket.outputTokens;
@@ -206,6 +219,8 @@ function pricedActivity(
     activity: [...slots.values()],
     usage: [...slices.values()],
     unpricedModels: unpriced.size > 0 ? [...unpriced] : undefined,
+    priceKeys,
+    customPriced: custom.size > 0 ? [...custom] : undefined,
   };
 }
 

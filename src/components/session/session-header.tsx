@@ -115,10 +115,17 @@ export function SessionHeader({
 
   const provider = providerStyle(meta.provider);
   const resume = resumeCommand(meta);
-  const input = stats?.totalInputTokens ?? 0;
-  const output = stats?.totalOutputTokens ?? 0;
-  const cache = stats?.totalCacheReadTokens ?? 0;
-  const total = input + output + cache;
+  // The priced usage splits tokens into classes that never overlap, whatever
+  // the provider's own counters do, so it is preferred when there is one.
+  const billed = cost && cost.byModel.length > 0 ? cost.byModel : null;
+  const sum = (pick: (m: CostSummary["byModel"][number]) => number) =>
+    billed ? billed.reduce((n, m) => n + pick(m), 0) : 0;
+  const input = billed ? sum((m) => m.inputTokens) : stats?.totalInputTokens ?? 0;
+  const output = billed ? sum((m) => m.outputTokens) : stats?.totalOutputTokens ?? 0;
+  const cacheRead = billed ? sum((m) => m.cacheReadTokens) : stats?.totalCacheReadTokens ?? 0;
+  const cacheWrite = sum((m) => m.cacheWriteTokens);
+  const allInput = input + cacheWrite + cacheRead;
+  const total = allInput + output;
 
   return (
     <div className="border-b border-border bg-card/40">
@@ -265,7 +272,12 @@ export function SessionHeader({
               <StatCard
                 label="Total tokens"
                 value={total > 0 ? tokens(total) : "—"}
-                sub="in + out + cache"
+                sub={
+                  allInput > 0 && output > 0
+                    ? `${tokens(allInput)} in · ${tokens(output)} out`
+                    : "in + out + cache"
+                }
+                hint="Everything sent to and returned by the model: uncached input, cache writes, cache reads and output."
                 accent
               />
               {context && (
@@ -288,7 +300,9 @@ export function SessionHeader({
                       ? `excludes ${cost.unpricedModels.join(", ")}`
                       : cost.inherited
                         ? `+ ${formatCost(cost.inherited.totalUSD)} inherited`
-                        : "at API list prices"
+                        : (cost.customPriced?.length ?? 0) > 0
+                          ? "with your custom prices"
+                          : "at API list prices"
                   }
                   onClick={() => setCostOpen(true)}
                 />
@@ -308,13 +322,36 @@ export function SessionHeader({
               {/* Only surface the token buckets the session actually reported —
                   empty "—" cards are noise. */}
               {input > 0 && (
-                <StatCard label="Input tokens" value={tokens(input)} sub="fresh input" />
+                <StatCard
+                  label="Uncached input"
+                  value={tokens(input)}
+                  sub={allInput > input ? `of ${tokens(allInput)} total input` : "new prompt text"}
+                  hint="Input the model had not seen before, billed at the full input rate. Total input also counts cache writes and cache reads, which are billed at their own rates."
+                />
+              )}
+              {cacheWrite > 0 && (
+                <StatCard
+                  label="Cache writes"
+                  value={tokens(cacheWrite)}
+                  sub="context stored"
+                  hint="Input stored in the prompt cache so later requests can reuse it. Billed a little above the input rate."
+                />
+              )}
+              {cacheRead > 0 && (
+                <StatCard
+                  label="Cache reads"
+                  value={tokens(cacheRead)}
+                  sub="reused context"
+                  hint="Input served from the prompt cache at a steep discount. The whole conversation is re-sent on every request, so this grows fastest."
+                />
               )}
               {output > 0 && (
-                <StatCard label="Output tokens" value={tokens(output)} sub="generated" />
-              )}
-              {cache > 0 && (
-                <StatCard label="Cache reads" value={tokens(cache)} sub="reused context" />
+                <StatCard
+                  label="Output"
+                  value={tokens(output)}
+                  sub="generated"
+                  hint="Tokens the model wrote: replies, tool calls and reasoning."
+                />
               )}
               {stats.totalPremiumRequests > 0 && (
                 <StatCard

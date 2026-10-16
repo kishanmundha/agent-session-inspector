@@ -104,7 +104,7 @@ function CostSection({ cost }: { cost: CostSummary }) {
         <Table className="text-xs">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              {["Model", "Input", "Cache write", "Cache read", "Output", "Cost"].map(
+              {["Model", "Uncached input", "Cache write", "Cache read", "Output", "Cost"].map(
                 (label, i) => (
                   <TableHead
                     key={label}

@@ -2,8 +2,9 @@ import { ACTIVITY_SLOT_MS, type AnalyticsSession, type ProviderId } from "@/lib/
 import { addDays, dayKey, startOfDay } from "@/lib/analytics";
 
 /**
- * One calendar day of activity across every session, for the activity tab.
- * Like the analytics, it runs in the browser so the day is the viewer's own.
+ * Activity across every session over one or more calendar days, for the
+ * activity tab. Like the analytics, it runs in the browser so the days are
+ * the viewer's own.
  */
 
 export interface DayFilter {
@@ -20,6 +21,25 @@ export interface DaySlot {
   activeMs: number;
 }
 
+/** One whole day of a multi-day range. */
+export interface DayBar {
+  /** Local midnight, epoch milliseconds. */
+  t: number;
+  /** Sessions that did any work that day. */
+  sessions: number;
+  activeMs: number;
+  costUSD: number;
+}
+
+/** Tokens by billed class; the classes never overlap. */
+export interface TokenTotals {
+  /** Uncached input. */
+  inputTokens: number;
+  cacheWriteTokens: number;
+  cacheReadTokens: number;
+  outputTokens: number;
+}
+
 export interface DaySession {
   provider: ProviderId;
   id: string;
@@ -31,6 +51,8 @@ export interface DaySession {
   /** Time spent working, the "agent time" of the session that day. */
   activeMs: number;
   costUSD: number;
+  /** All tokens billed in the range, every class together. */
+  tokens: number;
   /** First and last slot the session touched, to the slot's resolution. */
   start: number;
   end: number;
@@ -43,11 +65,13 @@ export interface DayShare {
 }
 
 export interface DayActivity {
-  /** Every slot of the day, oldest first. */
+  /** Every slot of the range, oldest first. */
   slots: DaySlot[];
-  /** Sessions active that day, earliest first. */
+  /** Every day of the range, oldest first; one entry for a single day. */
+  days: DayBar[];
+  /** Sessions active in the range, earliest first. */
   sessions: DaySession[];
-  totals: {
+  totals: TokenTotals & {
     sessions: number;
     projects: number;
     messages: number;
@@ -92,20 +116,50 @@ function share<T extends DayShare>(rows: Map<string, T>, key: string, create: ()
   return row;
 }
 
-export function computeDay(all: AnalyticsSession[], day: Date, filter: DayFilter): DayActivity {
-  const from = startOfDay(day).getTime();
-  const to = addDays(day, 1).getTime();
+/** Number of calendar days from `from` to `to`, both included. */
+export function daysBetween(from: Date, to: Date): number {
+  return Math.round((startOfDay(to).getTime() - startOfDay(from).getTime()) / 86_400_000) + 1;
+}
+
+/** Activity from the start of `fromDay` to the end of `toDay`. */
+export function computeActivity(
+  all: AnalyticsSession[],
+  fromDay: Date,
+  toDay: Date,
+  filter: DayFilter,
+): DayActivity {
+  const from = startOfDay(fromDay).getTime();
+  const to = addDays(toDay, 1).getTime();
   // A day is 23 or 25 hours long when the clocks change.
   const slots: DaySlot[] = Array.from({ length: Math.ceil((to - from) / ACTIVITY_SLOT_MS) }, (_, i) => ({
     t: from + i * ACTIVITY_SLOT_MS,
     sessions: 0,
     activeMs: 0,
   }));
+  const days: DayBar[] = Array.from({ length: daysBetween(fromDay, toDay) }, (_, i) => ({
+    t: addDays(fromDay, i).getTime(),
+    sessions: 0,
+    activeMs: 0,
+    costUSD: 0,
+  }));
+  const dayOf = (t: number) => {
+    let i = days.length - 1;
+    while (i > 0 && days[i].t > t) i--;
+    return days[i];
+  };
 
   const sessions: DaySession[] = [];
   const projects = new Map<string, DayShare>();
   const models = new Map<string, DayShare>();
   const agents = new Map<string, DayShare & { provider: ProviderId }>();
+
+  const tokenTotals: TokenTotals = {
+    inputTokens: 0,
+    cacheWriteTokens: 0,
+    cacheReadTokens: 0,
+    outputTokens: 0,
+  };
+  const seenDays = new Set<number>();
 
   for (const session of all) {
     if (!matches(session, filter)) continue;
@@ -123,6 +177,7 @@ export function computeDay(all: AnalyticsSession[], day: Date, filter: DayFilter
         toolCalls: 0,
         activeMs: 0,
         costUSD: 0,
+        tokens: 0,
         start: slot.t,
         end: slot.t,
       };
@@ -138,7 +193,15 @@ export function computeDay(all: AnalyticsSession[], day: Date, filter: DayFilter
         cell.sessions++;
         cell.activeMs += slot.activeMs;
       }
+      const bar = dayOf(slot.t);
+      if (!seenDays.has(bar.t)) {
+        seenDays.add(bar.t);
+        bar.sessions++;
+      }
+      bar.activeMs += slot.activeMs;
+      bar.costUSD += slot.costUSD ?? 0;
     }
+    seenDays.clear();
     if (!row) continue;
     sessions.push(row);
 
@@ -160,12 +223,19 @@ export function computeDay(all: AnalyticsSession[], day: Date, filter: DayFilter
       if (slice.t < from || slice.t >= to) continue;
       share(models, slice.model, () => ({ name: slice.model, activeMs: 0, costUSD: 0 })).costUSD +=
         slice.costUSD ?? 0;
+      tokenTotals.inputTokens += slice.inputTokens;
+      tokenTotals.cacheWriteTokens += slice.cacheWriteTokens;
+      tokenTotals.cacheReadTokens += slice.cacheReadTokens;
+      tokenTotals.outputTokens += slice.outputTokens;
+      row.tokens +=
+        slice.inputTokens + slice.cacheWriteTokens + slice.cacheReadTokens + slice.outputTokens;
     }
     const model = row.model ?? "unknown";
     share(models, model, () => ({ name: model, activeMs: 0, costUSD: 0 })).activeMs += row.activeMs;
   }
 
   const totals: DayActivity["totals"] = {
+    ...tokenTotals,
     sessions: sessions.length,
     projects: projects.size,
     messages: 0,
@@ -193,6 +263,7 @@ export function computeDay(all: AnalyticsSession[], day: Date, filter: DayFilter
 
   return {
     slots,
+    days,
     sessions: sessions.sort((a, b) => a.start - b.start),
     totals,
     byProject: ranked(projects),

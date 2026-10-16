@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { CopyButton } from "@/components/common/copy-button";
 import { formatCost } from "@/lib/format";
+import { sourceOf } from "@/lib/price-sources";
 import { cn } from "@/lib/utils";
 import type { CostLine, CostSummary } from "./types";
 
@@ -42,6 +43,38 @@ const GLOSSARY: [string, string][] = [
   ],
   ["Output", "the model's replies, tool calls and reasoning."],
 ];
+
+const externalLink = { target: "_blank", rel: "noreferrer" } as const;
+
+/** The model name, linked to its vendor's price list when one is known. */
+function ModelPriceLink({ model, priceKey }: { model: string; priceKey?: string }) {
+  if (!priceKey) return <>{model}</>;
+  const source = sourceOf(priceKey);
+  return (
+    <a
+      href={source.url}
+      {...externalLink}
+      title={`Check the rates on ${source.label} pricing`}
+      className="inline-flex items-center gap-1 rounded-sm underline decoration-muted-foreground/50 underline-offset-2 hover:text-brand hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
+      {model}
+      <ExternalLink className="size-3 text-muted-foreground" aria-hidden />
+      <span className="sr-only">({source.label} pricing, opens in a new tab)</span>
+    </a>
+  );
+}
+
+/** Marks a model whose rates come from the user's pricing.json. */
+function CustomPriceBadge({ path }: { path: string }) {
+  return (
+    <span
+      title={`Priced from ${path}, not the bundled table`}
+      className="ml-2 rounded-sm border border-amber-500/40 bg-amber-500/10 px-1.5 py-px font-sans text-[10px] font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400"
+    >
+      Your price
+    </span>
+  );
+}
 
 /** Rates keep enough decimals to show sub-cent prices such as $0.075. */
 export function formatRate(rate: number) {
@@ -69,6 +102,7 @@ function overrideTemplate(prices: CostSummary["prices"]) {
 function CostTable({ cost, totalLabel }: { cost: CostSummary; totalLabel: string }) {
   const multiModel = cost.byModel.length > 1;
   const partial = cost.unpricedModels.length > 0;
+  const custom = new Set(cost.customPriced ?? []);
   return (
     <div className="overflow-hidden rounded-lg border border-border">
       <Table className="text-xs">
@@ -91,7 +125,8 @@ function CostTable({ cost, totalLabel }: { cost: CostSummary; totalLabel: string
                   scope="rowgroup"
                   className="h-auto px-3 py-1.5 font-mono font-semibold"
                 >
-                  {model.model}
+                  <ModelPriceLink model={model.model} priceKey={cost.priceKeys?.[model.model]} />
+                  {custom.has(model.model) && <CustomPriceBadge path={cost.overridePath} />}
                 </TableHead>
                 <TableCell className="px-3 py-1.5 text-right font-mono font-semibold text-foreground">
                   {multiModel && model.costUSD !== null && formatCost(model.costUSD)}
@@ -145,131 +180,162 @@ export function CostDialog({
   cost,
   open,
   onOpenChange,
+  scope,
 }: {
   cost: CostSummary;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Set when the cost covers many sessions, e.g. a dashboard's range, not one session. */
+  scope?: { sessions: number; period: string };
 }) {
   const partial = cost.unpricedModels.length > 0;
-  const template = overrideTemplate(cost.prices);
+  // Empty only while a dashboard's receipt is still fetching its entries.
+  const template = Object.keys(cost.prices).length > 0 ? overrideTemplate(cost.prices) : null;
+  const customPriced = cost.customPriced ?? [];
   // Starts open when a price is missing: that is when it is needed.
   const [pricesOpen, setPricesOpen] = useState(partial);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
-        <div className="space-y-1.5">
+      {/* Only the body scrolls, so the title and close button stay put. */}
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
+        <div className="space-y-1.5 border-b border-border px-5 pt-5 pb-3">
           <DialogTitle>How this cost is estimated</DialogTitle>
           <DialogDescription>
-            This is what the session&rsquo;s tokens would cost on the
-            pay-per-token API at list prices. It is not a bill: on a
-            subscription or a request-based plan you pay your plan price, however
-            many tokens a session uses.
+            {scope ? (
+              <>
+                This is what the tokens of {scope.sessions.toLocaleString()} session
+                {scope.sessions === 1 ? "" : "s"} ({scope.period}) would cost on the
+                pay-per-token API at list prices.
+              </>
+            ) : (
+              <>This is what the session&rsquo;s tokens would cost on the pay-per-token API at list prices.</>
+            )}{" "}
+            It is not a bill: on a subscription or a request-based plan you pay
+            your plan price, however many tokens a session uses.
           </DialogDescription>
         </div>
 
-        <CostTable cost={cost} totalLabel={cost.inherited ? "This session" : "Total"} />
+        <div className="flex min-h-0 shrink! flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5 *:shrink-0">
+          <CostTable cost={cost} totalLabel={cost.inherited ? "This session" : "Total"} />
 
-        <p className="text-xs text-muted-foreground">
-          Each row is tokens ÷ 1,000,000 × rate, using the list price on the day
-          of the request.
-          {partial && (
-            <>
-              {" "}
-              No price is known for {cost.unpricedModels.join(", ")}, so the
-              total leaves {cost.unpricedModels.length > 1 ? "them" : "it"} out.
-            </>
-          )}
-        </p>
+          <p className="text-xs text-muted-foreground">
+            Each row is tokens ÷ 1,000,000 × rate, using the list price on the day
+            of the request. Click a model name to check its rates on the
+            vendor&rsquo;s price list.
+            {partial && (
+              <>
+                {" "}
+                No price is known for {cost.unpricedModels.join(", ")}, so the
+                total leaves {cost.unpricedModels.length > 1 ? "them" : "it"} out.
+              </>
+            )}
+          </p>
 
-        {cost.inherited && (
-          <div className="space-y-2 border-t border-border pt-3">
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium text-foreground">
-                Inherited from the forked session
-              </h3>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                This session is a fork, so it opens with a copy of its
-                parent&rsquo;s history. Those requests were made, and are
-                counted, in the parent session; they are listed here for
-                reference and are not part of this session&rsquo;s cost or of
-                any usage total.
-              </p>
-            </div>
-            <CostTable cost={cost.inherited} totalLabel="Inherited" />
-          </div>
-        )}
-
-        <dl className="space-y-1.5 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-          {GLOSSARY.map(([term, meaning]) => (
-            <div key={term}>
-              <dt className="inline font-medium text-foreground">{term}: </dt>
-              <dd className="inline">{meaning}</dd>
-            </div>
-          ))}
-        </dl>
-
-        {/* Same disclosure pattern as a timeline event row. */}
-        <div className="overflow-hidden rounded-lg border border-border bg-card text-xs">
-          <button
-            type="button"
-            onClick={() => setPricesOpen(!pricesOpen)}
-            aria-expanded={pricesOpen}
-            aria-controls="cost-dialog-prices"
-            className="flex w-full items-center gap-2 px-3 py-2 text-left font-medium text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-          >
-            <ChevronRight
-              className={cn(
-                "size-3.5 shrink-0 text-muted-foreground transition-transform",
-                pricesOpen && "rotate-90",
-              )}
-              aria-hidden
-            />
-            {partial ? "Add the missing price" : "Change these prices"}
-          </button>
-          <div
-            id="cost-dialog-prices"
-            hidden={!pricesOpen}
-            className="space-y-2 border-t border-border px-3 py-3 leading-relaxed text-muted-foreground"
-          >
-            <p>
-              Save the block below as{" "}
-              <code className="font-mono text-foreground">{cost.overridePath}</code>{" "}
-              and edit the numbers. It replaces the bundled price for the models
-              it lists and takes effect on the next page load.
+          {customPriced.length > 0 && (
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground">Custom prices in use.</span>{" "}
+              <code className="font-mono text-foreground">{cost.overridePath}</code> sets the price
+              for <span className="font-mono text-foreground">{customPriced.join(", ")}</span>, in
+              place of the bundled table.
             </p>
-            <div className="relative">
-              <pre className="overflow-x-auto rounded-lg border border-border bg-muted/50 p-3 pr-10 font-mono text-[11px] leading-relaxed text-foreground">
-                {template}
-              </pre>
-              <CopyButton
-                value={template}
-                label="Copy pricing.json"
-                className="absolute top-1.5 right-1.5"
-              />
+          )}
+
+          {cost.inherited && (
+            <div className="space-y-2 border-t border-border pt-3">
+              <div className="space-y-1">
+                <h3 className="text-sm font-medium text-foreground">
+                  Inherited from the forked session
+                </h3>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  This session is a fork, so it opens with a copy of its
+                  parent&rsquo;s history. Those requests were made, and are
+                  counted, in the parent session; they are listed here for
+                  reference and are not part of this session&rsquo;s cost or of
+                  any usage total.
+                </p>
+              </div>
+              <CostTable cost={cost.inherited} totalLabel="Inherited" />
             </div>
-            <ul className="list-disc space-y-1 pl-4">
-              <li>All prices are US dollars per million tokens.</li>
-              <li>
-                <code className="font-mono text-foreground">input</code> and{" "}
-                <code className="font-mono text-foreground">output</code> are
-                required. <code className="font-mono text-foreground">cacheRead</code>,{" "}
-                <code className="font-mono text-foreground">cacheWrite</code> and{" "}
-                <code className="font-mono text-foreground">cacheWrite1h</code>{" "}
-                are optional: the first two fall back to the input price,
-                and <code className="font-mono text-foreground">cacheWrite1h</code>{" "}
-                to <code className="font-mono text-foreground">cacheWrite</code>.{" "}
-                <code className="font-mono text-foreground">fast</code> multiplies
-                every price for requests made in a faster, premium speed tier.
-              </li>
-              <li>
-                To record a price change, add a second entry with{" "}
-                <code className="font-mono text-foreground">
-                  &quot;from&quot;: &quot;YYYY-MM-DD&quot;
-                </code>
-                . Requests before that day keep the old price.
-              </li>
-            </ul>
+          )}
+
+          <dl className="space-y-1.5 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+            {GLOSSARY.map(([term, meaning]) => (
+              <div key={term}>
+                <dt className="inline font-medium text-foreground">{term}: </dt>
+                <dd className="inline">{meaning}</dd>
+              </div>
+            ))}
+          </dl>
+
+          {/* Same disclosure pattern as a timeline event row. */}
+          <div className="overflow-hidden rounded-lg border border-border bg-card text-xs">
+            <button
+              type="button"
+              onClick={() => setPricesOpen(!pricesOpen)}
+              aria-expanded={pricesOpen}
+              aria-controls="cost-dialog-prices"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left font-medium text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            >
+              <ChevronRight
+                className={cn(
+                  "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                  pricesOpen && "rotate-90",
+                )}
+                aria-hidden
+              />
+              {partial ? "Add the missing price" : "Change these prices"}
+            </button>
+            <div
+              id="cost-dialog-prices"
+              hidden={!pricesOpen}
+              className="space-y-2 border-t border-border px-3 py-3 leading-relaxed text-muted-foreground"
+            >
+              {template ? (
+                <>
+                  <p>
+                    Save the block below as{" "}
+                    <code className="font-mono text-foreground">{cost.overridePath}</code>{" "}
+                    and edit the numbers. It replaces the bundled price for the models
+                    it lists and takes effect on the next page load.
+                  </p>
+                  <div className="relative">
+                    <pre className="overflow-x-auto rounded-lg border border-border bg-muted/50 p-3 pr-10 font-mono text-[11px] leading-relaxed text-foreground">
+                      {template}
+                    </pre>
+                    <CopyButton
+                      value={template}
+                      label="Copy pricing.json"
+                      className="absolute top-1.5 right-1.5"
+                    />
+                  </div>
+                </>
+              ) : (
+                <p>Loading the prices these models use now…</p>
+              )}
+              <ul className="list-disc space-y-1 pl-4">
+                <li>All prices are US dollars per million tokens.</li>
+                <li>
+                  <code className="font-mono text-foreground">input</code> and{" "}
+                  <code className="font-mono text-foreground">output</code> are
+                  required. <code className="font-mono text-foreground">cacheRead</code>,{" "}
+                  <code className="font-mono text-foreground">cacheWrite</code> and{" "}
+                  <code className="font-mono text-foreground">cacheWrite1h</code>{" "}
+                  are optional: the first two fall back to the input price,
+                  and <code className="font-mono text-foreground">cacheWrite1h</code>{" "}
+                  to <code className="font-mono text-foreground">cacheWrite</code>.{" "}
+                  <code className="font-mono text-foreground">fast</code> multiplies
+                  every price for requests made in a faster, premium speed tier.
+                </li>
+                <li>
+                  To record a price change, add a second entry with{" "}
+                  <code className="font-mono text-foreground">
+                    &quot;from&quot;: &quot;YYYY-MM-DD&quot;
+                  </code>
+                  . Requests before that day keep the old price.
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -40,6 +40,7 @@ import {
   type QualitySession,
 } from "@/lib/quality";
 import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
+import { anyValue, oneOf, useStoredState } from "@/lib/use-stored-state";
 import { cn } from "@/lib/utils";
 
 /** Above this many days the trend groups by week, so bars stay wide enough to read. */
@@ -234,10 +235,22 @@ export function QualityDashboard({
   projectOptions: { value: string; label: string }[];
 }) {
   const { sessions, error } = useAnalyticsSessions(reloadToken);
-  const [range, setRange] = useState("90");
-  const [provider, setProvider] = useState("all");
-  const [model, setModel] = useState("all");
-  const [groupKey, setGroupKey] = useState<GroupKey>("agent");
+  const [range, setRange] = useStoredState<string>(
+    "quality-range",
+    "90",
+    oneOf(RANGES.map((r) => r.value)),
+  );
+  const [storedProvider, setProvider] = useStoredState<string>("quality-provider", "all", anyValue);
+  const [storedModel, setModel] = useStoredState<string>("quality-model", "all", anyValue);
+  // A remembered agent or model with no sessions any more reads as "all".
+  const provider =
+    !sessions || sessions.some((s) => s.provider === storedProvider) ? storedProvider : "all";
+  const model = !sessions || modelsOf(sessions).includes(storedModel) ? storedModel : "all";
+  const [groupKey, setGroupKey] = useStoredState<GroupKey>(
+    "quality-group",
+    "agent",
+    oneOf(GROUP_OPTIONS.map((o) => o.value)),
+  );
 
   const filter: AnalyticsFilter = useMemo(
     () => ({

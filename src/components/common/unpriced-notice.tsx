@@ -10,60 +10,11 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-
-interface PriceSource {
-  label: string;
-  url: string;
-  /** Model ids this vendor's price list covers. */
-  match: RegExp;
-}
-
-/** Vendor price lists, all quoted in US dollars per million tokens. */
-const PRICE_SOURCES: PriceSource[] = [
-  {
-    label: "Anthropic",
-    url: "https://platform.claude.com/docs/en/about-claude/pricing",
-    match: /^claude/,
-  },
-  {
-    label: "OpenAI",
-    url: "https://platform.openai.com/docs/pricing",
-    match: /^(gpt|chatgpt|codex|o\d)/,
-  },
-  {
-    label: "Google Gemini",
-    url: "https://ai.google.dev/gemini-api/docs/pricing",
-    match: /^gemini/,
-  },
-  { label: "xAI", url: "https://docs.x.ai/docs/models", match: /^grok/ },
-  {
-    label: "Mistral",
-    url: "https://mistral.ai/pricing",
-    match: /^(mistral|codestral|devstral|magistral|ministral|pixtral)/,
-  },
-  {
-    label: "DeepSeek",
-    url: "https://api-docs.deepseek.com/quick_start/pricing",
-    match: /^deepseek/,
-  },
-];
-
-/** Lists most models of most vendors, for the ones without a list above. */
-const CATALOG = { label: "OpenRouter", url: "https://openrouter.ai/models" };
-
-function sourceOf(key: string): { label: string; url: string } {
-  return (
-    PRICE_SOURCES.find((source) => source.match.test(key)) ?? {
-      label: CATALOG.label,
-      url: `${CATALOG.url}?q=${encodeURIComponent(key)}`,
-    }
-  );
-}
+import { CATALOG, PRICE_SOURCES, sourceOf } from "@/lib/price-sources";
+import { DEFAULT_OVERRIDE_PATH } from "@/lib/range-cost";
 
 /** What usage recorded without a model id is filed under; it has no key to price. */
 const UNKNOWN_MODEL = "unknown";
-
-const DEFAULT_OVERRIDE_PATH = "~/.agent-session-inspector/pricing.json";
 
 const externalLink = { target: "_blank", rel: "noreferrer" } as const;
 
@@ -134,8 +85,9 @@ export function UnpricedNotice({ models }: { models: string[] }) {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <div className="space-y-1.5">
+        {/* Only the body scrolls, so the title and close button stay put. */}
+        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
+          <div className="space-y-1.5 border-b border-border px-5 pt-5 pb-3">
             <DialogTitle>Add {manyNamed ? "the missing prices" : "the missing price"}</DialogTitle>
             <DialogDescription>
               Costs are estimated from a price table bundled with the app. A model the table does
@@ -144,97 +96,99 @@ export function UnpricedNotice({ models }: { models: string[] }) {
             </DialogDescription>
           </div>
 
-          <section className="space-y-2">
-            <h3 className="text-xs font-medium text-foreground">1. Find the price</h3>
-            <ul className="overflow-hidden rounded-lg border border-border text-xs">
-              {keys.map((key) => {
-                const source = sourceOf(key);
-                return (
-                  <li
-                    key={key}
-                    className="flex items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
-                  >
-                    <span className="min-w-0 flex-1 truncate font-mono text-foreground">{key}</span>
+          <div className="flex min-h-0 shrink! flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5 *:shrink-0">
+            <section className="space-y-2">
+              <h3 className="text-xs font-medium text-foreground">1. Find the price</h3>
+              <ul className="overflow-hidden rounded-lg border border-border text-xs">
+                {keys.map((key) => {
+                  const source = sourceOf(key);
+                  return (
+                    <li
+                      key={key}
+                      className="flex items-center gap-2 border-b border-border/60 px-3 py-2 last:border-b-0"
+                    >
+                      <span className="min-w-0 flex-1 truncate font-mono text-foreground">{key}</span>
+                      <a
+                        href={source.url}
+                        {...externalLink}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-sm font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      >
+                        {source.label} pricing
+                        <ExternalLink className="size-3" aria-hidden />
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                All price lists:{" "}
+                {[...PRICE_SOURCES, CATALOG].map((source, i) => (
+                  <span key={source.label}>
+                    {i > 0 && " · "}
                     <a
                       href={source.url}
                       {...externalLink}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-sm font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      className="text-foreground underline underline-offset-2 hover:text-brand"
                     >
-                      {source.label} pricing
-                      <ExternalLink className="size-3" aria-hidden />
+                      {source.label}
                     </a>
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              All price lists:{" "}
-              {[...PRICE_SOURCES, CATALOG].map((source, i) => (
-                <span key={source.label}>
-                  {i > 0 && " · "}
-                  <a
-                    href={source.url}
-                    {...externalLink}
-                    className="text-foreground underline underline-offset-2 hover:text-brand"
-                  >
-                    {source.label}
-                  </a>
-                </span>
-              ))}
-              . Use the pay-per-token API price in US dollars per million tokens.
-            </p>
-          </section>
-
-          <section className="space-y-2 border-t border-border pt-3">
-            <h3 className="text-xs font-medium text-foreground">2. Add it to pricing.json</h3>
-            <div className="flex items-center gap-1 text-xs leading-relaxed text-muted-foreground">
-              <p className="min-w-0 flex-1">
-                Create <Code>{overridePath}</Code> if it does not exist, or add{" "}
-                {manyNamed ? "these entries" : "this entry"} to the one you have, and replace the zeros.
+                  </span>
+                ))}
+                . Use the pay-per-token API price in US dollars per million tokens.
               </p>
-              <CopyButton value={overridePath} label="Copy path" />
-            </div>
-            <div className="relative">
-              <pre className="overflow-x-auto rounded-lg border border-border bg-muted/50 p-3 pr-10 font-mono text-[11px] leading-relaxed text-foreground">
-                {template}
-              </pre>
-              <CopyButton
-                value={template}
-                label="Copy pricing.json"
-                className="absolute top-1.5 right-1.5"
-              />
-            </div>
-            <ul className="list-disc space-y-1 pl-4 text-xs leading-relaxed text-muted-foreground">
-              <li>
-                <Code>input</Code> and <Code>output</Code> are required. <Code>cacheRead</Code>,{" "}
-                <Code>cacheWrite</Code> and <Code>cacheWrite1h</Code> are optional: the first two
-                fall back to the input price, and <Code>cacheWrite1h</Code> to{" "}
-                <Code>cacheWrite</Code>.
-              </li>
-              <li>
-                A model you run yourself costs nothing per token: leave <Code>input</Code> and{" "}
-                <Code>output</Code> at 0 to count it as free.
-              </li>
-              <li>
-                To record a price change, give the model a list of entries and mark the later one
-                with <Code>&quot;from&quot;: &quot;YYYY-MM-DD&quot;</Code>. Older sessions keep
-                the old price.
-              </li>
-            </ul>
-          </section>
+            </section>
 
-          <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-            <span className="font-medium text-foreground">3. Reload this page.</span> The file is
-            read on every load, so no restart is needed. Entries in it also replace the bundled
-            price of any model they name.
-            {named.length < models.length && (
-              <>
-                {" "}
-                Usage listed as <Code>{UNKNOWN_MODEL}</Code> was recorded without a model name, so
-                it cannot be given a price.
-              </>
-            )}
-          </p>
+            <section className="space-y-2 border-t border-border pt-3">
+              <h3 className="text-xs font-medium text-foreground">2. Add it to pricing.json</h3>
+              <div className="flex items-center gap-1 text-xs leading-relaxed text-muted-foreground">
+                <p className="min-w-0 flex-1">
+                  Create <Code>{overridePath}</Code> if it does not exist, or add{" "}
+                  {manyNamed ? "these entries" : "this entry"} to the one you have, and replace the zeros.
+                </p>
+                <CopyButton value={overridePath} label="Copy path" />
+              </div>
+              <div className="relative">
+                <pre className="overflow-x-auto rounded-lg border border-border bg-muted/50 p-3 pr-10 font-mono text-[11px] leading-relaxed text-foreground">
+                  {template}
+                </pre>
+                <CopyButton
+                  value={template}
+                  label="Copy pricing.json"
+                  className="absolute top-1.5 right-1.5"
+                />
+              </div>
+              <ul className="list-disc space-y-1 pl-4 text-xs leading-relaxed text-muted-foreground">
+                <li>
+                  <Code>input</Code> and <Code>output</Code> are required. <Code>cacheRead</Code>,{" "}
+                  <Code>cacheWrite</Code> and <Code>cacheWrite1h</Code> are optional: the first two
+                  fall back to the input price, and <Code>cacheWrite1h</Code> to{" "}
+                  <Code>cacheWrite</Code>.
+                </li>
+                <li>
+                  A model you run yourself costs nothing per token: leave <Code>input</Code> and{" "}
+                  <Code>output</Code> at 0 to count it as free.
+                </li>
+                <li>
+                  To record a price change, give the model a list of entries and mark the later one
+                  with <Code>&quot;from&quot;: &quot;YYYY-MM-DD&quot;</Code>. Older sessions keep
+                  the old price.
+                </li>
+              </ul>
+            </section>
+
+            <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground">3. Reload this page.</span> The file is
+              read on every load, so no restart is needed. Entries in it also replace the bundled
+              price of any model they name.
+              {named.length < models.length && (
+                <>
+                  {" "}
+                  Usage listed as <Code>{UNKNOWN_MODEL}</Code> was recorded without a model name, so
+                  it cannot be given a price.
+                </>
+              )}
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </>
