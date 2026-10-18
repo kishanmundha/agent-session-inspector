@@ -33,7 +33,7 @@ Commands:
   Run a command with --help for its options.
 
 Options:
-  -p, --port <port>   Port to listen on (default: 3000, or the next free one)
+  -p, --port <port>   Port to listen on (default: 4747, or the next free one)
   -H, --host <host>   Interface to bind (default: 127.0.0.1)
       --no-open       Don't open the browser
   -v, --version       Print the version
@@ -165,7 +165,7 @@ if (!existsSync(SERVER)) {
 
 let port = opts.port;
 if (port === null) {
-  port = await pickPort(Number(process.env.PORT) || 3000, opts.host);
+  port = await pickPort(Number(process.env.PORT) || 4747, opts.host);
 } else if (!(await isFree(port, opts.host))) {
   fail(`port ${port} is already in use`);
 }

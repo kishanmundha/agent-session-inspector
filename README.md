@@ -32,7 +32,7 @@ Run it with [Node.js](https://nodejs.org) 22.13 or newer, nothing to install:
 npx agent-session-inspector
 ```
 
-It serves on [http://localhost:3000](http://localhost:3000) (or the next free
+It serves on [http://localhost:4747](http://localhost:4747) (or the next free
 port), bound to `127.0.0.1` only, and opens your browser. `--port`, `--host` and
 `--no-open` change that; `--help` lists everything.
 

@@ -35,9 +35,9 @@
   },
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 4747",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 4747",
     "lint": "eslint",
     "cli": "node scripts/build-cli.mjs && node bin/agent-session-inspector.mjs",
     "deploy:docker": "./scripts/deploy-docker.sh",

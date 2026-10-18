@@ -11,7 +11,7 @@ pnpm install
 pnpm dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:4747](http://localhost:4747).
 
 To run it in Docker with the transcript directories mounted read-only:
 
