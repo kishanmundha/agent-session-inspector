@@ -174,7 +174,7 @@ const SCRIPT_WRITES = [
 
 /** The string a variable was last assigned before `index`, if it was a literal. */
 function assignedString(source: string, name: string, index: number): string | undefined {
-  const escaped = name.replace(/\$/g, "\\$");
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const assignment = new RegExp(String.raw`(?<![\w$.])${escaped}\s*=\s*(['"])([^'"\n]+)\1`, "g");
   let value: string | undefined;
   for (const m of source.slice(0, index).matchAll(assignment)) value = m[2];

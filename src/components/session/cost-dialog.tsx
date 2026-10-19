@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { Fragment, useState } from "react";
-import { ChevronRight, ExternalLink } from "lucide-react";
+import { Fragment, useState } from 'react';
+import { ChevronRight, ExternalLink } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -16,38 +16,44 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { CopyButton } from "@/components/common/copy-button";
-import { formatCost } from "@/lib/format";
-import { sourceOf } from "@/lib/price-sources";
-import { cn } from "@/lib/utils";
-import type { CostLine, CostSummary } from "./types";
+} from '@/components/ui/table';
+import { CopyButton } from '@/components/common/copy-button';
+import { formatCost } from '@/lib/format';
+import { sourceOf } from '@/lib/price-sources';
+import { cn } from '@/lib/utils';
+import type { CostLine, CostSummary } from './types';
 
-export const CLASS_LABEL: Record<CostLine["kind"], string> = {
-  input: "Uncached input",
-  cacheWrite: "Cache write",
-  cacheWrite1h: "Cache write (1h)",
-  cacheRead: "Cache read",
-  output: "Output",
+export const CLASS_LABEL: Record<CostLine['kind'], string> = {
+  input: 'Uncached input',
+  cacheWrite: 'Cache write',
+  cacheWrite1h: 'Cache write (1h)',
+  cacheRead: 'Cache read',
+  output: 'Output',
 };
 
 const GLOSSARY: [string, string][] = [
-  ["Uncached input", "new prompt text the model had not seen before."],
+  ['Uncached input', 'new prompt text the model had not seen before.'],
   [
-    "Cache write",
-    "context stored so later requests can reuse it. A 1-hour cache costs more to write than the default.",
+    'Cache write',
+    'context stored so later requests can reuse it. A 1-hour cache costs more to write than the default.',
   ],
   [
-    "Cache read",
-    "stored context reused at a discount. The whole conversation is re-sent on every request, so this grows fastest in long sessions.",
+    'Cache read',
+    'stored context reused at a discount. The whole conversation is re-sent on every request, so this grows fastest in long sessions.',
   ],
-  ["Output", "the model's replies, tool calls and reasoning."],
+  ['Output', "the model's replies, tool calls and reasoning."],
 ];
 
-const externalLink = { target: "_blank", rel: "noreferrer" } as const;
+const externalLink = { target: '_blank', rel: 'noreferrer' } as const;
 
 /** The model name, linked to its vendor's price list when one is known. */
-function ModelPriceLink({ model, priceKey }: { model: string; priceKey?: string }) {
+function ModelPriceLink({
+  model,
+  priceKey,
+}: {
+  model: string;
+  priceKey?: string;
+}) {
   if (!priceKey) return <>{model}</>;
   const source = sourceOf(priceKey);
   return (
@@ -59,7 +65,9 @@ function ModelPriceLink({ model, priceKey }: { model: string; priceKey?: string 
     >
       {model}
       <ExternalLink className="size-3 text-muted-foreground" aria-hidden />
-      <span className="sr-only">({source.label} pricing, opens in a new tab)</span>
+      <span className="sr-only">
+        ({source.label} pricing, opens in a new tab)
+      </span>
     </a>
   );
 }
@@ -88,18 +96,29 @@ export function formatRate(rate: number) {
  * A pricing.json the user can paste as-is: this session's models at the rates
  * currently applied, with a zeroed entry to fill in for any without a price.
  */
-function overrideTemplate(prices: CostSummary["prices"]) {
+function overrideTemplate(prices: CostSummary['prices']) {
   const models = Object.entries(prices).map(([model, entries]) => {
     const rows = (entries ?? [{ input: 0, output: 0 }])
-      .map((entry) => `    ${JSON.stringify(entry).replace(/([{,:])/g, "$1 ").replace("}", " }")}`)
-      .join(",\n");
+      .map((entry) => {
+        const fields = Object.entries(entry).map(
+          ([key, value]) => `${JSON.stringify(key)}: ${JSON.stringify(value)}`,
+        );
+        return `    { ${fields.join(', ')} }`;
+      })
+      .join(',\n');
     return `  ${JSON.stringify(model)}: [\n${rows}\n  ]`;
   });
-  return `{\n${models.join(",\n")}\n}`;
+  return `{\n${models.join(',\n')}\n}`;
 }
 
 /** One receipt: a row per rate paid, grouped by model, with its total. */
-function CostTable({ cost, totalLabel }: { cost: CostSummary; totalLabel: string }) {
+function CostTable({
+  cost,
+  totalLabel,
+}: {
+  cost: CostSummary;
+  totalLabel: string;
+}) {
   const multiModel = cost.byModel.length > 1;
   const partial = cost.unpricedModels.length > 0;
   const custom = new Set(cost.customPriced ?? []);
@@ -108,12 +127,18 @@ function CostTable({ cost, totalLabel }: { cost: CostSummary; totalLabel: string
       <Table className="text-xs">
         <TableHeader>
           <TableRow className="bg-muted/60 hover:bg-muted/60">
-            <TableHead className="h-8 px-3 text-muted-foreground">Token type</TableHead>
-            <TableHead className="h-8 px-3 text-right text-muted-foreground">Tokens</TableHead>
+            <TableHead className="h-8 px-3 text-muted-foreground">
+              Token type
+            </TableHead>
+            <TableHead className="h-8 px-3 text-right text-muted-foreground">
+              Tokens
+            </TableHead>
             <TableHead className="h-8 px-3 text-right text-muted-foreground">
               Rate / 1M
             </TableHead>
-            <TableHead className="h-8 px-3 text-right text-muted-foreground">Cost</TableHead>
+            <TableHead className="h-8 px-3 text-right text-muted-foreground">
+              Cost
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody className="tabular-nums">
@@ -125,17 +150,27 @@ function CostTable({ cost, totalLabel }: { cost: CostSummary; totalLabel: string
                   scope="rowgroup"
                   className="h-auto px-3 py-1.5 font-mono font-semibold"
                 >
-                  <ModelPriceLink model={model.model} priceKey={cost.priceKeys?.[model.model]} />
-                  {custom.has(model.model) && <CustomPriceBadge path={cost.overridePath} />}
+                  <ModelPriceLink
+                    model={model.model}
+                    priceKey={cost.priceKeys?.[model.model]}
+                  />
+                  {custom.has(model.model) && (
+                    <CustomPriceBadge path={cost.overridePath} />
+                  )}
                 </TableHead>
                 <TableCell className="px-3 py-1.5 text-right font-mono font-semibold text-foreground">
-                  {multiModel && model.costUSD !== null && formatCost(model.costUSD)}
+                  {multiModel &&
+                    model.costUSD !== null &&
+                    formatCost(model.costUSD)}
                 </TableCell>
               </TableRow>
               {cost.lines
                 .filter((line) => line.model === model.model)
                 .map((line) => (
-                  <TableRow key={`${line.kind}-${line.rate}`} className="border-border/60">
+                  <TableRow
+                    key={`${line.kind}-${line.rate}`}
+                    className="border-border/60"
+                  >
                     <TableCell className="px-3 py-1.5 text-foreground">
                       {CLASS_LABEL[line.kind]}
                     </TableCell>
@@ -143,7 +178,7 @@ function CostTable({ cost, totalLabel }: { cost: CostSummary; totalLabel: string
                       {line.tokens.toLocaleString()}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-right font-mono">
-                      {line.rate === null ? "—" : formatRate(line.rate)}
+                      {line.rate === null ? '—' : formatRate(line.rate)}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-right font-mono text-foreground">
                       {line.usd === null ? (
@@ -161,12 +196,16 @@ function CostTable({ cost, totalLabel }: { cost: CostSummary; totalLabel: string
         </TableBody>
         <TableFooter className="bg-muted/60">
           <TableRow className="hover:bg-transparent">
-            <TableHead colSpan={3} scope="row" className="h-auto px-3 py-2 font-semibold">
+            <TableHead
+              colSpan={3}
+              scope="row"
+              className="h-auto px-3 py-2 font-semibold"
+            >
               {totalLabel}
             </TableHead>
             <TableCell className="px-3 py-2 text-right font-mono font-bold tabular-nums text-foreground">
               {formatCost(cost.totalUSD)}
-              {partial && "+"}
+              {partial && '+'}
             </TableCell>
           </TableRow>
         </TableFooter>
@@ -190,7 +229,8 @@ export function CostDialog({
 }) {
   const partial = cost.unpricedModels.length > 0;
   // Empty only while a dashboard's receipt is still fetching its entries.
-  const template = Object.keys(cost.prices).length > 0 ? overrideTemplate(cost.prices) : null;
+  const template =
+    Object.keys(cost.prices).length > 0 ? overrideTemplate(cost.prices) : null;
   const customPriced = cost.customPriced ?? [];
   // Starts open when a price is missing: that is when it is needed.
   const [pricesOpen, setPricesOpen] = useState(partial);
@@ -204,40 +244,55 @@ export function CostDialog({
           <DialogDescription>
             {scope ? (
               <>
-                This is what the tokens of {scope.sessions.toLocaleString()} session
-                {scope.sessions === 1 ? "" : "s"} ({scope.period}) would cost on the
-                pay-per-token API at list prices.
+                This is what the tokens of {scope.sessions.toLocaleString()}{' '}
+                session
+                {scope.sessions === 1 ? '' : 's'} ({scope.period}) would cost on
+                the pay-per-token API at list prices.
               </>
             ) : (
-              <>This is what the session&rsquo;s tokens would cost on the pay-per-token API at list prices.</>
-            )}{" "}
+              <>
+                This is what the session&rsquo;s tokens would cost on the
+                pay-per-token API at list prices.
+              </>
+            )}{' '}
             It is not a bill: on a subscription or a request-based plan you pay
             your plan price, however many tokens a session uses.
           </DialogDescription>
         </div>
 
         <div className="flex min-h-0 shrink! flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5 *:shrink-0">
-          <CostTable cost={cost} totalLabel={cost.inherited ? "This session" : "Total"} />
+          <CostTable
+            cost={cost}
+            totalLabel={cost.inherited ? 'This session' : 'Total'}
+          />
 
           <p className="text-xs text-muted-foreground">
-            Each row is tokens ÷ 1,000,000 × rate, using the list price on the day
-            of the request. Click a model name to check its rates on the
+            Each row is tokens ÷ 1,000,000 × rate, using the list price on the
+            day of the request. Click a model name to check its rates on the
             vendor&rsquo;s price list.
             {partial && (
               <>
-                {" "}
-                No price is known for {cost.unpricedModels.join(", ")}, so the
-                total leaves {cost.unpricedModels.length > 1 ? "them" : "it"} out.
+                {' '}
+                No price is known for {cost.unpricedModels.join(', ')}, so the
+                total leaves {cost.unpricedModels.length > 1 ? 'them' : 'it'}{' '}
+                out.
               </>
             )}
           </p>
 
           {customPriced.length > 0 && (
             <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-              <span className="font-medium text-foreground">Custom prices in use.</span>{" "}
-              <code className="font-mono text-foreground">{cost.overridePath}</code> sets the price
-              for <span className="font-mono text-foreground">{customPriced.join(", ")}</span>, in
-              place of the bundled table.
+              <span className="font-medium text-foreground">
+                Custom prices in use.
+              </span>{' '}
+              <code className="font-mono text-foreground">
+                {cost.overridePath}
+              </code>{' '}
+              sets the price for{' '}
+              <span className="font-mono text-foreground">
+                {customPriced.join(', ')}
+              </span>
+              , in place of the bundled table.
             </p>
           )}
 
@@ -279,12 +334,12 @@ export function CostDialog({
             >
               <ChevronRight
                 className={cn(
-                  "size-3.5 shrink-0 text-muted-foreground transition-transform",
-                  pricesOpen && "rotate-90",
+                  'size-3.5 shrink-0 text-muted-foreground transition-transform',
+                  pricesOpen && 'rotate-90',
                 )}
                 aria-hidden
               />
-              {partial ? "Add the missing price" : "Change these prices"}
+              {partial ? 'Add the missing price' : 'Change these prices'}
             </button>
             <div
               id="cost-dialog-prices"
@@ -294,10 +349,12 @@ export function CostDialog({
               {template ? (
                 <>
                   <p>
-                    Save the block below as{" "}
-                    <code className="font-mono text-foreground">{cost.overridePath}</code>{" "}
-                    and edit the numbers. It replaces the bundled price for the models
-                    it lists and takes effect on the next page load.
+                    Save the block below as{' '}
+                    <code className="font-mono text-foreground">
+                      {cost.overridePath}
+                    </code>{' '}
+                    and edit the numbers. It replaces the bundled price for the
+                    models it lists and takes effect on the next page load.
                   </p>
                   <div className="relative">
                     <pre className="overflow-x-auto rounded-lg border border-border bg-muted/50 p-3 pr-10 font-mono text-[11px] leading-relaxed text-foreground">
@@ -316,19 +373,27 @@ export function CostDialog({
               <ul className="list-disc space-y-1 pl-4">
                 <li>All prices are US dollars per million tokens.</li>
                 <li>
-                  <code className="font-mono text-foreground">input</code> and{" "}
+                  <code className="font-mono text-foreground">input</code> and{' '}
                   <code className="font-mono text-foreground">output</code> are
-                  required. <code className="font-mono text-foreground">cacheRead</code>,{" "}
-                  <code className="font-mono text-foreground">cacheWrite</code> and{" "}
-                  <code className="font-mono text-foreground">cacheWrite1h</code>{" "}
-                  are optional: the first two fall back to the input price,
-                  and <code className="font-mono text-foreground">cacheWrite1h</code>{" "}
-                  to <code className="font-mono text-foreground">cacheWrite</code>.{" "}
-                  <code className="font-mono text-foreground">fast</code> multiplies
-                  every price for requests made in a faster, premium speed tier.
+                  required.{' '}
+                  <code className="font-mono text-foreground">cacheRead</code>,{' '}
+                  <code className="font-mono text-foreground">cacheWrite</code>{' '}
+                  and{' '}
+                  <code className="font-mono text-foreground">
+                    cacheWrite1h
+                  </code>{' '}
+                  are optional: the first two fall back to the input price, and{' '}
+                  <code className="font-mono text-foreground">
+                    cacheWrite1h
+                  </code>{' '}
+                  to{' '}
+                  <code className="font-mono text-foreground">cacheWrite</code>.{' '}
+                  <code className="font-mono text-foreground">fast</code>{' '}
+                  multiplies every price for requests made in a faster, premium
+                  speed tier.
                 </li>
                 <li>
-                  To record a price change, add a second entry with{" "}
+                  To record a price change, add a second entry with{' '}
                   <code className="font-mono text-foreground">
                     &quot;from&quot;: &quot;YYYY-MM-DD&quot;
                   </code>
