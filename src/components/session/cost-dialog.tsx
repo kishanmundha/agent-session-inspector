@@ -18,31 +18,24 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { CopyButton } from '@/components/common/copy-button';
-import { formatCost } from '@/lib/format';
+import { formatCost, formatNumber } from '@/lib/format';
+import { formatLocale } from '@/i18n/current';
+import { useT } from '@/i18n/client';
 import { sourceOf } from '@/lib/price-sources';
 import { cn } from '@/lib/utils';
 import type { CostLine, CostSummary } from './types';
 
-export const CLASS_LABEL: Record<CostLine['kind'], string> = {
-  input: 'Uncached input',
-  cacheWrite: 'Cache write',
-  cacheWrite1h: 'Cache write (1h)',
-  cacheRead: 'Cache read',
-  output: 'Output',
-};
-
-const GLOSSARY: [string, string][] = [
-  ['Uncached input', 'new prompt text the model had not seen before.'],
-  [
-    'Cache write',
-    'context stored so later requests can reuse it. A 1-hour cache costs more to write than the default.',
-  ],
-  [
-    'Cache read',
-    'stored context reused at a discount. The whole conversation is re-sent on every request, so this grows fastest in long sessions.',
-  ],
-  ['Output', "the model's replies, tool calls and reasoning."],
+/** Token classes in receipt order; labelled by `cost.classes.*`. */
+export const COST_KINDS: CostLine['kind'][] = [
+  'input',
+  'cacheWrite',
+  'cacheWrite1h',
+  'cacheRead',
+  'output',
 ];
+
+/** Classes the glossary explains; the 1-hour write is covered by the plain one. */
+const GLOSSARY = ['input', 'cacheWrite', 'cacheRead', 'output'] as const;
 
 const externalLink = { target: '_blank', rel: 'noreferrer' } as const;
 
@@ -54,19 +47,20 @@ function ModelPriceLink({
   model: string;
   priceKey?: string;
 }) {
+  const t = useT();
   if (!priceKey) return <>{model}</>;
   const source = sourceOf(priceKey);
   return (
     <a
       href={source.url}
       {...externalLink}
-      title={`Check the rates on ${source.label} pricing`}
+      title={t('cost.checkRates', { source: source.label })}
       className="inline-flex items-center gap-1 rounded-sm underline decoration-muted-foreground/50 underline-offset-2 hover:text-brand hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       {model}
       <ExternalLink className="size-3 text-muted-foreground" aria-hidden />
       <span className="sr-only">
-        ({source.label} pricing, opens in a new tab)
+        {t('cost.opensInTab', { source: source.label })}
       </span>
     </a>
   );
@@ -74,22 +68,26 @@ function ModelPriceLink({
 
 /** Marks a model whose rates come from the user's pricing.json. */
 function CustomPriceBadge({ path }: { path: string }) {
+  const t = useT();
   return (
     <span
-      title={`Priced from ${path}, not the bundled table`}
+      title={t('cost.pricedFrom', { path })}
       className="ml-2 rounded-sm border border-amber-500/40 bg-amber-500/10 px-1.5 py-px font-sans text-[10px] font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400"
     >
-      Your price
+      {t('cost.yourPrice')}
     </span>
   );
 }
 
 /** Rates keep enough decimals to show sub-cent prices such as $0.075. */
 export function formatRate(rate: number) {
-  return `$${rate.toLocaleString(undefined, {
+  return rate.toLocaleString(formatLocale(), {
+    style: 'currency',
+    currency: 'USD',
+    currencyDisplay: 'narrowSymbol',
     minimumFractionDigits: 2,
     maximumFractionDigits: 4,
-  })}`;
+  });
 }
 
 /**
@@ -119,6 +117,7 @@ function CostTable({
   cost: CostSummary;
   totalLabel: string;
 }) {
+  const t = useT();
   const multiModel = cost.byModel.length > 1;
   const partial = cost.unpricedModels.length > 0;
   const custom = new Set(cost.customPriced ?? []);
@@ -128,16 +127,16 @@ function CostTable({
         <TableHeader>
           <TableRow className="bg-muted/60 hover:bg-muted/60">
             <TableHead className="h-8 px-3 text-muted-foreground">
-              Token type
+              {t('cost.tokenType')}
             </TableHead>
             <TableHead className="h-8 px-3 text-right text-muted-foreground">
-              Tokens
+              {t('usage.units.tokens')}
             </TableHead>
             <TableHead className="h-8 px-3 text-right text-muted-foreground">
-              Rate / 1M
+              {t('cost.ratePerMillion')}
             </TableHead>
             <TableHead className="h-8 px-3 text-right text-muted-foreground">
-              Cost
+              {t('usage.units.costUSD')}
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -172,10 +171,10 @@ function CostTable({
                     className="border-border/60"
                   >
                     <TableCell className="px-3 py-1.5 text-foreground">
-                      {CLASS_LABEL[line.kind]}
+                      {t(`cost.classes.${line.kind}`)}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-right font-mono">
-                      {line.tokens.toLocaleString()}
+                      {formatNumber(line.tokens)}
                     </TableCell>
                     <TableCell className="px-3 py-1.5 text-right font-mono">
                       {line.rate === null ? '—' : formatRate(line.rate)}
@@ -183,7 +182,7 @@ function CostTable({
                     <TableCell className="px-3 py-1.5 text-right font-mono text-foreground">
                       {line.usd === null ? (
                         <span className="font-sans text-muted-foreground">
-                          no price
+                          {t('cost.noPrice')}
                         </span>
                       ) : (
                         formatCost(line.usd)
@@ -227,11 +226,17 @@ export function CostDialog({
   /** Set when the cost covers many sessions, e.g. a dashboard's range, not one session. */
   scope?: { sessions: number; period: string };
 }) {
+  const t = useT();
   const partial = cost.unpricedModels.length > 0;
   // Empty only while a dashboard's receipt is still fetching its entries.
   const template =
     Object.keys(cost.prices).length > 0 ? overrideTemplate(cost.prices) : null;
   const customPriced = cost.customPriced ?? [];
+  const code = {
+    c: (chunks: React.ReactNode) => (
+      <code className="font-mono text-foreground">{chunks}</code>
+    ),
+  };
   // Starts open when a price is missing: that is when it is needed.
   const [pricesOpen, setPricesOpen] = useState(partial);
 
@@ -240,42 +245,30 @@ export function CostDialog({
       {/* Only the body scrolls, so the title and close button stay put. */}
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
         <div className="space-y-1.5 border-b border-border px-5 pt-5 pb-3">
-          <DialogTitle>How this cost is estimated</DialogTitle>
+          <DialogTitle>{t('cost.title')}</DialogTitle>
           <DialogDescription>
-            {scope ? (
-              <>
-                This is what the tokens of {scope.sessions.toLocaleString()}{' '}
-                session
-                {scope.sessions === 1 ? '' : 's'} ({scope.period}) would cost on
-                the pay-per-token API at list prices.
-              </>
-            ) : (
-              <>
-                This is what the session&rsquo;s tokens would cost on the
-                pay-per-token API at list prices.
-              </>
-            )}{' '}
-            It is not a bill: on a subscription or a request-based plan you pay
-            your plan price, however many tokens a session uses.
+            {scope
+              ? t('cost.introRange', { count: scope.sessions, period: scope.period })
+              : t('cost.introSession')}{' '}
+            {t('cost.notABill')}
           </DialogDescription>
         </div>
 
         <div className="flex min-h-0 shrink! flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5 *:shrink-0">
           <CostTable
             cost={cost}
-            totalLabel={cost.inherited ? 'This session' : 'Total'}
+            totalLabel={cost.inherited ? t('cost.thisSession') : t('cost.total')}
           />
 
           <p className="text-xs text-muted-foreground">
-            Each row is tokens ÷ 1,000,000 × rate, using the list price on the
-            day of the request. Click a model name to check its rates on the
-            vendor&rsquo;s price list.
+            {t('cost.rowFormula')}
             {partial && (
               <>
                 {' '}
-                No price is known for {cost.unpricedModels.join(', ')}, so the
-                total leaves {cost.unpricedModels.length > 1 ? 'them' : 'it'}{' '}
-                out.
+                {t('cost.unpriced', {
+                  models: cost.unpricedModels.join(', '),
+                  count: cost.unpricedModels.length,
+                })}
               </>
             )}
           </p>
@@ -283,16 +276,20 @@ export function CostDialog({
           {customPriced.length > 0 && (
             <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
               <span className="font-medium text-foreground">
-                Custom prices in use.
+                {t('cost.customInUse')}
               </span>{' '}
-              <code className="font-mono text-foreground">
-                {cost.overridePath}
-              </code>{' '}
-              sets the price for{' '}
-              <span className="font-mono text-foreground">
-                {customPriced.join(', ')}
-              </span>
-              , in place of the bundled table.
+              {t.rich(
+                'cost.customDetail',
+                {
+                  c: (chunks) => (
+                    <code className="font-mono text-foreground">{chunks}</code>
+                  ),
+                  m: (chunks) => (
+                    <span className="font-mono text-foreground">{chunks}</span>
+                  ),
+                },
+                { path: cost.overridePath, models: customPriced.join(', ') },
+              )}
             </p>
           )}
 
@@ -300,25 +297,23 @@ export function CostDialog({
             <div className="space-y-2 border-t border-border pt-3">
               <div className="space-y-1">
                 <h3 className="text-sm font-medium text-foreground">
-                  Inherited from the forked session
+                  {t('cost.inheritedTitle')}
                 </h3>
                 <p className="text-xs leading-relaxed text-muted-foreground">
-                  This session is a fork, so it opens with a copy of its
-                  parent&rsquo;s history. Those requests were made, and are
-                  counted, in the parent session; they are listed here for
-                  reference and are not part of this session&rsquo;s cost or of
-                  any usage total.
+                  {t('cost.inheritedDetail')}
                 </p>
               </div>
-              <CostTable cost={cost.inherited} totalLabel="Inherited" />
+              <CostTable cost={cost.inherited} totalLabel={t('cost.inherited')} />
             </div>
           )}
 
           <dl className="space-y-1.5 border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-            {GLOSSARY.map(([term, meaning]) => (
-              <div key={term}>
-                <dt className="inline font-medium text-foreground">{term}: </dt>
-                <dd className="inline">{meaning}</dd>
+            {GLOSSARY.map((kind) => (
+              <div key={kind}>
+                <dt className="inline font-medium text-foreground">
+                  {t('cost.glossaryTerm', { term: t(`cost.classes.${kind}`) })}{' '}
+                </dt>
+                <dd className="inline">{t(`cost.glossary.${kind}`)}</dd>
               </div>
             ))}
           </dl>
@@ -339,7 +334,7 @@ export function CostDialog({
                 )}
                 aria-hidden
               />
-              {partial ? 'Add the missing price' : 'Change these prices'}
+              {partial ? t('unpriced.dialogTitle', { count: 1 }) : t('cost.changePrices')}
             </button>
             <div
               id="cost-dialog-prices"
@@ -349,12 +344,7 @@ export function CostDialog({
               {template ? (
                 <>
                   <p>
-                    Save the block below as{' '}
-                    <code className="font-mono text-foreground">
-                      {cost.overridePath}
-                    </code>{' '}
-                    and edit the numbers. It replaces the bundled price for the
-                    models it lists and takes effect on the next page load.
+                    {t.rich('cost.saveAs', code, { path: cost.overridePath })}
                   </p>
                   <div className="relative">
                     <pre className="overflow-x-auto rounded-lg border border-border bg-muted/50 p-3 pr-10 font-mono text-[11px] leading-relaxed text-foreground">
@@ -362,43 +352,21 @@ export function CostDialog({
                     </pre>
                     <CopyButton
                       value={template}
-                      label="Copy pricing.json"
+                      label={t('unpriced.copyFile')}
                       className="absolute top-1.5 right-1.5"
                     />
                   </div>
                 </>
               ) : (
-                <p>Loading the prices these models use now…</p>
+                <p>{t('cost.loadingPrices')}</p>
               )}
               <ul className="list-disc space-y-1 pl-4">
-                <li>All prices are US dollars per million tokens.</li>
+                <li>{t('cost.usdPerMillion')}</li>
                 <li>
-                  <code className="font-mono text-foreground">input</code> and{' '}
-                  <code className="font-mono text-foreground">output</code> are
-                  required.{' '}
-                  <code className="font-mono text-foreground">cacheRead</code>,{' '}
-                  <code className="font-mono text-foreground">cacheWrite</code>{' '}
-                  and{' '}
-                  <code className="font-mono text-foreground">
-                    cacheWrite1h
-                  </code>{' '}
-                  are optional: the first two fall back to the input price, and{' '}
-                  <code className="font-mono text-foreground">
-                    cacheWrite1h
-                  </code>{' '}
-                  to{' '}
-                  <code className="font-mono text-foreground">cacheWrite</code>.{' '}
-                  <code className="font-mono text-foreground">fast</code>{' '}
-                  multiplies every price for requests made in a faster, premium
-                  speed tier.
+                  {t.rich('unpriced.fieldsNote', code)}{' '}
+                  {t.rich('cost.fastNote', code)}
                 </li>
-                <li>
-                  To record a price change, add a second entry with{' '}
-                  <code className="font-mono text-foreground">
-                    &quot;from&quot;: &quot;YYYY-MM-DD&quot;
-                  </code>
-                  . Requests before that day keep the old price.
-                </li>
+                <li>{t.rich('cost.priceChangeNote', code)}</li>
               </ul>
             </div>
           </div>

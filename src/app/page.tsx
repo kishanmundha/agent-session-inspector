@@ -24,6 +24,7 @@ import { ScrollToTop } from "@/components/common/scroll-to-top";
 import { SearchInput } from "@/components/common/search-input";
 import { SessionCardSkeleton } from "@/components/common/skeleton";
 import { PalettePicker } from "@/components/common/palette-picker";
+import { LanguagePicker } from "@/components/common/language-picker";
 import { SearchTrigger } from "@/components/common/command-palette";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { SessionCard, type SessionMeta } from "@/components/home/session-card";
@@ -35,12 +36,13 @@ import { QualityDashboard } from "@/components/home/quality-dashboard";
 import { ActivityDashboard } from "@/components/home/activity-dashboard";
 import { AboutDialog } from "@/components/home/about-dialog";
 import { APP_INFO } from "@/lib/app-info";
-import { SUPPORTED_AGENTS, providerStyle } from "@/lib/provider-meta";
+import { providerStyle, supportedAgents } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
 import { ALL_PROJECTS, projectOf, summarizeProjects } from "@/lib/projects";
-import { SORT_OPTIONS, sortSessions, useSessionSort } from "@/lib/session-sort";
+import { SORT_KEYS, sortSessions, useSessionSort } from "@/lib/session-sort";
 import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
+import { useLocale, useT } from "@/i18n/client";
 
 const HOME_TABS = [
   "analytics",
@@ -62,6 +64,8 @@ export default function HomePage() {
 }
 
 function Home() {
+  const t = useT();
+  const locale = useLocale();
   const [tab, setTab] = useTabParam(HOME_TABS, "analytics");
   const [projectParam, setProject] = useQueryParam("project", ALL_PROJECTS);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
@@ -69,7 +73,7 @@ function Home() {
   const [provider, setProvider] = useState<string>("all");
   const [logs, setLogs] = useState<LogFile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useSessionSort();
 
@@ -99,9 +103,7 @@ function Home() {
         setProviders(nextProviders);
       } catch {
         if (!cancelled) {
-          setError(
-            "Could not read the agent session directories. Are ~/.copilot, ~/.claude or ~/.codex present and readable?",
-          );
+          setError(true);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -114,7 +116,7 @@ function Home() {
 
   function refresh() {
     setLoading(true);
-    setError(null);
+    setError(false);
     setReloadToken((t) => t + 1);
   }
 
@@ -131,12 +133,12 @@ function Home() {
 
   const projectOptions = useMemo(
     () => [
-      { value: ALL_PROJECTS, label: "All projects" },
+      { value: ALL_PROJECTS, label: t("home.allProjects") },
       ...[...projects]
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((p) => ({ value: p.name, label: p.name })),
     ],
-    [projects],
+    [projects, t],
   );
 
   const projectSessions = useMemo(
@@ -204,10 +206,15 @@ function Home() {
                 )}
                 aria-hidden
               />
-              <span className="font-medium tabular-nums text-foreground">
-                {providerSessions.length}
-              </span>
-              sessions
+              {t.rich(
+                "home.sessionCount",
+                {
+                  n: (chunks) => (
+                    <span className="font-medium tabular-nums text-foreground">{chunks}</span>
+                  ),
+                },
+                { count: providerSessions.length },
+              )}
             </span>
             <SearchTrigger />
             <Tooltip>
@@ -218,7 +225,7 @@ function Home() {
                     size="icon"
                     onClick={refresh}
                     disabled={loading}
-                    aria-label="Refresh"
+                    aria-label={t("home.refresh")}
                     className="text-muted-foreground"
                   >
                     <RefreshCw
@@ -228,8 +235,9 @@ function Home() {
                   </Button>
                 }
               />
-              <TooltipContent>Refresh</TooltipContent>
+              <TooltipContent>{t("home.refresh")}</TooltipContent>
             </Tooltip>
+            <LanguagePicker />
             <PalettePicker />
             <ThemeToggle />
             <AboutDialog providers={providers} />
@@ -243,12 +251,14 @@ function Home() {
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">
-                Failed to load sessions
+                {t("home.loadError")}
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{error}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {t("home.loadErrorDetail")}
+              </p>
             </div>
             <Button variant="outline" size="sm" onClick={refresh}>
-              Retry
+              {t("home.retry")}
             </Button>
           </div>
         )}
@@ -257,37 +267,37 @@ function Home() {
           <TabsList className="mb-5 max-w-full justify-start overflow-x-auto">
             <TabsTrigger value="analytics" className="px-3">
               <BarChart3 className="size-4" aria-hidden />
-              Analytics
+              {t("home.tabs.analytics")}
             </TabsTrigger>
             <TabsTrigger value="usage" className="px-3">
               <Wallet className="size-4" aria-hidden />
-              Usage
+              {t("home.tabs.usage")}
             </TabsTrigger>
             <TabsTrigger value="activity" className="px-3">
               <CalendarClock className="size-4" aria-hidden />
-              Activity
+              {t("home.tabs.activity")}
             </TabsTrigger>
             <TabsTrigger value="quality" className="px-3">
               <HeartPulse className="size-4" aria-hidden />
-              Quality
+              {t("home.tabs.quality")}
             </TabsTrigger>
             <TabsTrigger value="projects" className="px-3">
               <FolderGit2 className="size-4" aria-hidden />
-              Projects
+              {t("home.tabs.projects")}
               <span className="ml-1 rounded-sm bg-foreground/10 px-1.5 text-[11px] tabular-nums">
                 {projects.length}
               </span>
             </TabsTrigger>
             <TabsTrigger value="sessions" className="px-3">
               <ListTree className="size-4" aria-hidden />
-              Sessions
+              {t("home.tabs.sessions")}
               <span className="ml-1 rounded-sm bg-foreground/10 px-1.5 text-[11px] tabular-nums">
                 {projectSessions.length}
               </span>
             </TabsTrigger>
             <TabsTrigger value="logs" className="px-3">
               <FileText className="size-4" aria-hidden />
-              Logs
+              {t("home.tabs.logs")}
               <span className="ml-1 rounded-sm bg-foreground/10 px-1.5 text-[11px] tabular-nums">
                 {logs.length}
               </span>
@@ -344,12 +354,12 @@ function Home() {
               <div
                 className="mb-3 flex flex-wrap items-center gap-2"
                 role="group"
-                aria-label="Filter by agent"
+                aria-label={t("home.filterByAgent")}
               >
                 <ProviderChip
                   active={provider === "all"}
                   onClick={() => setProvider("all")}
-                  label="All agents"
+                  label={t("home.allAgents")}
                   count={projectSessions.length}
                 />
                 {availableProviders.map((p) => (
@@ -369,8 +379,8 @@ function Home() {
                 value={search}
                 onChange={setSearch}
                 shortcut
-                placeholder="Search title, repo, branch or id…"
-                aria-label="Search sessions"
+                placeholder={t("home.searchPlaceholder")}
+                aria-label={t("home.searchSessions")}
                 className="w-full max-w-sm"
               />
               {projectOptions.length > 2 && (
@@ -378,25 +388,28 @@ function Home() {
                   value={project}
                   onChange={setProject}
                   options={projectOptions}
-                  aria-label="Project"
+                  aria-label={t("home.project")}
                   className="max-w-56"
                 />
               )}
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="hidden sm:inline" aria-hidden>
-                  Sort
+                  {t("home.sort")}
                 </span>
                 <OptionSelect
                   value={sort}
                   onChange={setSort}
-                  options={SORT_OPTIONS}
-                  aria-label="Sort sessions"
+                  options={SORT_KEYS.map((key) => ({ value: key, label: t(`sort.${key}`) }))}
+                  aria-label={t("home.sortSessions")}
                 />
               </div>
               <span className="ml-auto text-xs tabular-nums text-muted-foreground">
                 {loading
-                  ? "Loading…"
-                  : `${filteredSessions.length} of ${providerSessions.length}`}
+                  ? t("common.loading")
+                  : t("common.nOfTotal", {
+                      shown: filteredSessions.length,
+                      total: providerSessions.length,
+                    })}
               </span>
             </div>
 
@@ -410,18 +423,21 @@ function Home() {
               ) : (
                 <EmptyState
                   icon={Inbox}
-                  title={search ? "No matching sessions" : "No sessions yet"}
+                  title={search ? t("home.noMatchingSessions") : t("home.noSessions")}
                   description={
                     search
-                      ? `Nothing matches “${search}”. Try a repository name, branch or session id.`
+                      ? t("home.noMatchDetail", { query: search })
                       : project !== ALL_PROJECTS
-                        ? `No ${providerStyle(provider).shortLabel} sessions in ${project}.`
-                        : `Sessions appear here once a supported agent writes a transcript on this machine: ${SUPPORTED_AGENTS}.`
+                        ? t("home.noProjectSessions", {
+                            agent: providerStyle(provider).shortLabel,
+                            project,
+                          })
+                        : t("home.noSessionsDetail", { agents: supportedAgents(locale) })
                   }
                   action={
                     search ? (
                       <Button variant="outline" size="sm" onClick={() => setSearch("")}>
-                        Clear search
+                        {t("common.clearSearch")}
                       </Button>
                     ) : undefined
                   }

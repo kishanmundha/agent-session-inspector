@@ -7,9 +7,8 @@ import { EmptyState } from "@/components/common/empty-state";
 import { SearchInput } from "@/components/common/search-input";
 import { editsByTurn } from "@/lib/edits";
 import { firstLine, formatDateTime } from "@/lib/format";
+import { useT } from "@/i18n/client";
 import type { AgentEvent } from "./types";
-
-const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
 
 /**
  * The files the session changed, turn by turn in timeline order: each prompt
@@ -27,6 +26,7 @@ export function SessionEdits({
   /** Opens the timeline at an event. */
   onOpenEvent: (eventId: string) => void;
 }) {
+  const t = useT();
   const [filter, setFilter] = useState("");
   const turns = useMemo(() => editsByTurn(events, cwd), [events, cwd]);
 
@@ -48,8 +48,8 @@ export function SessionEdits({
     return (
       <EmptyState
         icon={FilePen}
-        title="No file edits"
-        description="Files appear here, grouped by prompt, when the agent writes, edits or patches one, or changes one from the shell."
+        title={t("edits.emptyTitle")}
+        description={t("edits.emptyDetail")}
       />
     );
   }
@@ -66,13 +66,14 @@ export function SessionEdits({
           <SearchInput
             value={filter}
             onChange={setFilter}
-            placeholder="Filter files…"
-            aria-label="Filter edited files"
+            placeholder={t("logs.filterFiles")}
+            aria-label={t("edits.filterLabel")}
             className="w-full max-w-sm"
           />
         )}
         <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-          {plural(files, "file")} · {plural(edits, "edit")} · {plural(turns.length, "turn")}
+          {t("edits.files", { count: files })} · {t("edits.edits", { count: edits })} ·{" "}
+          {t("edits.turns", { count: turns.length })}
         </span>
       </div>
 
@@ -83,24 +84,24 @@ export function SessionEdits({
         >
           <header className="flex items-baseline gap-3 border-b border-border bg-muted/40 px-3 py-2">
             <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-              {turn.turn > 0 ? `Turn ${turn.turn}` : "Start"}
+              {turn.turn > 0 ? t("costByTurn.turn", { turn: turn.turn }) : t("edits.start")}
             </span>
             {turn.promptEventId ? (
               <button
                 type="button"
                 onClick={() => onOpenEvent(turn.promptEventId!)}
-                title="Open this prompt in the timeline"
+                title={t("edits.openPrompt")}
                 className="min-w-0 flex-1 truncate rounded-sm text-left text-sm font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
-                {firstLine(turn.prompt) ?? "Prompt"}
+                {firstLine(turn.prompt) ?? t("search.kinds.user")}
               </button>
             ) : (
               <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-                Before the first prompt
+                {t("costByTurn.beforeFirst")}
               </span>
             )}
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-              {plural(turn.files.length, "file")} · {formatDateTime(turn.timestamp)}
+              {t("edits.files", { count: turn.files.length })} · {formatDateTime(turn.timestamp)}
             </span>
           </header>
           <ul>
@@ -112,13 +113,13 @@ export function SessionEdits({
                 <button
                   type="button"
                   onClick={() => onOpenEvent(file.eventId)}
-                  title={`${file.path}\nOpen the edit in the timeline`}
+                  title={`${file.path}\n${t("edits.openEdit")}`}
                   className="min-w-0 flex-1 truncate rounded-sm text-left font-mono text-[13px] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   {display(file.path)}
                 </button>
                 <span className="opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                  <CopyButton value={file.path} label="Copy path" />
+                  <CopyButton value={file.path} label={t("unpriced.copyPath")} />
                 </span>
                 <span className="shrink-0 font-mono text-xs text-muted-foreground">
                   {file.tools.join(", ")}
@@ -134,7 +135,7 @@ export function SessionEdits({
 
       {visible.length === 0 && (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          No files match &ldquo;{filter}&rdquo;
+          {t("edits.noMatches", { query: filter })}
         </p>
       )}
     </div>

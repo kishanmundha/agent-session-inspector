@@ -9,7 +9,50 @@ import {
   type Locale,
 } from "react-day-picker"
 
+import {
+  az,
+  de,
+  enUS,
+  es,
+  fr,
+  id,
+  ja,
+  ko,
+  pl,
+  ptBR,
+  ru,
+  th,
+  tr,
+  uk,
+  vi,
+  zhCN,
+  zhTW,
+} from "react-day-picker/locale"
+import { useLocale } from "@/i18n/client"
+import type { Locale as AppLocale } from "@/i18n/config"
+
 import { Button, buttonVariants } from "@/components/ui/button"
+
+/** The day picker's month and weekday names for each interface language. */
+const DAY_PICKER_LOCALES: Record<AppLocale, Locale> = {
+  en: enUS,
+  az,
+  de,
+  es,
+  fr,
+  id,
+  ja,
+  ko,
+  pl,
+  "pt-BR": ptBR,
+  ru,
+  th,
+  tr,
+  uk,
+  vi,
+  "zh-CN": zhCN,
+  "zh-TW": zhTW,
+}
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from "lucide-react"
 
 function Calendar({
@@ -26,6 +69,8 @@ function Calendar({
   buttonVariant?: React.ComponentProps<typeof Button>["variant"]
 }) {
   const defaultClassNames = getDefaultClassNames()
+  const appLocale = useLocale()
+  locale ??= DAY_PICKER_LOCALES[appLocale]
 
   return (
     <DayPicker
@@ -41,6 +86,10 @@ function Calendar({
       formatters={{
         formatMonthDropdown: (date) =>
           date.toLocaleString(locale?.code, { month: "short" }),
+        // The heading uses the browser's calendar, as every other date in the
+        // app does, so Thai shows the Buddhist year (2569) like the rest.
+        formatCaption: (date) =>
+          date.toLocaleDateString(appLocale, { month: "long", year: "numeric" }),
         ...formatters,
       }}
       classNames={{

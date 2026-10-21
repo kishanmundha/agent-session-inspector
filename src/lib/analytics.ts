@@ -9,21 +9,16 @@ import type { AnalyticsSession, ProviderId } from "@/lib/providers/types";
 export const METRICS = ["messages", "sessions", "outputTokens", "costUSD"] as const;
 export type Metric = (typeof METRICS)[number];
 
-export const METRIC_LABELS: Record<Metric, string> = {
-  messages: "Messages",
-  sessions: "Sessions",
-  outputTokens: "Output tokens",
-  costUSD: "Cost",
-};
+/** Date ranges offered by the analytics and usage filters; labelled by `ranges.*`. */
+export const RANGES = [
+  { value: "7", days: 7 },
+  { value: "30", days: 30 },
+  { value: "90", days: 90 },
+  { value: "365", days: 365 },
+  { value: "all", days: null },
+] as const satisfies readonly { value: string; days: number | null }[];
 
-/** Date ranges offered by the analytics and usage filters. */
-export const RANGES: { value: string; label: string; days: number | null }[] = [
-  { value: "7", label: "Last 7 days", days: 7 },
-  { value: "30", label: "Last 30 days", days: 30 },
-  { value: "90", label: "Last 90 days", days: 90 },
-  { value: "365", label: "Last year", days: 365 },
-  { value: "all", label: "All time", days: null },
-];
+export type RangeValue = (typeof RANGES)[number]["value"];
 
 export interface AnalyticsFilter {
   /** How many days back from today to include; null for all time. */

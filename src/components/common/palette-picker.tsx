@@ -8,6 +8,7 @@ import {
   SelectItem,
   SelectTrigger,
 } from "@/components/ui/select";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 export const PALETTE_STORAGE_KEY = "cv-palette";
@@ -17,13 +18,13 @@ export const PALETTE_STORAGE_KEY = "cv-palette";
  * the real colours live in the `[data-palette]` blocks there.
  */
 export const PALETTES = [
-  { value: "ocean", label: "Ocean", swatch: "#4a8fd0" },
-  { value: "sage", label: "Sage", swatch: "#6b9c81" },
-  { value: "plum", label: "Plum", swatch: "#9c7fae" },
-  { value: "rose", label: "Rose", swatch: "#c4758c" },
-  { value: "sand", label: "Sand", swatch: "#b0915a" },
-  { value: "graphite", label: "Graphite", swatch: "#6b717c" },
-  { value: "terracotta", label: "Terracotta", swatch: "#d97757" },
+  { value: "ocean", swatch: "#4a8fd0" },
+  { value: "sage", swatch: "#6b9c81" },
+  { value: "plum", swatch: "#9c7fae" },
+  { value: "rose", swatch: "#c4758c" },
+  { value: "sand", swatch: "#b0915a" },
+  { value: "graphite", swatch: "#6b717c" },
+  { value: "terracotta", swatch: "#d97757" },
 ] as const;
 
 export type Palette = (typeof PALETTES)[number]["value"];
@@ -98,30 +99,32 @@ function Swatch({ color }: { color: string }) {
 }
 
 export function PalettePicker({ className }: { className?: string }) {
+  const t = useT();
   const palette = useSyncExternalStore(subscribe, readPalette, readServerPalette);
   const current = PALETTES.find((p) => p.value === palette) ?? PALETTES[0];
+  const label = (p: (typeof PALETTES)[number]) => t(`palette.${p.value}`);
 
   return (
     <Select
-      items={PALETTES}
+      items={PALETTES.map((p) => ({ value: p.value, label: label(p) }))}
       value={palette}
       onValueChange={(next) => {
         if (isPalette(next)) setPalette(next);
       }}
     >
       <SelectTrigger
-        aria-label={`Color palette: ${current.label}`}
+        aria-label={t("palette.ariaLabel", { name: label(current) })}
         className={cn("text-xs", className)}
       >
         <Swatch color={current.swatch} />
-        <span className="hidden sm:inline">{current.label}</span>
+        <span className="hidden sm:inline">{label(current)}</span>
       </SelectTrigger>
       <SelectContent align="end" className="w-auto min-w-36">
         <SelectGroup>
           {PALETTES.map((p) => (
             <SelectItem key={p.value} value={p.value}>
               <Swatch color={p.swatch} />
-              {p.label}
+              {label(p)}
             </SelectItem>
           ))}
         </SelectGroup>

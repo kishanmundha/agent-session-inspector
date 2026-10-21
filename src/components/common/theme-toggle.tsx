@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { PALETTES, PALETTE_STORAGE_KEY } from "./palette-picker";
+import { useT } from "@/i18n/client";
 import { Segmented } from "./segmented";
 
 export type Theme = "light" | "dark" | "system";
@@ -91,22 +92,23 @@ function setTheme(theme: Theme) {
   emit();
 }
 
-const OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Monitor },
+const OPTIONS: { value: Theme; icon: typeof Sun }[] = [
+  { value: "light", icon: Sun },
+  { value: "dark", icon: Moon },
+  { value: "system", icon: Monitor },
 ];
 
 export function ThemeToggle({ className }: { className?: string }) {
+  const t = useT();
   const theme = useSyncExternalStore(subscribe, readTheme, readServerTheme);
 
   return (
     <Segmented
-      label="Color theme"
+      label={t("theme.label")}
       size="default"
       value={theme}
       onChange={setTheme}
-      options={OPTIONS}
+      options={OPTIONS.map((o) => ({ ...o, label: t(`theme.${o.value}`) }))}
       className={className}
     />
   );

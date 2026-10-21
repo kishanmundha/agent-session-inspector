@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 /**
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 export function SearchInput({
   value,
   onChange,
-  placeholder = "Search…",
+  placeholder,
   shortcut = false,
   size = "default",
   className,
@@ -28,6 +29,8 @@ export function SearchInput({
   className?: string;
   "aria-label"?: string;
 }) {
+  const t = useT();
+  placeholder ??= t("common.searchPlaceholder");
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -76,7 +79,7 @@ export function SearchInput({
             variant="ghost"
             size="icon-xs"
             onClick={() => onChange("")}
-            aria-label="Clear search"
+            aria-label={t("common.clearSearch")}
             className="text-muted-foreground"
           >
             <X aria-hidden />

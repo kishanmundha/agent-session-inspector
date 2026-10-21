@@ -21,6 +21,7 @@ import { CopyButton } from "@/components/common/copy-button";
 import { ScrollToTop } from "@/components/common/scroll-to-top";
 import { Skeleton } from "@/components/common/skeleton";
 import { PalettePicker } from "@/components/common/palette-picker";
+import { LanguagePicker } from "@/components/common/language-picker";
 import { SearchTrigger } from "@/components/common/command-palette";
 import { ThemeToggle } from "@/components/common/theme-toggle";
 import { AboutDialog } from "@/components/home/about-dialog";
@@ -40,6 +41,7 @@ import { editsByTurn } from "@/lib/edits";
 import { firstLine } from "@/lib/format";
 import { isRunning } from "@/lib/session-state";
 import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
+import { useT } from "@/i18n/client";
 
 const SESSION_TABS = [
   "events",
@@ -77,10 +79,11 @@ export default function SessionPage(props: {
 }
 
 function Session({ provider, id }: { provider: string; id: string }) {
+  const t = useT();
   const [tabParam, setActiveTab] = useTabParam(SESSION_TABS, "events");
   const [data, setData] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const [eventFocusRequest, setEventFocusRequest] =
     useState<EventFocusRequest | null>(null);
 
@@ -126,7 +129,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
       } catch {
         // A failed background refresh leaves the transcript already on screen.
         if (!cancelled && !loaded.current) {
-          setError("This session could not be loaded. It may have been removed.");
+          setError(true);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -238,7 +241,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
 
   function retry() {
     setLoading(true);
-    setError(null);
+    setError(false);
     setReloadToken((t) => t + 1);
   }
 
@@ -267,7 +270,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
             className="text-muted-foreground"
           >
             <ArrowLeft aria-hidden />
-            <span className="hidden sm:inline">Sessions</span>
+            <span className="hidden sm:inline">{t("home.tabs.sessions")}</span>
           </Button>
           <span className="text-muted-foreground/50" aria-hidden>
             /
@@ -277,6 +280,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
           </span>
           <SearchTrigger className="shrink-0" />
           <ShortcutsTrigger className="hidden shrink-0 sm:inline-flex" />
+          <LanguagePicker className="shrink-0" />
           <PalettePicker className="shrink-0" />
           <ThemeToggle className="shrink-0" />
           <AboutDialog className="shrink-0" />
@@ -304,15 +308,17 @@ function Session({ provider, id }: { provider: string; id: string }) {
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border px-6 py-14 text-center">
             <AlertTriangle className="size-6 text-destructive" aria-hidden />
             <p className="text-sm font-medium text-foreground">
-              Session unavailable
+              {t("sessionPage.unavailable")}
             </p>
-            <p className="max-w-sm text-xs text-muted-foreground">{error}</p>
+            <p className="max-w-sm text-xs text-muted-foreground">
+              {t("sessionPage.unavailableDetail")}
+            </p>
             <div className="mt-2 flex gap-2">
               <Button variant="outline" size="sm" onClick={retry}>
-                Retry
+                {t("home.retry")}
               </Button>
               <Button size="sm" nativeButton={false} render={<Link href="/?tab=sessions" />}>
-                Back to sessions
+                {t("sessionPage.back")}
               </Button>
             </div>
           </div>
@@ -337,48 +343,48 @@ function Session({ provider, id }: { provider: string; id: string }) {
                 <TabsList className="w-max">
                   <TabsTrigger value="events" className="px-3">
                     <Zap className="size-4" aria-hidden />
-                    Events
+                    {t("sessionPage.tabs.events")}
                     <TabCount value={data.events.length} />
                   </TabsTrigger>
                   {data.checkpoints.length > 0 && (
                     <TabsTrigger value="checkpoints" className="px-3">
                       <Bookmark className="size-4" aria-hidden />
-                      Checkpoints
+                      {t("sessionPage.tabs.checkpoints")}
                       <TabCount value={data.checkpoints.length} />
                     </TabsTrigger>
                   )}
                   <TabsTrigger value="files" className="px-3">
                     <FileText className="size-4" aria-hidden />
-                    Files
+                    {t("sessionPage.tabs.files")}
                     <TabCount value={data.files.length} />
                   </TabsTrigger>
                   <TabsTrigger value="edits" className="px-3">
                     <FilePen className="size-4" aria-hidden />
-                    Edits
+                    {t("sessionPage.tabs.edits")}
                     <TabCount value={editCount} />
                   </TabsTrigger>
                   {data.research.length > 0 && (
                     <TabsTrigger value="research" className="px-3">
                       <FlaskConical className="size-4" aria-hidden />
-                      Research
+                      {t("sessionPage.tabs.research")}
                       <TabCount value={data.research.length} />
                     </TabsTrigger>
                   )}
                   <TabsTrigger value="workspace" className="px-3">
                     <ClipboardList className="size-4" aria-hidden />
-                    Metadata
+                    {t("sessionPage.tabs.workspace")}
                   </TabsTrigger>
                   <TabsTrigger value="cost" className="px-3">
                     <CircleDollarSign className="size-4" aria-hidden />
-                    Cost
+                    {t("sessionPage.tabs.cost")}
                   </TabsTrigger>
                   <TabsTrigger value="optimizer" className="px-3">
                     <Lightbulb className="size-4" aria-hidden />
-                    Token Optimizer
+                    {t("sessionPage.tabs.optimizer")}
                     {data.tokenAnalysis?.hints.some((h) => h.severity === "high") && (
                       <span
                         className="ml-1 inline-flex size-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white"
-                        title="High-impact hints"
+                        title={t("sessionPage.highImpact")}
                       >
                         {
                           data.tokenAnalysis.hints.filter(
@@ -433,14 +439,14 @@ function Session({ provider, id }: { provider: string; id: string }) {
                     {data.rawMeta.content && (
                       <CopyButton
                         value={data.rawMeta.content}
-                        label={`Copy ${data.rawMeta.name}`}
+                        label={t("common.copyNamed", { name: data.rawMeta.name })}
                         className="ml-auto"
                       />
                     )}
                   </div>
                   <ScrollArea className="h-[60vh] w-full">
                     <pre className="w-max min-w-full p-4 font-mono text-xs text-foreground">
-                      {data.rawMeta.content || "No session metadata found"}
+                      {data.rawMeta.content || t("sessionPage.noMetadata")}
                     </pre>
                   </ScrollArea>
                 </div>

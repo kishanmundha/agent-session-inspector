@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy, type LucideIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 type Status = "idle" | "copied" | "failed";
 
 export function CopyButton({
   value,
-  label = "Copy",
+  label,
   size = "xs",
   icon: IdleIcon = Copy,
   className,
@@ -26,6 +27,8 @@ export function CopyButton({
   className?: string;
   children?: React.ReactNode;
 }) {
+  const t = useT();
+  label ??= t("common.copy");
   const [status, setStatus] = useState<Status>("idle");
   const timer = useRef<number | undefined>(undefined);
 
@@ -66,7 +69,11 @@ export function CopyButton({
         }
       />
       <TooltipContent>
-        {status === "copied" ? "Copied" : status === "failed" ? "Copy failed" : label}
+        {status === "copied"
+          ? t("common.copied")
+          : status === "failed"
+            ? t("common.copyFailed")
+            : label}
       </TooltipContent>
     </Tooltip>
   );

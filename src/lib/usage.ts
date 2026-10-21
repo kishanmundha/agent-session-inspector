@@ -10,12 +10,6 @@ import type { AnalyticsSession, ProviderId } from "@/lib/providers/types";
 export const DIMENSIONS = ["project", "model", "agent"] as const;
 export type Dimension = (typeof DIMENSIONS)[number];
 
-export const DIMENSION_LABELS: Record<Dimension, string> = {
-  project: "Project",
-  model: "Model",
-  agent: "Agent",
-};
-
 /** What the charts measure: dollars, or tokens of every class. */
 export type Unit = "costUSD" | "tokens";
 

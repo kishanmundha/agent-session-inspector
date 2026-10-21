@@ -30,6 +30,7 @@ import { isRunning } from '@/lib/session-state';
 import { sortSessions, useSessionSort } from '@/lib/session-sort';
 import { useHotkeys } from '@/lib/use-hotkeys';
 import { cn } from '@/lib/utils';
+import { useT } from '@/i18n/client';
 import type { SessionMeta } from './types';
 
 const TOGGLE_SIDEBAR_EVENT = 'asv:toggle-sidebar';
@@ -41,6 +42,7 @@ const LIST_REFRESH_MS = 30_000;
 
 /** Top-bar button for the session sidebar; `b` does the same. */
 export function SidebarTrigger({ className }: { className?: string }) {
+  const t = useT();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -51,20 +53,21 @@ export function SidebarTrigger({ className }: { className?: string }) {
             onClick={() =>
               window.dispatchEvent(new Event(TOGGLE_SIDEBAR_EVENT))
             }
-            aria-label="Toggle session sidebar"
+            aria-label={t('shell.toggleSidebar')}
             className={cn('text-muted-foreground', className)}
           >
             <PanelLeft aria-hidden />
           </Button>
         }
       />
-      <TooltipContent>Session sidebar (b)</TooltipContent>
+      <TooltipContent>{t('shell.sidebarTooltip')}</TooltipContent>
     </Tooltip>
   );
 }
 
 /** Top-bar button for the shortcut list; `?` does the same. */
 export function ShortcutsTrigger({ className }: { className?: string }) {
+  const t = useT();
   return (
     <Tooltip>
       <TooltipTrigger
@@ -75,14 +78,14 @@ export function ShortcutsTrigger({ className }: { className?: string }) {
             onClick={() =>
               window.dispatchEvent(new Event(OPEN_SHORTCUTS_EVENT))
             }
-            aria-label="Keyboard shortcuts"
+            aria-label={t('shell.shortcuts')}
             className={cn('text-muted-foreground', className)}
           >
             <Keyboard aria-hidden />
           </Button>
         }
       />
-      <TooltipContent>Keyboard shortcuts (?)</TooltipContent>
+      <TooltipContent>{t('shell.shortcutsTooltip')}</TooltipContent>
     </Tooltip>
   );
 }
@@ -117,32 +120,30 @@ function writeDocked(docked: boolean) {
   listeners.forEach((notify) => notify());
 }
 
-const SHORTCUTS: {
-  group: string;
-  items: [keys: string[], action: string][];
-}[] = [
+/** Keys per action; the words are the `shell.keys.*` messages. */
+const SHORTCUTS = [
   {
-    group: 'Timeline',
+    group: 'timeline',
     items: [
-      [['/'], 'Search events in this session'],
-      [['f'], 'Cycle the transcript view: normal, compact, focused'],
-      [['o'], 'Flip the order: oldest or newest first'],
-      [['l'], 'Follow the session live'],
-      [['j', 'k'], 'Move to the next or previous event'],
-      [['Enter'], 'Expand or collapse the selected event'],
-      [['e', 'E'], 'Expand or collapse every event'],
+      [['/'], 'search'],
+      [['f'], 'view'],
+      [['o'], 'order'],
+      [['l'], 'live'],
+      [['j', 'k'], 'move'],
+      [['Enter'], 'expand'],
+      [['e', 'E'], 'expandAll'],
     ],
   },
   {
-    group: 'Navigation',
+    group: 'navigation',
     items: [
-      [['b'], 'Show or hide the session sidebar'],
-      [[']', '['], 'Open the next or previous session'],
-      [['⌘K'], 'Search every session'],
-      [['?'], 'Show this list'],
+      [['b'], 'sidebar'],
+      [[']', '['], 'neighbour'],
+      [['⌘K'], 'searchAll'],
+      [['?'], 'help'],
     ],
   },
-];
+] as const;
 
 function ShortcutsDialog({
   open,
@@ -151,17 +152,16 @@ function ShortcutsDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogTitle>Keyboard shortcuts</DialogTitle>
-        <DialogDescription>
-          Available on any session page, outside text fields.
-        </DialogDescription>
+        <DialogTitle>{t('shell.shortcuts')}</DialogTitle>
+        <DialogDescription>{t('shell.shortcutsDescription')}</DialogDescription>
         {SHORTCUTS.map(({ group, items }) => (
           <div key={group}>
             <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-              {group}
+              {t(`shell.groups.${group}`)}
             </p>
             <dl className="divide-y divide-border rounded-lg border border-border">
               {items.map(([keys, action]) => (
@@ -169,7 +169,9 @@ function ShortcutsDialog({
                   key={action}
                   className="flex items-center justify-between gap-4 px-3 py-1.5"
                 >
-                  <dt className="text-xs text-foreground">{action}</dt>
+                  <dt className="text-xs text-foreground">
+                    {t(`shell.keys.${action}`)}
+                  </dt>
                   <dd className="flex shrink-0 gap-1">
                     {keys.map((key) => (
                       <kbd
@@ -216,6 +218,7 @@ function sessionLabel(s: SessionMeta) {
  * It lives in the layout, so neither reloads when the session changes.
  */
 export function SessionShell({ children }: { children: React.ReactNode }) {
+  const t = useT();
   const router = useRouter();
   const params = useParams<{ provider?: string; id?: string }>();
   const docked = useSyncExternalStore(subscribe, readDocked, () => false);
@@ -327,26 +330,31 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
         />
       )}
       <aside
-        aria-label="Sessions"
+        aria-label={t('home.tabs.sessions')}
         className={cn(
           'fixed inset-y-0 left-0 z-40 w-72 flex-col border-r border-border bg-background',
           drawer ? 'flex' : docked ? 'hidden lg:flex' : 'hidden',
         )}
       >
         <div className="flex h-[var(--cv-topbar-h)] shrink-0 items-center gap-2 border-b border-border px-3">
-          <span className="text-sm font-medium text-foreground">Sessions</span>
+          <span className="text-sm font-medium text-foreground">
+            {t('home.tabs.sessions')}
+          </span>
           {sessions && (
             <span className="text-xs tabular-nums text-muted-foreground">
               {visible.length === sessions.length
                 ? sessions.length
-                : `${visible.length} of ${sessions.length}`}
+                : t('common.nOfTotal', {
+                    shown: visible.length,
+                    total: sessions.length,
+                  })}
             </span>
           )}
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={toggleSidebar}
-            aria-label="Hide session sidebar"
+            aria-label={t('shell.hideSidebar')}
             className="ml-auto text-muted-foreground"
           >
             <PanelLeftClose aria-hidden />
@@ -358,8 +366,8 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
             value={search}
             onChange={setSearch}
             size="sm"
-            placeholder="Filter sessions…"
-            aria-label="Filter sessions"
+            placeholder={t('shell.filter')}
+            aria-label={t('shell.filterLabel')}
             className="min-w-0 flex-1"
           />
           {project && (
@@ -371,14 +379,16 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
                     size="sm"
                     pressed={sameProject}
                     onPressedChange={setSameProject}
-                    aria-label={`Only sessions in ${project}`}
+                    aria-label={t('shell.onlyProjectLabel', { project })}
                     className="text-muted-foreground aria-pressed:border-foreground/25 aria-pressed:text-foreground"
                   >
                     <FolderGit2 aria-hidden />
                   </Toggle>
                 }
               />
-              <TooltipContent>Only {project}</TooltipContent>
+              <TooltipContent>
+                {t('shell.onlyProject', { project })}
+              </TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -426,7 +436,7 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
                           className="size-1.5 animate-pulse rounded-full bg-emerald-500"
                           aria-hidden
                         />
-                        running
+                        {t('sessionCard.running')}
                       </span>
                     ) : (
                       timeAgo(s.updated_at)
@@ -438,14 +448,12 @@ export function SessionShell({ children }: { children: React.ReactNode }) {
           })}
           {sessions === null && (
             <p className="px-2.5 py-3 text-xs text-muted-foreground">
-              {failed
-                ? 'The session list could not be loaded.'
-                : 'Loading sessions…'}
+              {failed ? t('shell.loadFailed') : t('shell.loading')}
             </p>
           )}
           {sessions !== null && visible.length === 0 && (
             <p className="px-2.5 py-3 text-xs text-muted-foreground">
-              No sessions match.
+              {t('shell.noMatches')}
             </p>
           )}
         </nav>

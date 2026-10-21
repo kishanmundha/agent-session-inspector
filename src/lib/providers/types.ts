@@ -402,12 +402,32 @@ export interface SessionStats {
   eventCount: number;
 }
 
+export type TokenHintId =
+  | "toolVolume"
+  | "largeResults"
+  | "rereads"
+  | "screenshots"
+  | "reasoning"
+  | "injected"
+  | "apiErrors"
+  | "lowCache"
+  | "noCompaction"
+  | "compacted"
+  | "hostContext"
+  | "instructions"
+  | "shellCalls";
+
+/**
+ * A suggestion for spending fewer tokens. The words are the browser's
+ * `hints.<id>.*` messages, filled in from `values`, so they follow the
+ * interface language; `saving` names a `hints.savings.*` message when the
+ * hint can estimate one.
+ */
 export interface TokenHint {
   severity: "high" | "medium" | "low";
-  category: string;
-  title: string;
-  description: string;
-  saving?: string;
+  id: TokenHintId;
+  values: Record<string, string | number>;
+  saving?: "varies" | "tokens" | "tokensPlus";
   focus?: {
     categories?: string[];
     subKeys?: string[];

@@ -16,10 +16,11 @@ import {
   firstLine,
   formatCost,
   formatDateTime,
+  formatNumber,
   formatTokens,
   timeAgo,
 } from "@/lib/format";
-import { OUTCOME_LABELS, SIGNAL_INFO } from "@/lib/health";
+import { useLocale, useT } from "@/i18n/client";
 import { providerStyle } from "@/lib/provider-meta";
 import { isRunning } from "@/lib/session-state";
 import { cn } from "@/lib/utils";
@@ -40,7 +41,7 @@ function Stat({
     <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
       <Icon className="size-3.5 opacity-70" aria-hidden />
       <span className="font-medium tabular-nums text-foreground">
-        {value.toLocaleString()}
+        {formatNumber(value)}
       </span>
       <span>{label}</span>
     </span>
@@ -48,6 +49,8 @@ function Stat({
 }
 
 export function SessionCard({ session: s }: { session: SessionMeta }) {
+  const t = useT();
+  const locale = useLocale();
   // Prefer the AI-generated checkpoint title; fall back to the raw session name.
   const rawName = firstLine(s.name);
   const displayTitle = s.title ?? rawName;
@@ -83,7 +86,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
             <h3 className="line-clamp-2 break-words text-sm font-semibold leading-snug text-foreground">
               {displayTitle ?? (
                 <span className="font-normal italic text-muted-foreground">
-                  Unnamed session
+                  {t("sessionCard.unnamed")}
                 </span>
               )}
             </h3>
@@ -102,7 +105,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                     isRunning(s.updated_at) ? (
                       <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium text-emerald-600 dark:text-emerald-400">
                         <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
-                        running
+                        {t("sessionCard.running")}
                       </span>
                     ) : (
                       <span className="whitespace-nowrap text-xs text-muted-foreground">
@@ -112,7 +115,7 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                   }
                 />
                 <TooltipContent>
-                  Updated {formatDateTime(s.updated_at)}
+                  {t("sessionCard.updated", { date: formatDateTime(s.updated_at) })}
                 </TooltipContent>
               </Tooltip>
               {s.client_name && (
@@ -151,12 +154,26 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
         {hasStats && (
           <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border/70 pt-2.5">
             {!!s.userMessageCount && (
-              <Stat icon={MessageSquare} value={s.userMessageCount} label="turns" />
+              <Stat
+                icon={MessageSquare}
+                value={s.userMessageCount}
+                label={t("sessionCard.turns", { count: s.userMessageCount })}
+              />
             )}
             {!!s.toolCallCount && (
-              <Stat icon={Wrench} value={s.toolCallCount} label="tools" />
+              <Stat
+                icon={Wrench}
+                value={s.toolCallCount}
+                label={t("sessionCard.tools", { count: s.toolCallCount })}
+              />
             )}
-            {!!s.eventCount && <Stat icon={Zap} value={s.eventCount} label="events" />}
+            {!!s.eventCount && (
+              <Stat
+                icon={Zap}
+                value={s.eventCount}
+                label={t("sessionCard.events", { count: s.eventCount })}
+              />
+            )}
 
             {(input + output > 0 || showCost || health) && (
               <div className="ml-auto flex items-center gap-1.5">
@@ -166,10 +183,15 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                       render={<GradeBadge grade={health.grade} className="h-[22px]" />}
                     />
                     <TooltipContent>
-                      Health {health.score} · {OUTCOME_LABELS[health.outcome].toLowerCase()}
-                      {health.signals
-                        .filter((signal) => signal.id !== "outcome")
-                        .map((signal) => ` · ${SIGNAL_INFO[signal.id].label.toLowerCase()}`)}
+                      {[
+                        t("sessionCard.health", { score: health.score }),
+                        t(`health.outcomes.${health.outcome}`).toLocaleLowerCase(locale),
+                        ...health.signals
+                          .filter((signal) => signal.id !== "outcome")
+                          .map((signal) =>
+                            t(`health.signals.${signal.id}.label`).toLocaleLowerCase(locale),
+                          ),
+                      ].join(" · ")}
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -184,10 +206,11 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                       }
                     />
                     <TooltipContent>
-                      Estimated cost at API list prices
-                      {unpriced.length > 0 && ` · excludes ${unpriced.join(", ")}`}
+                      {t("sessionCard.costTooltip")}
+                      {unpriced.length > 0 &&
+                        ` · ${t("sessionCard.excludes", { models: unpriced.join(", ") })}`}
                       {s.inheritedCostUSD != null &&
-                        ` · plus ${formatCost(s.inheritedCostUSD)} inherited from the forked session`}
+                        ` · ${t("sessionCard.inherited", { amount: formatCost(s.inheritedCostUSD) })}`}
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -197,13 +220,13 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                       render={
                         <span className="inline-flex items-center gap-1 rounded-sm border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-xs text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300">
                           <InputTokensIcon className="size-3" aria-hidden />
-                          <span className="opacity-70">in</span>
+                          <span className="opacity-70">{t("sessionCard.in")}</span>
                           {formatTokens(input)}
                         </span>
                       }
                     />
                     <TooltipContent>
-                      {input.toLocaleString()} input tokens
+                      {t("sessionCard.inputTokens", { count: input })}
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -213,13 +236,13 @@ export function SessionCard({ session: s }: { session: SessionMeta }) {
                       render={
                         <span className="inline-flex items-center gap-1 rounded-sm border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 font-mono text-xs text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300">
                           <OutputTokensIcon className="size-3" aria-hidden />
-                          <span className="opacity-70">out</span>
+                          <span className="opacity-70">{t("sessionCard.out")}</span>
                           {formatTokens(output)}
                         </span>
                       }
                     />
                     <TooltipContent>
-                      {output.toLocaleString()} output tokens
+                      {t("sessionCard.outputTokens", { count: output })}
                     </TooltipContent>
                   </Tooltip>
                 )}

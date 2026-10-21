@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { formatCost, formatTokens } from "@/lib/format";
+import { formatCost, formatPercent, formatTokens } from "@/lib/format";
 import type { Amount, Unit, UsagePeriod } from "@/lib/usage";
+import { formatLocale } from "@/i18n/current";
+import { useT, type Translator } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 /** One coloured group in the usage charts: a project, a model or an agent. */
@@ -37,13 +39,18 @@ export function niceCeil(value: number): number {
   return step * power;
 }
 
-const shortDate = (date: Date) => date.toLocaleDateString([], { month: "short", day: "numeric" });
+const shortDate = (date: Date) =>
+  date.toLocaleDateString(formatLocale(), { month: "short", day: "numeric" });
 
-function periodLabel(period: UsagePeriod): string {
+function periodLabel(t: Translator, period: UsagePeriod): string {
   if (period.days === 1) {
-    return period.start.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+    return period.start.toLocaleDateString(formatLocale(), {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
   }
-  return `Week of ${shortDate(period.start)}`;
+  return t("usage.weekOf", { date: shortDate(period.start) });
 }
 
 /** A period's value for each series, with everything unlisted folded into `OTHER`. */
@@ -71,6 +78,7 @@ export function StackedBars({
   series: Series[];
   unit: Unit;
 }) {
+  const t = useT();
   const [hovered, setHovered] = useState<number | null>(null);
   const max = niceCeil(Math.max(0, ...periods.map((p) => p[unit])));
   const values = periods.map((p) => split(breakdownOf(p), series, unit));
@@ -92,7 +100,10 @@ export function StackedBars({
         <div className="min-w-0 flex-1">
           <div
             role="img"
-            aria-label={`${unit === "costUSD" ? "Cost" : "Tokens"} per ${periods[0]?.days === 1 ? "day" : "week"} over ${periods.length} bars`}
+            aria-label={t(
+              periods[0]?.days === 1 ? `usage.barsPerDay.${unit}` : `usage.barsPerWeek.${unit}`,
+              { count: periods.length },
+            )}
             className="relative flex h-48 items-end gap-[2px] border-b border-border"
             onMouseLeave={() => setHovered(null)}
           >
@@ -135,7 +146,7 @@ export function StackedBars({
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs" aria-live="polite">
         <span className="font-medium tabular-nums">
-          {active === null ? "Whole range" : periodLabel(periods[active])} ·{" "}
+          {active === null ? t("usage.wholeRange") : periodLabel(t, periods[active])} ·{" "}
           {formatUnit(unit, shownTotal)}
         </span>
         {series.map((s, i) => (
@@ -228,6 +239,7 @@ const MAP_H = 56;
 
 /** Share of the total as nested tiles, largest first. */
 export function Treemap({ items, unit }: { items: TreemapItem[]; unit: Unit }) {
+  const t = useT();
   const sorted = items.filter((item) => item.value > 0).sort((a, b) => b.value - a.value);
   const total = sorted.reduce((sum, item) => sum + item.value, 0);
   const rects = squarify(
@@ -241,7 +253,7 @@ export function Treemap({ items, unit }: { items: TreemapItem[]; unit: Unit }) {
       className="relative w-full"
       style={{ aspectRatio: `${MAP_W} / ${MAP_H}` }}
       role="img"
-      aria-label={`Share of ${unit === "costUSD" ? "cost" : "tokens"} across ${sorted.length} groups`}
+      aria-label={t(`usage.treemapLabel.${unit}`, { count: sorted.length })}
     >
       {sorted.map((item, i) => {
         const rect = rects[i];
@@ -249,7 +261,7 @@ export function Treemap({ items, unit }: { items: TreemapItem[]; unit: Unit }) {
         return (
           <div
             key={item.name}
-            title={`${item.label}: ${formatUnit(unit, item.value)} (${(share * 100).toFixed(1)}%)`}
+            title={`${item.label}: ${formatUnit(unit, item.value)} (${formatPercent(share, 1)})`}
             className="absolute p-px"
             style={{
               left: `${(rect.x / MAP_W) * 100}%`,
@@ -271,7 +283,7 @@ export function Treemap({ items, unit }: { items: TreemapItem[]; unit: Unit }) {
                 <>
                   <span className="block truncate text-xs font-medium">{item.label}</span>
                   <span className="block truncate text-[11px] tabular-nums text-muted-foreground">
-                    {formatUnit(unit, item.value)} · {(share * 100).toFixed(1)}%
+                    {formatUnit(unit, item.value)} · {formatPercent(share, 1)}
                   </span>
                 </>
               )}

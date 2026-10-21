@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 /** Floating "back to top" affordance for the long event/log views. */
 export function ScrollToTop({ threshold = 600 }: { threshold?: number }) {
+  const t = useT();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export function ScrollToTop({ threshold = 600 }: { threshold?: number }) {
             variant="outline"
             size="icon-lg"
             onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            aria-label="Back to top"
+            aria-label={t("common.backToTop")}
             tabIndex={visible ? 0 : -1}
             className={cn(
               "fixed bottom-6 right-6 z-30 size-10 rounded-full bg-card text-muted-foreground shadow-lg dark:bg-card",
@@ -38,7 +40,7 @@ export function ScrollToTop({ threshold = 600 }: { threshold?: number }) {
           </Button>
         }
       />
-      <TooltipContent side="left">Back to top</TooltipContent>
+      <TooltipContent side="left">{t("common.backToTop")}</TooltipContent>
     </Tooltip>
   );
 }

@@ -22,24 +22,25 @@ import { Button } from "@/components/ui/button";
 import { providerStyle } from "@/lib/provider-meta";
 import { timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 import type { SearchKind, SearchResponse } from "@/lib/search";
 
 const OPEN_EVENT = "asv:open-search";
 
-const PAGES: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Analytics", href: "/?tab=analytics", icon: BarChart3 },
-  { label: "Usage", href: "/?tab=usage", icon: Wallet },
-  { label: "Projects", href: "/?tab=projects", icon: FolderGit2 },
-  { label: "Sessions", href: "/?tab=sessions", icon: ListTree },
-  { label: "Logs", href: "/?tab=logs", icon: FileText },
-];
+const PAGES = [
+  { tab: "analytics", icon: BarChart3 },
+  { tab: "usage", icon: Wallet },
+  { tab: "projects", icon: FolderGit2 },
+  { tab: "sessions", icon: ListTree },
+  { tab: "logs", icon: FileText },
+] as const;
 
-const KIND_META: Record<SearchKind, { label: string; icon: LucideIcon }> = {
-  user: { label: "Prompt", icon: User },
-  assistant: { label: "Reply", icon: Bot },
-  thinking: { label: "Thinking", icon: Bot },
-  tool: { label: "Tool call", icon: Wrench },
-  result: { label: "Tool output", icon: Terminal },
+const KIND_ICONS: Record<SearchKind, LucideIcon> = {
+  user: User,
+  assistant: Bot,
+  thinking: Bot,
+  tool: Wrench,
+  result: Terminal,
 };
 
 /** One row the arrow keys can land on. */
@@ -68,15 +69,16 @@ function Highlight({ text, terms }: { text: string; terms: string[] }) {
 
 /** Header button that opens the palette; ⌘K does the same from anywhere. */
 export function SearchTrigger({ className }: { className?: string }) {
+  const t = useT();
   return (
     <Button
       variant="outline"
       onClick={() => window.dispatchEvent(new Event(OPEN_EVENT))}
-      aria-label="Search all sessions"
+      aria-label={t("search.searchAll")}
       className={cn("gap-2 text-muted-foreground", className)}
     >
       <Search aria-hidden />
-      <span className="hidden md:inline">Search…</span>
+      <span className="hidden md:inline">{t("common.searchPlaceholder")}</span>
       <kbd className="pointer-events-none hidden rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] md:block">
         ⌘K
       </kbd>
@@ -89,6 +91,7 @@ export function SearchTrigger({ className }: { className?: string }) {
  * once in the root layout so it works on every page.
  */
 export function CommandPalette() {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -148,7 +151,11 @@ export function CommandPalette() {
   }, [trimmed, searchable]);
 
   const terms = useMemo(() => trimmed.toLowerCase().split(/\s+/).filter(Boolean), [trimmed]);
-  const pages = PAGES.filter((p) => p.label.toLowerCase().includes(trimmed.toLowerCase()));
+  const pages = PAGES.map((p) => ({
+    href: `/?tab=${p.tab}`,
+    icon: p.icon,
+    label: t(`home.tabs.${p.tab}`),
+  })).filter((p) => p.label.toLowerCase().includes(trimmed.toLowerCase()));
   const results = searchable ? (response?.results ?? []) : [];
 
   // Flat list in display order, so the arrow keys cross section boundaries.
@@ -207,10 +214,8 @@ export function CommandPalette() {
   return (
     <Dialog open={open} onOpenChange={toggle}>
       <DialogContent className="top-[12vh] max-h-[76vh] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogTitle className="sr-only">Search</DialogTitle>
-        <DialogDescription className="sr-only">
-          Search the text of every session, or jump to a page.
-        </DialogDescription>
+        <DialogTitle className="sr-only">{t("search.title")}</DialogTitle>
+        <DialogDescription className="sr-only">{t("search.description")}</DialogDescription>
 
         <div className="flex items-center gap-2.5 border-b border-border py-3 pr-12 pl-4">
           {pending ? (
@@ -227,8 +232,8 @@ export function CommandPalette() {
               setActive(0);
             }}
             onKeyDown={onInputKeyDown}
-            placeholder="Search prompts, replies, commands and tool output…"
-            aria-label="Search all sessions"
+            placeholder={t("search.placeholder")}
+            aria-label={t("search.searchAll")}
             role="combobox"
             aria-expanded
             aria-controls="cv-palette-list"
@@ -246,7 +251,7 @@ export function CommandPalette() {
           {pages.length > 0 && (
             <>
               <p className="px-4 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                Go to
+                {t("search.goTo")}
               </p>
               {pages.map((p) => (
                 <div key={p.href} {...rowProps(`page:${p.href}`)}>
@@ -260,10 +265,10 @@ export function CommandPalette() {
           {searchable && response && (
             <p className="px-4 pt-3 pb-1 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               {response.total === 0
-                ? "Sessions"
+                ? t("search.sessions")
                 : response.total > results.length
-                  ? `Sessions · first ${results.length} of ${response.total}`
-                  : `Sessions · ${response.total}`}
+                  ? t("search.sessionsFirst", { shown: results.length, total: response.total })
+                  : t("search.sessionsCount", { total: response.total })}
             </p>
           )}
 
@@ -284,12 +289,13 @@ export function CommandPalette() {
                   </span>
                 </div>
                 {r.hits.map((hit, i) => {
-                  const kind = KIND_META[hit.kind];
+                  const KindIcon = KIND_ICONS[hit.kind];
+                  const kindLabel = t(`search.kinds.${hit.kind}`);
                   return (
                     <div key={i} {...rowProps(`hit:${id}:${i}`)}>
-                      <kind.icon
+                      <KindIcon
                         className="ml-4.5 size-3 shrink-0 text-muted-foreground"
-                        aria-label={hit.tool ? `${kind.label}: ${hit.tool}` : kind.label}
+                        aria-label={hit.tool ? `${kindLabel}: ${hit.tool}` : kindLabel}
                       />
                       <span
                         className={cn(
@@ -304,7 +310,7 @@ export function CommandPalette() {
                 })}
                 {r.matchCount > r.hits.length && (
                   <p className="py-0.5 pr-4 pl-13 text-[11px] text-muted-foreground/80">
-                    +{r.matchCount - r.hits.length} more in this session
+                    {t("search.moreInSession", { count: r.matchCount - r.hits.length })}
                   </p>
                 )}
               </div>
@@ -313,32 +319,32 @@ export function CommandPalette() {
 
           {failed ? (
             <p className="px-4 py-6 text-center text-sm text-destructive">
-              Search failed. Check that the app is still running.
+              {t("search.failed")}
             </p>
           ) : searchable && response && response.total === 0 && !pending ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              No session mentions “{response.query}”.
+              {t("search.noMatches", { query: response.query })}
             </p>
           ) : searchable && !response ? (
             <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-              Searching… the first search reads every transcript.
+              {t("search.searching")}
             </p>
           ) : (
             !searchable &&
             pages.length === 0 && (
               <p className="px-4 py-6 text-center text-sm text-muted-foreground">
-                Type at least two characters to search.
+                {t("search.typeMore")}
               </p>
             )
           )}
         </div>
 
         <div className="flex items-center gap-3 border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-          <span>↑↓ to move</span>
+          <span>{t("search.hintMove")}</span>
           <span className="flex items-center gap-1">
-            <CornerDownLeft className="size-3" aria-hidden /> to open
+            <CornerDownLeft className="size-3" aria-hidden /> {t("search.hintOpen")}
           </span>
-          <span>Words must all appear in the same message</span>
+          <span>{t("search.hintWords")}</span>
         </div>
       </DialogContent>
     </Dialog>

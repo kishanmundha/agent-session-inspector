@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { themeInitScript } from "@/components/common/theme-toggle";
 import { CommandPalette } from "@/components/common/command-palette";
 import { FaviconSync } from "@/components/common/favicon-sync";
+import { I18nProvider } from "@/i18n/client";
+import { getLocale, getMessages, getTranslator } from "@/i18n/server";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -19,14 +21,16 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "Agent Session Inspector",
-    template: "%s · Agent Session Inspector",
-  },
-  description:
-    "Visualize sessions from Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes and other coding agents",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslator();
+  return {
+    title: {
+      default: t("meta.title"),
+      template: `%s · ${t("meta.title")}`,
+    },
+    description: t("meta.description"),
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: [
@@ -35,10 +39,13 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // The language picker's cookie, else the browser's Accept-Language.
+  const locale = await getLocale();
+  const messages = getMessages(locale);
   return (
     <html
-      lang="en"
+      lang={locale}
       suppressHydrationWarning
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
@@ -57,13 +64,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:text-background"
         >
-          Skip to content
+          {messages.meta.skipToContent}
         </a>
         <FaviconSync />
-        <TooltipProvider>
-          {children}
-          <CommandPalette />
-        </TooltipProvider>
+        <I18nProvider locale={locale} messages={messages}>
+          <TooltipProvider>
+            {children}
+            <CommandPalette />
+          </TooltipProvider>
+        </I18nProvider>
       </body>
     </html>
   );

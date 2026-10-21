@@ -15,6 +15,7 @@ import { APP_INFO } from "@/lib/app-info";
 import { providerStyle } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 
 /** lucide-react ships no brand icons, so the GitHub mark is drawn here. */
 function GitHubMark({ className }: { className?: string }) {
@@ -36,6 +37,7 @@ export function AboutDialog({
   providers?: ProviderInfo[];
   className?: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [fetched, setFetched] = useState<ProviderInfo[] | null>(null);
   const requested = useRef(false);
@@ -63,14 +65,14 @@ export function AboutDialog({
               variant="outline"
               size="icon"
               onClick={openDialog}
-              aria-label="About"
+              aria-label={t("about.title")}
               className={cn("text-muted-foreground", className)}
             >
               <Info className="size-3.5" aria-hidden />
             </Button>
           }
         />
-        <TooltipContent>About</TooltipContent>
+        <TooltipContent>{t("about.title")}</TooltipContent>
       </Tooltip>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -83,19 +85,27 @@ export function AboutDialog({
               <DialogTitle>{APP_INFO.name}</DialogTitle>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 <span className="font-mono">v{APP_INFO.version}</span>
-                {" · by "}
-                <a
-                  href={APP_INFO.author.url}
-                  {...externalLink}
-                  className="font-medium text-foreground underline-offset-2 hover:underline"
-                >
-                  {APP_INFO.author.name}
-                </a>
+                {" · "}
+                {t.rich(
+                  "about.by",
+                  {
+                    a: (chunks) => (
+                      <a
+                        href={APP_INFO.author.url}
+                        {...externalLink}
+                        className="font-medium text-foreground underline-offset-2 hover:underline"
+                      >
+                        {chunks}
+                      </a>
+                    ),
+                  },
+                  { author: APP_INFO.author.name },
+                )}
               </p>
             </div>
           </div>
 
-          <DialogDescription>{APP_INFO.description}</DialogDescription>
+          <DialogDescription>{t("about.description")}</DialogDescription>
 
           <div className="flex flex-wrap gap-2">
             <Button
@@ -114,7 +124,7 @@ export function AboutDialog({
               render={<a href={APP_INFO.releasesUrl} {...externalLink} />}
             >
               <Tag className="size-3.5" aria-hidden />
-              Releases
+              {t("about.releases")}
             </Button>
             <Button
               variant="outline"
@@ -123,14 +133,14 @@ export function AboutDialog({
               render={<a href={APP_INFO.issuesUrl} {...externalLink} />}
             >
               <Bug className="size-3.5" aria-hidden />
-              Report an issue
+              {t("about.reportIssue")}
             </Button>
           </div>
 
           <section className="space-y-2 border-t border-border pt-3">
-            <h3 className="text-xs font-medium text-foreground">Data sources</h3>
+            <h3 className="text-xs font-medium text-foreground">{t("about.dataSources")}</h3>
             {!providers ? (
-              <p className="text-xs text-muted-foreground">Loading…</p>
+              <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
             ) : providers.length > 0 ? (
               <ul className="overflow-hidden rounded-lg border border-border text-xs">
                 {providers.map((p) => (
@@ -147,19 +157,20 @@ export function AboutDialog({
                       <p className="truncate font-mono text-muted-foreground">{p.rootDir}</p>
                     </div>
                     <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {`${p.sessionCount ?? 0} ${p.sessionCount === 1 ? "session" : "sessions"}`}
+                      {t("metrics.sessionsCount", { count: p.sessionCount ?? 0 })}
                     </span>
-                    <CopyButton value={p.rootDir} label="Copy path" />
+                    <CopyButton value={p.rootDir} label={t("unpriced.copyPath")} />
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-xs text-muted-foreground">No agent directories found.</p>
+              <p className="text-xs text-muted-foreground">{t("about.noDirectories")}</p>
             )}
             {unused.length > 0 && (
               <p className="text-xs text-muted-foreground">
-                {providers?.length ? "Also supports" : "Supports"}{" "}
-                {unused.map((p) => p.label).join(", ")}.
+                {t(providers?.length ? "about.alsoSupports" : "about.supports", {
+                  agents: unused.map((p) => p.label).join(", "),
+                })}
               </p>
             )}
           </section>

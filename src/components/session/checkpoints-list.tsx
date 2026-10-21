@@ -7,6 +7,7 @@ import { CopyButton } from "@/components/common/copy-button";
 import { EmptyState } from "@/components/common/empty-state";
 import { SearchInput } from "@/components/common/search-input";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/client";
 import type { CheckpointFile } from "./types";
 
 export function CheckpointsList({
@@ -14,14 +15,15 @@ export function CheckpointsList({
 }: {
   checkpoints: CheckpointFile[];
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   if (checkpoints.length === 0) {
     return (
       <EmptyState
         icon={Bookmark}
-        title="No checkpoints"
-        description="Copilot CLI writes checkpoint files when it summarizes progress. Claude Code and Codex sessions have none."
+        title={t("checkpoints.emptyTitle")}
+        description={t("checkpoints.emptyDetail")}
       />
     );
   }
@@ -63,7 +65,7 @@ export function CheckpointsList({
               </span>
               {cp.content && (
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                  {cp.content.length.toLocaleString()} chars
+                  {t("checkpoints.chars", { count: cp.content.length })}
                 </span>
               )}
             </button>
@@ -71,7 +73,7 @@ export function CheckpointsList({
               (cp.content ? (
                 <div className="border-t border-border">
                   <div className="flex justify-end border-b border-border bg-background px-2 py-1">
-                    <CopyButton value={cp.content} label="Copy checkpoint" />
+                    <CopyButton value={cp.content} label={t("checkpoints.copy")} />
                   </div>
                   <ScrollArea className="h-[60vh] w-full">
                     <pre className="w-max min-w-full p-4 font-mono text-xs text-foreground">
@@ -81,7 +83,7 @@ export function CheckpointsList({
                 </div>
               ) : (
                 <p className="border-t border-border p-4 text-sm text-muted-foreground">
-                  Empty file
+                  {t("checkpoints.emptyFile")}
                 </p>
               ))}
           </div>
@@ -99,6 +101,7 @@ export function PathList({
   paths: string[];
   kind: "file" | "research";
 }) {
+  const t = useT();
   const [filter, setFilter] = useState("");
   const q = filter.trim().toLowerCase();
   const visible = q ? paths.filter((p) => p.toLowerCase().includes(q)) : paths;
@@ -108,11 +111,9 @@ export function PathList({
     return (
       <EmptyState
         icon={Icon}
-        title={kind === "research" ? "No research files" : "No files"}
+        title={kind === "research" ? t("paths.noResearch") : t("paths.noFiles")}
         description={
-          kind === "research"
-            ? "Research notes appear here when the agent saves its findings."
-            : "No files recorded. Copilot lists its workspace files here; Claude Code and Codex list the files the session edited."
+          kind === "research" ? t("paths.noResearchDetail") : t("paths.noFilesDetail")
         }
       />
     );
@@ -124,8 +125,8 @@ export function PathList({
         <SearchInput
           value={filter}
           onChange={setFilter}
-          placeholder="Filter paths…"
-          aria-label="Filter paths"
+          placeholder={t("paths.filter")}
+          aria-label={t("paths.filterLabel")}
           className="w-full max-w-sm"
         />
       )}
@@ -136,12 +137,12 @@ export function PathList({
         >
           <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           <span className="min-w-0 flex-1 truncate font-mono text-foreground">{p}</span>
-          <CopyButton value={p} label="Copy path" />
+          <CopyButton value={p} label={t("unpriced.copyPath")} />
         </div>
       ))}
       {visible.length === 0 && (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          No paths match &ldquo;{filter}&rdquo;
+          {t("paths.noMatches", { query: filter })}
         </p>
       )}
     </div>

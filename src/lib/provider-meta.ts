@@ -112,9 +112,12 @@ export const PROVIDER_ORDER: ProviderId[] = [
 ];
 
 /** Every supported agent by name, for telling a new user what to expect. */
-export const SUPPORTED_AGENTS = new Intl.ListFormat("en", { type: "disjunction" }).format(
-  PROVIDER_ORDER.map((id) => PROVIDER_STYLES[id].label),
-);
+/** "GitHub Copilot CLI, …, or Hermes Agent", joined the way `locale` lists alternatives. */
+export function supportedAgents(locale: string): string {
+  return new Intl.ListFormat(locale, { type: "disjunction" }).format(
+    PROVIDER_ORDER.map((id) => PROVIDER_STYLES[id].label),
+  );
+}
 
 export function providerStyle(id: string | undefined): ProviderStyle {
   return PROVIDER_STYLES[(id ?? "copilot") as ProviderId] ?? PROVIDER_STYLES.copilot;

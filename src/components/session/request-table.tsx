@@ -14,22 +14,24 @@ import {
 } from "@/components/ui/table";
 import { Segmented } from "@/components/common/segmented";
 import { costTimeline, type CostRequest, type RequestClass } from "@/lib/cost-timeline";
-import { firstLine, formatCost, formatTokens } from "@/lib/format";
+import { firstLine, formatCost, formatNumber, formatTokens } from "@/lib/format";
+import { formatLocale } from "@/i18n/current";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 import type { AgentEvent } from "./types";
 
 /** Sessions with more requests than this open with their turns collapsed. */
 const OPEN_BY_DEFAULT = 60;
 
-/** The billed classes, in the order a request spends them. */
-const CLASSES: { key: RequestClass; label: string }[] = [
-  { key: "input", label: "Uncached input" },
-  { key: "cacheWrite", label: "Cache write" },
-  { key: "cacheRead", label: "Cache read" },
-  { key: "output", label: "Output" },
+/** The billed classes, in the order a request spends them; labelled by `cost.classes.*`. */
+const CLASSES: { key: RequestClass }[] = [
+  { key: "input" },
+  { key: "cacheWrite" },
+  { key: "cacheRead" },
+  { key: "output" },
 ];
 
-const COLUMNS = ["Context", ...CLASSES.map((c) => c.label), "Cost"];
+const COLUMNS = ["context", ...CLASSES.map((c) => c.key), "cost"] as const;
 
 /** What the class columns show: how many tokens, or what they cost. */
 type Unit = "tokens" | "cost";
@@ -71,8 +73,16 @@ function sum(requests: CostRequest[]): Totals {
 /** A single class of a single request is often a fraction of a cent. */
 function formatFineCost(usd: number) {
   if (usd >= 0.01) return formatCost(usd);
-  if (usd < 0.0001) return "<$0.0001";
-  return `$${usd.toFixed(4)}`;
+  const fine = (amount: number) =>
+    amount.toLocaleString(formatLocale(), {
+      style: "currency",
+      currency: "USD",
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4,
+    });
+  if (usd < 0.0001) return `<${fine(0.0001)}`;
+  return fine(usd);
 }
 
 /** One cell per billed class, as token counts or as what they cost. */
@@ -82,22 +92,31 @@ function Classes({
   unit,
   sticky,
 }: Pick<Totals, "tokens" | "usd"> & { unit: Unit; sticky?: string }) {
-  return CLASSES.map(({ key, label }) => {
+  const t = useT();
+  return CLASSES.map(({ key }) => {
     const count = tokens[key];
     const cost = usd[key];
-    const priced = cost === null ? "no price" : formatFineCost(cost);
+    const priced = cost === null ? t("cost.noPrice") : formatFineCost(cost);
     return (
       <TableCell
         key={key}
         className={cn("py-1.5 pr-0 pl-3 text-right", sticky)}
-        title={count > 0 ? `${label}: ${count.toLocaleString()} tokens, ${priced}` : undefined}
+        title={
+          count > 0
+            ? t("requests.cellTitle", {
+                label: t(`cost.classes.${key}`),
+                count,
+                priced,
+              })
+            : undefined
+        }
       >
         {count === 0 ? (
           "—"
         ) : unit === "tokens" ? (
           formatTokens(count)
         ) : cost === null ? (
-          <span className="font-sans">no price</span>
+          <span className="font-sans">{t("cost.noPrice")}</span>
         ) : (
           formatFineCost(cost)
         )}
@@ -109,7 +128,7 @@ function Classes({
 /** The context a request sent, over a bar scaled to the session's largest. */
 function Context({ value, max }: { value: number; max: number }) {
   return (
-    <TableCell className="py-1.5 pr-0 pl-3 text-right" title={value.toLocaleString()}>
+    <TableCell className="py-1.5 pr-0 pl-3 text-right" title={formatNumber(value)}>
       {formatTokens(value) ?? "—"}
       <span className="mt-0.5 block h-0.5 overflow-hidden rounded-full bg-muted" aria-hidden>
         <span
@@ -127,10 +146,11 @@ const STICKY_TOP = "sticky top-0 z-10 bg-card shadow-[inset_0_-1px_0_var(--borde
 const STICKY_BOTTOM = "sticky bottom-0 z-10 bg-card shadow-[inset_0_1px_0_var(--border)]";
 
 function Cost({ value, className }: { value: number | null; className?: string }) {
+  const t = useT();
   return (
     <TableCell className={cn("py-1.5 pr-0 pl-3 text-right text-foreground", className)}>
       {value === null ? (
-        <span className="font-sans font-normal text-muted-foreground">no price</span>
+        <span className="font-sans font-normal text-muted-foreground">{t("cost.noPrice")}</span>
       ) : (
         formatCost(value)
       )}
@@ -150,6 +170,7 @@ export function RequestTable({
   events: AgentEvent[];
   onOpenEvent: (eventId: string) => void;
 }) {
+  const t = useT();
   const { requests, turns } = useMemo(() => costTimeline(events), [events]);
   // null follows the default; a turn in `flipped` is the opposite of the rest.
   const [view, setView] = useState<{ allOpen: boolean | null; flipped: Set<number> }>({
@@ -165,7 +186,7 @@ export function RequestTable({
       if (group) group.push(request);
       else byTurn.set(request.turn, [request]);
     }
-    const prompts = new Map(turns.map((t) => [t.turn, t.prompt]));
+    const prompts = new Map(turns.map((turn) => [turn.turn, turn.prompt]));
     return [...byTurn].map(([turn, rows]) => ({
       turn,
       rows,
@@ -197,20 +218,20 @@ export function RequestTable({
     <section className="rounded-xl border border-border bg-card p-5">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-sm font-semibold text-foreground">
-          Requests
+          {t("requests.title")}
           <span className="ml-2 text-xs font-normal text-muted-foreground">
-            every call to the model, grouped by turn
+            {t("requests.subtitle")}
           </span>
         </h2>
         <div className="flex items-center gap-2">
           {priced && (
             <Segmented
-              label="Show each token class as"
+              label={t("requests.showAs")}
               value={unit}
               onChange={setUnit}
               options={[
-                { value: "tokens", label: "Tokens" },
-                { value: "cost", label: "Cost" },
+                { value: "tokens", label: t("usage.units.tokens") },
+                { value: "cost", label: t("usage.units.costUSD") },
               ]}
             />
           )}
@@ -219,16 +240,14 @@ export function RequestTable({
             size="sm"
             onClick={() => setView({ allOpen: !anyOpen, flipped: new Set() })}
           >
-            {anyOpen ? "Collapse all" : "Expand all"}
+            {anyOpen ? t("requests.collapseAll") : t("requests.expandAll")}
           </Button>
         </div>
       </div>
       <p className="mb-3 max-w-3xl text-xs leading-relaxed text-muted-foreground">
-        Each tool round is its own request, and every request sends the whole conversation again.{" "}
-        <span className="text-foreground">Context</span> is what one request sent: cache read
-        (already stored), cache write (new since the last request, stored for the next) and uncached
-        input. A turn row adds up its requests, so its cache read is the context multiplied by the
-        number of requests, not the size of the context.
+        {t.rich("requests.explainer", {
+          b: (chunks) => <span className="text-foreground">{chunks}</span>,
+        })}
       </p>
 
       {/* The table scrolls sideways, so it needs its own vertical scroll for the header to stick. */}
@@ -236,21 +255,28 @@ export function RequestTable({
         <Table className="min-w-[47rem] table-fixed text-xs">
           <colgroup>
             <col />
-            {COLUMNS.map((label) => (
-              <col key={label} className={label === "Cost" ? "w-20" : label === "Uncached input" ? "w-28" : "w-24"} />
+            {COLUMNS.map((column) => (
+              <col
+                key={column}
+                className={column === "cost" ? "w-20" : column === "input" ? "w-28" : "w-24"}
+              />
             ))}
           </colgroup>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className={cn("h-8 px-0 text-muted-foreground", STICKY_TOP)}>
-                Turn / request
+                {t("requests.turnRequest")}
               </TableHead>
-              {COLUMNS.map((label) => (
+              {COLUMNS.map((column) => (
                 <TableHead
-                  key={label}
+                  key={column}
                   className={cn("h-8 pr-0 pl-3 text-right text-muted-foreground", STICKY_TOP)}
                 >
-                  {label}
+                  {column === "context"
+                    ? t("sessionHeader.context")
+                    : column === "cost"
+                      ? t("usage.units.costUSD")
+                      : t(`cost.classes.${column}`)}
                 </TableHead>
               ))}
             </TableRow>
@@ -274,10 +300,10 @@ export function RequestTable({
                           aria-hidden
                         />
                         <span className="shrink-0">
-                          {turn === 0 ? "Before the first prompt" : `Turn ${turn}`}
+                          {turn === 0 ? t("costByTurn.beforeFirst") : t("costByTurn.turn", { turn })}
                         </span>
                         <span className="shrink-0 font-normal tabular-nums text-muted-foreground">
-                          {rows.length} {rows.length === 1 ? "request" : "requests"}
+                          {t("costByTurn.requests", { count: rows.length })}
                         </span>
                         <span className="min-w-0 truncate font-normal text-muted-foreground">
                           {firstLine(prompt)}
@@ -305,8 +331,8 @@ export function RequestTable({
                             <button
                               type="button"
                               onClick={() => onOpenEvent(r.eventId)}
-                              aria-label={`Request ${r.n}: open in the timeline`}
-                              title="Open in the timeline"
+                              aria-label={t("requests.openRequest", { n: r.n })}
+                              title={t("requests.openInTimeline")}
                               className="inline-flex cursor-pointer items-center gap-1 rounded-sm text-foreground underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-ring"
                             >
                               #{r.n}
@@ -319,9 +345,9 @@ export function RequestTable({
                             {missed && (
                               <span
                                 className="ml-2 rounded-sm bg-amber-500/15 px-1.5 py-0.5 font-sans text-[10px] text-amber-700 dark:text-amber-400"
-                                title="Little of the context came from the cache, so it was sent and stored again at the higher rate. This follows a compaction, a change to the early context, or a pause longer than the cache lifetime."
+                                title={t("requests.cacheMissHint")}
                               >
-                                cache miss
+                                {t("requests.cacheMiss")}
                               </span>
                             )}
                           </TableCell>
@@ -338,9 +364,9 @@ export function RequestTable({
           <TableFooter className="bg-transparent font-mono tabular-nums">
             <TableRow className="hover:bg-transparent">
               <TableCell className={cn("truncate px-0 py-1.5 font-sans text-foreground", STICKY_BOTTOM)}>
-                Whole session
+                {t("requests.wholeSession")}
                 <span className="ml-1.5 font-normal text-muted-foreground">
-                  {requests.length} requests, context peaked at {formatTokens(peak)}
+                  {t("requests.summary", { count: requests.length, peak: formatTokens(peak) ?? "0" })}
                 </span>
               </TableCell>
               <TableCell className={cn("py-1.5 pr-0 pl-3", STICKY_BOTTOM)} />
@@ -352,8 +378,7 @@ export function RequestTable({
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Click a request number to open it in the timeline. Hover a value for its exact token count
-        and cost{priced && ", or switch the columns between tokens and cost"}.
+        {priced ? t("requests.footerPriced") : t("requests.footer")}
       </p>
     </section>
   );

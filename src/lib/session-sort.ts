@@ -5,21 +5,22 @@ import type { SessionMeta } from "@/lib/providers/types";
 
 export type SortKey = "recent" | "oldest" | "cost" | "tokens" | "events" | "health" | "name";
 
-export const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "recent", label: "Most recent" },
-  { value: "oldest", label: "Oldest first" },
-  { value: "cost", label: "Highest cost" },
-  { value: "tokens", label: "Most tokens" },
-  { value: "events", label: "Most events" },
-  { value: "health", label: "Lowest health" },
-  { value: "name", label: "Name (A–Z)" },
+/** In menu order; the labels are the `sort.*` messages. */
+export const SORT_KEYS: SortKey[] = [
+  "recent",
+  "oldest",
+  "cost",
+  "tokens",
+  "events",
+  "health",
+  "name",
 ];
 
 const DEFAULT_SORT: SortKey = "recent";
 const SORT_STORAGE_KEY = "asv-session-sort";
 
 function isSortKey(value: unknown): value is SortKey {
-  return SORT_OPTIONS.some((o) => o.value === value);
+  return SORT_KEYS.includes(value as SortKey);
 }
 
 function totalTokens(s: SessionMeta) {

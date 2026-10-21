@@ -5,16 +5,11 @@ import { useParams } from "next/navigation";
 import { ChevronRight, Info } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { CopyButton } from "@/components/common/copy-button";
-import {
-  describeEventPath,
-  describeRecordPath,
-  eventDoc,
-  PROVIDER_FORMATS,
-  recordVersion,
-  SHARED_CHANGES,
-} from "@/lib/event-docs";
+import { describeEventPath, describeRecordPath, eventDoc, recordVersion } from "@/lib/event-docs";
+import { useEventDocs, type EventDocs } from "@/i18n/event-docs";
 import { formatSchema, inferSchema, type JsonSchema } from "@/lib/json-schema";
 import { PROVIDER_STYLES } from "@/lib/provider-meta";
+import { useT, type Translator } from "@/i18n/client";
 import type { AgentEvent, ProviderId } from "./types";
 
 /** The transcript records an event was read from, uncapped. */
@@ -42,9 +37,9 @@ const PRE_CLS =
   "max-h-96 min-w-0 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted p-2.5 font-mono text-[11px] leading-relaxed text-foreground [overflow-wrap:anywhere]";
 
 /** Line-based transcripts number their records from 0; people count from 1. */
-function describeSource(provider: string, source: string) {
+function describeSource(t: Translator, provider: string, source: string) {
   const jsonl = provider === "claude" || provider === "cowork" || provider === "codex" || provider === "copilot";
-  return jsonl && /^\d+$/.test(source) ? `line ${Number(source) + 1}` : source;
+  return jsonl && /^\d+$/.test(source) ? t("eventAbout.line", { line: Number(source) + 1 }) : source;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -77,6 +72,7 @@ function SchemaBlock({
   /** Shown in place of the schema while it cannot be built. */
   placeholder: string;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   return (
     <div className="overflow-hidden rounded-md border border-border">
@@ -94,7 +90,7 @@ function SchemaBlock({
           <span className="text-xs font-medium text-foreground">{title}</span>
           <span className="truncate text-[11px] text-muted-foreground">{hint}</span>
         </button>
-        {schema && <CopyButton value={schema} label={`Copy the ${title.toLowerCase()}`} />}
+        {schema && <CopyButton value={schema} label={t("common.copyNamed", { name: title })} />}
       </div>
       {open && (
         <div className="border-t border-border p-2">
@@ -130,11 +126,11 @@ export function EventAboutDialog({
   /** The session's client version, for agents that stamp it only once. */
   clientVersion?: string;
 }) {
+  const t = useT();
   const params = useParams<{ provider?: string; id?: string }>();
   const provider = (params.provider ?? "") as ProviderId;
   const providerLabel = PROVIDER_STYLES[provider]?.label ?? provider;
-  const doc = eventDoc(event.type);
-  const resultDoc = result && result.type !== event.type ? eventDoc(result.type) : null;
+  const docs = useEventDocs();
   const [records, setRecords] = useState<RecordsState>({ status: "idle" });
   const requested = useRef(false);
 
@@ -146,6 +142,64 @@ export function EventAboutDialog({
       .then((loaded) => setRecords({ status: "loaded", records: loaded }))
       .catch(() => setRecords({ status: "failed" }));
   }, [open, sources, params.provider, params.id]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* Only the body scrolls, so the title and close button stay put. */}
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <div className="flex items-center gap-3 border-b border-border px-5 pt-5 pb-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <Info className="size-4" aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <DialogTitle className="truncate font-mono text-sm">
+              {result && result.type !== event.type ? `${event.type} + ${result.type}` : event.type}
+            </DialogTitle>
+            <p className="mt-0.5 text-xs text-muted-foreground">{t("eventAbout.subtitle")}</p>
+          </div>
+        </div>
+
+        {/* The reference arrives in a moment on first open, in the active language. */}
+        {docs && (
+          <AboutBody
+            docs={docs}
+            provider={provider}
+            providerLabel={providerLabel}
+            event={event}
+            result={result}
+            sources={sources}
+            clientVersion={clientVersion}
+            records={records}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AboutBody({
+  docs,
+  provider,
+  providerLabel,
+  event,
+  result,
+  sources,
+  clientVersion,
+  records,
+}: {
+  docs: EventDocs;
+  provider: ProviderId;
+  providerLabel: string;
+  event: AgentEvent;
+  result?: AgentEvent;
+  sources: string[];
+  clientVersion?: string;
+  records: RecordsState;
+}) {
+  const t = useT();
+  const doc = eventDoc(docs, event.type);
+  const resultDoc = result && result.type !== event.type ? eventDoc(docs, result.type) : null;
+  const providerFormat = (docs.providerFormats as Partial<Record<ProviderId, string>>)[provider];
 
   const providerSources = [
     ...(doc.sources?.[provider] ?? []).map((s) => ({ ...s, type: event.type })),
@@ -164,10 +218,10 @@ export function EventAboutDialog({
   const eventSchema = formatSchema(
     combine(
       shown.map((e) => {
-        const d = eventDoc(e.type);
-        return { title: e.type, description: d.summary, ...inferSchema(e, (p) => describeEventPath(d, p)) };
+        const d = eventDoc(docs, e.type);
+        return { title: e.type, description: d.summary, ...inferSchema(e, (p) => describeEventPath(docs, d, p)) };
       }),
-      "A call and its result, shown as one row.",
+      docs.callAndResult,
     ),
   );
   const recordSchema =
@@ -175,125 +229,106 @@ export function EventAboutDialog({
       ? formatSchema(
           combine(
             records.records.map((r) => ({
-              title: `${providerLabel} record`,
-              ...inferSchema(r, (p) => describeRecordPath(provider, p)),
+              title: docs.recordTitle.replace("{agent}", providerLabel),
+              ...inferSchema(r, (p) => describeRecordPath(docs, provider, p)),
             })),
-            "The records the row was read from, in transcript order.",
+            docs.recordsInOrder,
           ),
         )
       : null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Only the body scrolls, so the title and close button stay put. */}
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <div className="flex items-center gap-3 border-b border-border px-5 pt-5 pb-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-            <Info className="size-4" aria-hidden />
-          </span>
-          <div className="min-w-0">
-            <DialogTitle className="truncate font-mono text-sm">
-              {resultDoc ? `${event.type} + ${result!.type}` : event.type}
-            </DialogTitle>
-            <p className="mt-0.5 text-xs text-muted-foreground">About this event type</p>
-          </div>
-        </div>
+    <div className="flex min-h-0 shrink! flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5">
+      <div className="space-y-1.5">
+        <DialogDescription className="text-sm text-foreground">{doc.summary}</DialogDescription>
+        {resultDoc && <p className="text-sm text-foreground">{resultDoc.summary}</p>}
+        {doc.detail && <p className="text-xs leading-relaxed text-muted-foreground">{doc.detail}</p>}
+      </div>
 
-        <div className="flex min-h-0 shrink! flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5">
-          <div className="space-y-1.5">
-            <DialogDescription className="text-sm text-foreground">{doc.summary}</DialogDescription>
-            {resultDoc && <p className="text-sm text-foreground">{resultDoc.summary}</p>}
-            {doc.detail && <p className="text-xs leading-relaxed text-muted-foreground">{doc.detail}</p>}
-          </div>
-
-          <Section title={`Where it comes from · ${providerLabel}`}>
-            {PROVIDER_FORMATS[provider] && (
-              <p className="text-xs leading-relaxed text-muted-foreground">{PROVIDER_FORMATS[provider]}</p>
-            )}
-            {providerSources.length > 0 ? (
-              <ul className="space-y-1.5 text-xs">
-                {providerSources.map((s) => (
-                  <li key={`${s.type}:${s.record}`} className="rounded-md border border-border px-2.5 py-1.5">
-                    <p className="text-foreground">
-                      {s.record}
-                      {resultDoc && <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">→ {s.type}</span>}
-                    </p>
-                    {s.note && <p className="mt-0.5 leading-relaxed text-muted-foreground">{s.note}</p>}
-                  </li>
-                ))}
-              </ul>
+      <Section title={t("eventAbout.whereFrom", { agent: providerLabel })}>
+        {providerFormat && (
+          <p className="text-xs leading-relaxed text-muted-foreground">{providerFormat}</p>
+        )}
+        {providerSources.length > 0 ? (
+          <ul className="space-y-1.5 text-xs">
+            {providerSources.map((s) => (
+              <li key={`${s.type}:${s.record}`} className="rounded-md border border-border px-2.5 py-1.5">
+                <p className="text-foreground">
+                  {s.record}
+                  {resultDoc && <span className="ml-1.5 font-mono text-[11px] text-muted-foreground">→ {s.type}</span>}
+                </p>
+                {s.note && <p className="mt-0.5 leading-relaxed text-muted-foreground">{s.note}</p>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {t("eventAbout.notDescribed", { agent: providerLabel })}
+          </p>
+        )}
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+          <dt className="text-muted-foreground">{t("eventAbout.thisEvent")}</dt>
+          <dd className="font-mono text-foreground">
+            {sources.length > 0
+              ? sources.map((s) => describeSource(t, provider, s)).join(", ")
+              : t("eventAbout.noRecord")}
+          </dd>
+          <dt className="text-muted-foreground">{t("eventAbout.recordedBy")}</dt>
+          <dd className="text-foreground">
+            {recorded ? (
+              recorded.map((v) => (
+                <span key={v.label ?? "format"} className="mr-3 inline-block">
+                  {v.label ?? docs.eventFormat} <span className="font-mono">{v.value}</span>
+                </span>
+              ))
+            ) : records.status === "idle" && sources.length > 0 ? (
+              <span className="text-muted-foreground">{t("eventAbout.reading")}</span>
+            ) : clientVersion ? (
+              <>
+                <span className="font-mono">{clientVersion}</span>
+                <span className="text-muted-foreground"> · {t("eventAbout.fromSession")}</span>
+              </>
             ) : (
-              <p className="text-xs text-muted-foreground">
-                The record this type is read from is not described for {providerLabel} yet. Compare the two
-                schemas below to see how it maps.
-              </p>
+              <span className="text-muted-foreground">{t("eventAbout.noVersion")}</span>
             )}
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-              <dt className="text-muted-foreground">This event</dt>
-              <dd className="font-mono text-foreground">
-                {sources.length > 0
-                  ? sources.map((s) => describeSource(provider, s)).join(", ")
-                  : "no original record to look up"}
-              </dd>
-              <dt className="text-muted-foreground">Recorded by</dt>
-              <dd className="text-foreground">
-                {recorded ? (
-                  recorded.map((v) => (
-                    <span key={v.label} className="mr-3 inline-block">
-                      {v.label} <span className="font-mono">{v.value}</span>
-                    </span>
-                  ))
-                ) : records.status === "idle" && sources.length > 0 ? (
-                  <span className="text-muted-foreground">Reading the record…</span>
-                ) : clientVersion ? (
-                  <>
-                    <span className="font-mono">{clientVersion}</span>
-                    <span className="text-muted-foreground"> · from the session; this record names no version</span>
-                  </>
-                ) : (
-                  <span className="text-muted-foreground">No version recorded</span>
-                )}
-              </dd>
-            </dl>
-          </Section>
+          </dd>
+        </dl>
+      </Section>
 
-          <Section title="What the app changes">
-            <ul className="list-disc space-y-1 pl-4 text-xs leading-relaxed text-muted-foreground marker:text-border">
-              {changes.map((c) => (
-                <li key={c} className="text-foreground">{c}</li>
-              ))}
-              {SHARED_CHANGES.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ul>
-          </Section>
+      <Section title={t("eventAbout.changes")}>
+        <ul className="list-disc space-y-1 pl-4 text-xs leading-relaxed text-muted-foreground marker:text-border">
+          {changes.map((c) => (
+            <li key={c} className="text-foreground">{c}</li>
+          ))}
+          {docs.sharedChanges.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      </Section>
 
-          <Section title="Format">
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              JSON Schema of this event and of the record it was read from: each property with its
-              type and meaning, without the values. Raw on the row shows the values.
-            </p>
-            <SchemaBlock
-              title="Transformed schema"
-              hint="the event as this app holds it"
-              schema={eventSchema}
-              placeholder=""
-            />
-            <SchemaBlock
-              title="Original schema"
-              hint={`the record as ${providerLabel} wrote it`}
-              schema={recordSchema}
-              placeholder={
-                sources.length === 0
-                  ? "This event was built by the app, or the agent's records cannot be looked up one by one."
-                  : records.status === "failed"
-                    ? "Could not read the record."
-                    : "Reading the record…"
-              }
-            />
-          </Section>
-        </div>
-      </DialogContent>
-    </Dialog>
+      <Section title={t("eventAbout.format")}>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {t("eventAbout.formatDetail")}
+        </p>
+        <SchemaBlock
+          title={t("eventAbout.transformed")}
+          hint={t("eventAbout.transformedHint")}
+          schema={eventSchema}
+          placeholder=""
+        />
+        <SchemaBlock
+          title={t("eventAbout.original")}
+          hint={t("eventAbout.originalHint", { agent: providerLabel })}
+          schema={recordSchema}
+          placeholder={
+            sources.length === 0
+              ? t("eventAbout.builtByApp")
+              : records.status === "failed"
+                ? t("eventAbout.readFailed")
+                : t("eventAbout.reading")
+          }
+        />
+      </Section>
+    </div>
   );
 }

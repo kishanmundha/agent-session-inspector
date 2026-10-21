@@ -2,13 +2,21 @@
 
 import { useState } from "react";
 import { formatCost, formatTokens } from "@/lib/format";
-import { METRIC_LABELS, type DayRow, type Metric, type WeekRow } from "@/lib/analytics";
+import type { DayRow, Metric, WeekRow } from "@/lib/analytics";
+import { formatLocale } from "@/i18n/current";
+import { useT, type Translator } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 /** One hue, light to dark: empty, then four steps of the brand colour. */
 const HEAT = ["bg-muted", "bg-brand/25", "bg-brand/50", "bg-brand/75", "bg-brand"];
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** Short weekday names, Sunday first, in the interface language. */
+function weekdays(): string[] {
+  // 2023-01-01 was a Sunday.
+  return Array.from({ length: 7 }, (_, i) =>
+    new Date(2023, 0, 1 + i).toLocaleDateString(formatLocale(), { weekday: "short" }),
+  );
+}
 
 /** Square-root scale, so one huge day does not flatten every other day to the lowest step. */
 function heatLevel(value: number, max: number): number {
@@ -16,37 +24,45 @@ function heatLevel(value: number, max: number): number {
   return Math.max(1, Math.ceil(4 * Math.sqrt(value / max)));
 }
 
-export function formatMetric(metric: Metric, value: number): string {
+export function formatMetric(t: Translator, metric: Metric, value: number): string {
   if (metric === "costUSD") return formatCost(value);
-  const amount =
-    metric === "outputTokens" ? (formatTokens(value) ?? "0") : value.toLocaleString();
-  const unit = METRIC_LABELS[metric].toLowerCase();
-  return `${amount} ${value === 1 ? unit.replace(/s$/, "") : unit}`;
+  if (metric === "outputTokens") {
+    return t("metrics.outputTokensAmount", { amount: formatTokens(value) ?? "0", count: value });
+  }
+  return t(`metrics.${metric}Count`, { count: value });
 }
 
 /** The line under a heatmap: what the pointer is on, and what the shades mean. */
 function HeatFooter({ readout, hint }: { readout: string | null; hint: string }) {
+  const t = useT();
   return (
     <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
       <span className={cn("truncate", readout && "text-foreground")} aria-live="polite">
         {readout ?? hint}
       </span>
       <span className="flex shrink-0 items-center gap-1" aria-hidden>
-        Less
+        {t("charts.less")}
         {HEAT.map((cls) => (
           <span key={cls} className={cn("size-3 rounded-[3px]", cls)} />
         ))}
-        More
+        {t("charts.more")}
       </span>
     </div>
   );
 }
 
 const fullDate = (date: Date) =>
-  date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  date.toLocaleDateString(formatLocale(), {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
 /** GitHub-style calendar: one column per week, one cell per day. */
 export function CalendarHeatmap({ days, metric }: { days: DayRow[]; metric: Metric }) {
+  const t = useT();
+  const weekdayNames = weekdays();
   const [readout, setReadout] = useState<string | null>(null);
   const max = Math.max(0, ...days.map((d) => d[metric]));
 
@@ -66,7 +82,7 @@ export function CalendarHeatmap({ days, metric }: { days: DayRow[]; metric: Metr
     const first = column.find((d): d is DayRow => d !== null);
     if (!first || first.date.getMonth() === lastMonth) return "";
     lastMonth = first.date.getMonth();
-    return first.date.toLocaleDateString([], { month: "short" });
+    return first.date.toLocaleDateString(formatLocale(), { month: "short" });
   });
 
   return (
@@ -74,14 +90,14 @@ export function CalendarHeatmap({ days, metric }: { days: DayRow[]; metric: Metr
       <div className="overflow-x-auto pb-1">
         <div
           role="img"
-          aria-label={`${METRIC_LABELS[metric]} per day over ${days.length} days`}
+          aria-label={t("charts.perDay", { metric: t(`metrics.${metric}`), count: days.length })}
           className="inline-flex gap-[3px]"
           style={{ "--cell": `${cell}px` } as React.CSSProperties}
           onMouseLeave={() => setReadout(null)}
         >
           <div className="mr-1 flex flex-col gap-[3px] pt-[19px] text-[10px] leading-(--cell) text-muted-foreground">
-            {WEEKDAYS.map((name, i) => (
-              <span key={name} className="h-(--cell)">
+            {weekdayNames.map((name, i) => (
+              <span key={i} className="h-(--cell)">
                 {i % 2 === 1 ? name : ""}
               </span>
             ))}
@@ -95,9 +111,9 @@ export function CalendarHeatmap({ days, metric }: { days: DayRow[]; metric: Metr
                 day ? (
                   <span
                     key={day.day}
-                    title={`${fullDate(day.date)}: ${formatMetric(metric, day[metric])}`}
+                    title={`${fullDate(day.date)}: ${formatMetric(t, metric, day[metric])}`}
                     onMouseEnter={() =>
-                      setReadout(`${fullDate(day.date)} · ${formatMetric(metric, day[metric])}`)
+                      setReadout(`${fullDate(day.date)} · ${formatMetric(t, metric, day[metric])}`)
                     }
                     className={cn(
                       "size-(--cell) rounded-[3px] hover:ring-1 hover:ring-foreground/50",
@@ -112,7 +128,7 @@ export function CalendarHeatmap({ days, metric }: { days: DayRow[]; metric: Metr
           ))}
         </div>
       </div>
-      <HeatFooter readout={readout} hint="Hover a day for its count" />
+      <HeatFooter readout={readout} hint={t("charts.hoverDay")} />
     </div>
   );
 }
@@ -122,6 +138,8 @@ const pad = (hour: number) => String(hour % 24).padStart(2, "0");
 
 /** Weekday by hour of day, in the viewer's time zone. */
 export function HourHeatmap({ grid, metric }: { grid: number[][]; metric: Metric }) {
+  const t = useT();
+  const weekdayNames = weekdays();
   const [readout, setReadout] = useState<string | null>(null);
   const max = Math.max(0, ...grid.flat());
 
@@ -129,7 +147,7 @@ export function HourHeatmap({ grid, metric }: { grid: number[][]; metric: Metric
     <div>
       <div
         role="img"
-        aria-label={`${METRIC_LABELS[metric]} by weekday and hour of day`}
+        aria-label={t("charts.byWeekdayHour", { metric: t(`metrics.${metric}`) })}
         className="grid grid-cols-[auto_repeat(24,minmax(0,1fr))] gap-[3px]"
         onMouseLeave={() => setReadout(null)}
       >
@@ -142,10 +160,10 @@ export function HourHeatmap({ grid, metric }: { grid: number[][]; metric: Metric
         {grid.map((row, weekday) => (
           <div key={weekday} className="contents">
             <span className="pr-1.5 text-[10px] leading-5 text-muted-foreground">
-              {WEEKDAYS[weekday]}
+              {weekdayNames[weekday]}
             </span>
             {row.map((value, hour) => {
-              const text = `${WEEKDAYS[weekday]} ${pad(hour)}:00–${pad(hour + 1)}:00 · ${formatMetric(metric, value)}`;
+              const text = `${weekdayNames[weekday]} ${pad(hour)}:00–${pad(hour + 1)}:00 · ${formatMetric(t, metric, value)}`;
               return (
                 <span
                   key={hour}
@@ -163,17 +181,18 @@ export function HourHeatmap({ grid, metric }: { grid: number[][]; metric: Metric
       </div>
       <HeatFooter
         readout={readout}
-        hint={`Times in ${Intl.DateTimeFormat().resolvedOptions().timeZone}`}
+        hint={t("charts.timesIn", { zone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
       />
     </div>
   );
 }
 
 const shortDate = (date: Date) =>
-  date.toLocaleDateString([], { month: "short", day: "numeric" });
+  date.toLocaleDateString(formatLocale(), { month: "short", day: "numeric" });
 
 /** Tool calls per week: a bar per week on a shared baseline. */
 export function WeeklyBars({ weeks }: { weeks: WeekRow[] }) {
+  const t = useT();
   const [readout, setReadout] = useState<string | null>(null);
   const max = Math.max(1, ...weeks.map((w) => w.toolCalls));
 
@@ -181,12 +200,15 @@ export function WeeklyBars({ weeks }: { weeks: WeekRow[] }) {
     <div>
       <div
         role="img"
-        aria-label={`Tool calls per week over ${weeks.length} weeks`}
+        aria-label={t("charts.toolCallsPerWeek", { count: weeks.length })}
         className="flex h-24 items-end gap-[2px] border-b border-border"
         onMouseLeave={() => setReadout(null)}
       >
         {weeks.map((week) => {
-          const text = `Week of ${shortDate(week.start)} · ${week.toolCalls.toLocaleString()} tool calls`;
+          const text = t("charts.weekOf", {
+            date: shortDate(week.start),
+            count: week.toolCalls,
+          });
           return (
             // The full-height wrapper is the hover target, so short bars are easy to hit.
             <div
@@ -208,7 +230,7 @@ export function WeeklyBars({ weeks }: { weeks: WeekRow[] }) {
       <div className="mt-1.5 flex justify-between gap-3 text-[10px] text-muted-foreground">
         <span className="shrink-0">{weeks.length > 0 && shortDate(weeks[0].start)}</span>
         <span className={cn("truncate text-xs", readout && "text-foreground")} aria-live="polite">
-          {readout ?? `peak ${max.toLocaleString()} calls in a week`}
+          {readout ?? t("charts.peakWeek", { count: max })}
         </span>
         <span className="shrink-0">
           {weeks.length > 1 && shortDate(weeks[weeks.length - 1].start)}

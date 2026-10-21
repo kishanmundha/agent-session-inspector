@@ -10,23 +10,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { BarList } from "@/components/common/bar-list";
 import { cn } from "@/lib/utils";
+import { formatNumber, formatPercent } from "@/lib/format";
+import { useT } from "@/i18n/client";
 import type { SessionStats, TokenAnalysis, TokenHint } from "./types";
 
 const SEVERITY = {
   high: {
-    label: "High impact",
     Icon: TriangleAlert,
     card: "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30",
     icon: "text-red-600 dark:text-red-400",
   },
   medium: {
-    label: "Medium impact",
     Icon: TriangleAlert,
     card: "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30",
     icon: "text-amber-600 dark:text-amber-400",
   },
   low: {
-    label: "Info",
     Icon: Info,
     card: "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30",
     icon: "text-emerald-600 dark:text-emerald-400",
@@ -46,22 +45,23 @@ export function TokenOptimizer({
   eventTypeCounts: { name: string; value: number }[];
   onFocusHint: (focus: NonNullable<TokenHint["focus"]>) => void;
 }) {
-  const breakdown = [
+  const t = useT();
+  const breakdown: { label: string; note?: string; chars: number; bar: string; text: string }[] = [
     {
-      label: "System context",
-      note: "agent managed",
+      label: t("optimizer.systemContext"),
+      note: t("optimizer.agentManaged"),
       chars: analysis.systemContextChars,
       bar: "bg-red-400 dark:bg-red-500",
       text: "text-red-700 dark:text-red-400",
     },
     {
-      label: "Tool results",
+      label: t("optimizer.toolResults"),
       chars: analysis.toolResultChars,
       bar: "bg-amber-400 dark:bg-amber-500",
       text: "text-amber-700 dark:text-amber-400",
     },
     {
-      label: "Assistant replies",
+      label: t("optimizer.assistantReplies"),
       chars: analysis.assistantChars,
       bar: "bg-sky-400 dark:bg-sky-500",
       text: "text-sky-700 dark:text-sky-400",
@@ -78,7 +78,7 @@ export function TokenOptimizer({
       <section>
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
           <Lightbulb className="size-4 text-brand" aria-hidden />
-          Optimization hints
+          {t("optimizer.hints")}
           {sortedHints.length > 0 && (
             <span className="rounded-sm bg-muted px-1.5 text-xs font-normal tabular-nums text-muted-foreground">
               {sortedHints.length}
@@ -93,7 +93,7 @@ export function TokenOptimizer({
               aria-hidden
             />
             <p className="text-sm text-foreground">
-              No issues detected in this session&rsquo;s context usage.
+              {t("optimizer.noIssues")}
             </p>
           </div>
         ) : (
@@ -102,7 +102,7 @@ export function TokenOptimizer({
               const cfg = SEVERITY[hint.severity];
               return (
                 <article
-                  key={`${hint.category}-${hint.title}`}
+                  key={hint.id}
                   className={cn("rounded-xl border p-4", cfg.card)}
                 >
                   <div className="flex items-start gap-3">
@@ -113,20 +113,22 @@ export function TokenOptimizer({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          {hint.category}
+                          {t(`hints.${hint.id}.category`)}
                         </span>
-                        <span className="sr-only">{cfg.label}</span>
+                        <span className="sr-only">{t(`optimizer.severity.${hint.severity}`)}</span>
                         {hint.saving && (
                           <span className="rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-xs text-foreground">
-                            save ~{hint.saving}
+                            {t("optimizer.save", {
+                              amount: t(`hints.savings.${hint.saving}`, hint.values),
+                            })}
                           </span>
                         )}
                       </div>
                       <p className="mt-0.5 text-sm font-semibold text-foreground">
-                        {hint.title}
+                        {t(`hints.${hint.id}.title`, hint.values)}
                       </p>
                       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                        {hint.description}
+                        {t(`hints.${hint.id}.description`, hint.values)}
                       </p>
                       {hint.focus && (
                         <Button
@@ -135,7 +137,7 @@ export function TokenOptimizer({
                           onClick={() => hint.focus && onFocusHint(hint.focus)}
                           className="mt-2.5"
                         >
-                          View related events
+                          {t("health.viewRelated")}
                           <ArrowRight data-icon="inline-end" aria-hidden />
                         </Button>
                       )}
@@ -150,12 +152,12 @@ export function TokenOptimizer({
 
       <section className="rounded-xl border border-border bg-card p-5">
         <h2 className="mb-4 text-sm font-semibold text-foreground">
-          Context usage breakdown
+          {t("optimizer.breakdown")}
         </h2>
 
         {totalChars === 0 ? (
           <p className="text-xs text-muted-foreground">
-            No measurable context recorded for this session.
+            {t("optimizer.noContext")}
           </p>
         ) : (
           <>
@@ -202,10 +204,10 @@ export function TokenOptimizer({
                         text,
                       )}
                     >
-                      {(chars / 1000).toFixed(0)}K chars
+                      {t("optimizer.kChars", { amount: Math.round(chars / 1000) })}
                     </span>
                     <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">
-                      {pct}%
+                      {formatPercent(pct / 100)}
                     </span>
                   </div>
                 );
@@ -217,21 +219,21 @@ export function TokenOptimizer({
         <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-4">
           {[
             {
-              label: "Output tokens",
+              label: t("stats.outputTokens"),
               value:
                 stats.totalOutputTokens > 0
-                  ? `${(stats.totalOutputTokens / 1000).toFixed(1)}K`
+                  ? `${formatNumber(Math.round(stats.totalOutputTokens / 100) / 10)}K`
                   : "—",
             },
             {
-              label: "Input tokens",
+              label: t("usage.inputTokens"),
               value:
                 stats.totalInputTokens > 0
-                  ? `${(stats.totalInputTokens / 1000).toFixed(1)}K`
-                  : "N/A (active)",
+                  ? `${formatNumber(Math.round(stats.totalInputTokens / 100) / 10)}K`
+                  : t("optimizer.notAvailable"),
             },
-            { label: "Compactions", value: String(analysis.compactionCount) },
-            { label: "Hook events", value: String(analysis.hookEventCount) },
+            { label: t("optimizer.compactions"), value: formatNumber(analysis.compactionCount) },
+            { label: t("optimizer.hookEvents"), value: formatNumber(analysis.hookEventCount) },
           ].map(({ label, value }) => (
             <div key={label} className="text-center">
               <div className="font-mono text-base font-bold tabular-nums text-foreground">
@@ -245,23 +247,27 @@ export function TokenOptimizer({
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="mb-3 text-sm font-semibold text-foreground">Tool usage</h3>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">
+            {t("analytics.toolUsage")}
+          </h3>
           <BarList
             items={analysis.topToolsByCount.map(({ name, count }) => ({
               name,
               value: count,
             }))}
             color="bg-chart-3"
-            emptyLabel="No tool calls recorded."
+            emptyLabel={t("optimizer.noToolCalls")}
           />
         </div>
         <div className="rounded-xl border border-border bg-card p-5">
-          <h3 className="mb-3 text-sm font-semibold text-foreground">Event types</h3>
+          <h3 className="mb-3 text-sm font-semibold text-foreground">
+            {t("optimizer.eventTypes")}
+          </h3>
           <BarList
             items={eventTypeCounts}
             color="bg-brand-2"
             limit={10}
-            emptyLabel="No events recorded."
+            emptyLabel={t("optimizer.noEvents")}
           />
         </div>
       </section>

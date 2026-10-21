@@ -33,7 +33,16 @@ import {
   type DayShare,
   type DaySlot,
 } from "@/lib/daily";
-import { formatCost, formatDuration, formatTokens } from "@/lib/format";
+import {
+  formatCost,
+  formatDuration,
+  formatMinutes,
+  formatNumber,
+  formatPercent,
+  formatTokens,
+} from "@/lib/format";
+import { formatLocale } from "@/i18n/current";
+import { useT } from "@/i18n/client";
 import { PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
 import { ACTIVITY_SLOT_MS } from "@/lib/providers/types";
 import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
@@ -42,21 +51,18 @@ import { cn } from "@/lib/utils";
 
 type ShareKey = "activeMs" | "costUSD";
 
-const SHARE_OPTIONS: { value: ShareKey; label: string }[] = [
-  { value: "activeMs", label: "Agent time" },
-  { value: "costUSD", label: "Cost" },
-];
+const SHARE_KEYS: ShareKey[] = ["activeMs", "costUSD"];
 
 const SESSION_COLUMNS = [
-  "Session",
-  "Model",
-  "Window",
-  "Messages",
-  "Tool calls",
-  "Tokens",
-  "Agent time",
-  "Cost",
-];
+  "session",
+  "model",
+  "window",
+  "messages",
+  "toolCalls",
+  "tokens",
+  "agentTime",
+  "cost",
+] as const;
 
 const tokens = (n: number) => formatTokens(n) ?? "0";
 
@@ -80,31 +86,33 @@ function parseRange(stored: string, today: string): DayRange | null {
   return dayFromKey(from) && dayFromKey(to) && from <= to && to <= today ? { from, to } : null;
 }
 
-/** Quick picks, each ending today or on a whole past period. */
-const PRESETS: { label: string; range: (today: Date) => [Date, Date] }[] = [
-  { label: "Today", range: (today) => [today, today] },
-  { label: "Yesterday", range: (today) => [addDays(today, -1), addDays(today, -1)] },
-  { label: "Last 7 days", range: (today) => [addDays(today, -6), today] },
-  { label: "Last 30 days", range: (today) => [addDays(today, -29), today] },
+/** Quick picks, each ending today or on a whole past period; labelled by `activity.presets.*`. */
+const PRESETS = [
+  { key: "today", range: (today: Date) => [today, today] },
+  { key: "yesterday", range: (today: Date) => [addDays(today, -1), addDays(today, -1)] },
+  { key: "last7", range: (today: Date) => [addDays(today, -6), today] },
+  { key: "last30", range: (today: Date) => [addDays(today, -29), today] },
   {
-    label: "This month",
-    range: (today) => [new Date(today.getFullYear(), today.getMonth(), 1), today],
+    key: "thisMonth",
+    range: (today: Date) => [new Date(today.getFullYear(), today.getMonth(), 1), today],
   },
   {
-    label: "Last month",
-    range: (today) => [
+    key: "lastMonth",
+    range: (today: Date) => [
       new Date(today.getFullYear(), today.getMonth() - 1, 1),
       new Date(today.getFullYear(), today.getMonth(), 0),
     ],
   },
-];
+] as const satisfies readonly { key: string; range: (today: Date) => Date[] }[];
 
 const clock = (ms: number) =>
-  new Date(ms).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  new Date(ms).toLocaleTimeString(formatLocale(), {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
 
-const minutes = (ms: number) => `${Math.round(ms / 60_000)}m`;
-
-const percent = (part: number, whole: number) => `${Math.round((part / whole) * 100)}%`;
+const percent = (part: number, whole: number) => formatPercent(part / whole);
 
 /** A session's span over a multi-day range: dates only where they change. */
 function spanLabel(start: number, end: number) {
@@ -116,12 +124,18 @@ function spanLabel(start: number, end: number) {
 }
 
 const shortDate = (date: Date) =>
-  date.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+  date.toLocaleDateString(formatLocale(), { month: "short", day: "numeric", year: "numeric" });
 
-const monthDay = (date: Date) => date.toLocaleDateString([], { month: "short", day: "numeric" });
+const monthDay = (date: Date) =>
+  date.toLocaleDateString(formatLocale(), { month: "short", day: "numeric" });
 
 const longDate = (date: Date) =>
-  date.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  date.toLocaleDateString(formatLocale(), {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
 function rangeLabel(from: Date, to: Date) {
   if (from.getTime() === to.getTime()) return shortDate(from);
@@ -132,6 +146,7 @@ function rangeLabel(from: Date, to: Date) {
 
 /** Agent time and sessions day by day, for a range of more than one day. */
 function DailyChart({ days, peak }: { days: DayBar[]; peak: number }) {
+  const t = useT();
   const [readout, setReadout] = useState<string | null>(null);
   const max = Math.max(1, ...days.map((d) => d.activeMs));
   const every = Math.max(1, Math.ceil(days.length / 8));
@@ -140,12 +155,21 @@ function DailyChart({ days, peak }: { days: DayBar[]; peak: number }) {
     <div>
       <div
         role="img"
-        aria-label={`Agent time per day over ${days.length} days`}
+        aria-label={t("activity.dailyLabel", { count: days.length })}
         className="flex h-28 items-end gap-0.5 border-b border-border"
         onMouseLeave={() => setReadout(null)}
       >
         {days.map((day) => {
-          const text = `${shortDate(new Date(day.t))} · ${day.sessions} session${day.sessions === 1 ? "" : "s"}${day.activeMs > 0 ? ` · ${formatDuration(day.activeMs)} agent time · ${formatCost(day.costUSD)}` : ""}`;
+          const text = [
+            shortDate(new Date(day.t)),
+            t("metrics.sessionsCount", { count: day.sessions }),
+            ...(day.activeMs > 0
+              ? [
+                  t("activity.agentTimeAmount", { amount: formatDuration(day.activeMs) }),
+                  formatCost(day.costUSD),
+                ]
+              : []),
+          ].join(" · ");
           return (
             <div
               key={day.t}
@@ -172,7 +196,7 @@ function DailyChart({ days, peak }: { days: DayBar[]; peak: number }) {
         className={cn("mt-2 truncate text-xs text-muted-foreground", readout && "text-foreground")}
         aria-live="polite"
       >
-        {readout ?? `Agent time per day · at most ${peak} session${peak === 1 ? "" : "s"} at once`}
+        {readout ?? t("activity.dailyHint", { count: peak })}
       </p>
     </div>
   );
@@ -180,6 +204,7 @@ function DailyChart({ days, peak }: { days: DayBar[]; peak: number }) {
 
 /** Sessions working at once, slot by slot across the day. */
 function ConcurrencyChart({ slots, peak }: { slots: DaySlot[]; peak: number }) {
+  const t = useT();
   const [readout, setReadout] = useState<string | null>(null);
   const max = Math.max(1, peak);
   const perHour = Math.round(3_600_000 / ACTIVITY_SLOT_MS);
@@ -188,12 +213,18 @@ function ConcurrencyChart({ slots, peak }: { slots: DaySlot[]; peak: number }) {
     <div>
       <div
         role="img"
-        aria-label={`Sessions working at once through the day, peaking at ${peak}`}
+        aria-label={t("activity.concurrencyLabel", { peak })}
         className="flex h-28 items-end gap-px border-b border-border"
         onMouseLeave={() => setReadout(null)}
       >
         {slots.map((slot) => {
-          const text = `${clock(slot.t)}–${clock(slot.t + ACTIVITY_SLOT_MS)} · ${slot.sessions} session${slot.sessions === 1 ? "" : "s"}${slot.sessions > 0 ? ` · ${formatDuration(slot.activeMs)} agent time` : ""}`;
+          const text = [
+            `${clock(slot.t)}–${clock(slot.t + ACTIVITY_SLOT_MS)}`,
+            t("metrics.sessionsCount", { count: slot.sessions }),
+            ...(slot.sessions > 0
+              ? [t("activity.agentTimeAmount", { amount: formatDuration(slot.activeMs) })]
+              : []),
+          ].join(" · ");
           return (
             // The full-height wrapper is the hover target, so empty slots still read out.
             <div
@@ -226,7 +257,10 @@ function ConcurrencyChart({ slots, peak }: { slots: DaySlot[]; peak: number }) {
         aria-live="polite"
       >
         {readout ??
-          `${Math.round(ACTIVITY_SLOT_MS / 60_000)}-minute slots · times in ${Intl.DateTimeFormat().resolvedOptions().timeZone}`}
+          t("activity.concurrencyHint", {
+            minutes: Math.round(ACTIVITY_SLOT_MS / 60_000),
+            zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          })}
       </p>
     </div>
   );
@@ -245,6 +279,7 @@ export function ActivityDashboard({
   onProjectChange: (project: string) => void;
   projectOptions: { value: string; label: string }[];
 }) {
+  const t = useT();
   const { sessions, error } = useAnalyticsSessions(reloadToken);
   const today = dayKey(new Date());
   const [storedRange, setStoredRange] = useStoredState<string>("activity-range", "", anyValue, "session");
@@ -252,7 +287,7 @@ export function ActivityDashboard({
   const [shareKey, setShareKey] = useStoredState<ShareKey>(
     "activity-share",
     "activeMs",
-    oneOf(SHARE_OPTIONS.map((o) => o.value)),
+    oneOf(SHARE_KEYS),
   );
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [costOpen, setCostOpen] = useState(false);
@@ -293,17 +328,17 @@ export function ActivityDashboard({
   );
   const providerOptions = useMemo(
     () => [
-      { value: "all", label: "All agents" },
+      { value: "all", label: t("home.allAgents") },
       ...providers.map((id) => ({ value: id as string, label: providerStyle(id).shortLabel })),
     ],
-    [providers],
+    [providers, t],
   );
 
   if (error && !sessions) {
     return (
       <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
-        <p className="text-sm">Could not load activity. Use refresh to try again.</p>
+        <p className="text-sm">{t("activity.loadError")}</p>
       </div>
     );
   }
@@ -336,7 +371,11 @@ export function ActivityDashboard({
   const allTokens = allInput + totals.outputTokens;
   const shares = (rows: DayShare[], label: (row: DayShare) => string = (row) => row.name) =>
     rows.map((row) => ({ name: label(row), value: row[shareKey] })).filter((row) => row.value > 0);
-  const formatShare = shareKey === "costUSD" ? formatCost : minutes;
+  const formatShare = shareKey === "costUSD" ? formatCost : formatMinutes;
+  const previousLabel = single
+    ? t("activity.previousDay")
+    : t("activity.previousDays", { count: span });
+  const nextLabel = single ? t("activity.nextDay") : t("activity.nextDays", { count: span });
 
   return (
     <div className="space-y-4">
@@ -347,8 +386,8 @@ export function ActivityDashboard({
             size="icon"
             disabled={single && !previous}
             onClick={() => (single ? previous && pick(previous, previous) : shift(-span))}
-            aria-label={single ? "Previous active day" : `Previous ${span} days`}
-            title={single ? "Previous active day" : `Previous ${span} days`}
+            aria-label={previousLabel}
+            title={previousLabel}
           >
             <ChevronLeft aria-hidden />
           </Button>
@@ -374,7 +413,7 @@ export function ActivityDashboard({
                     const [from, to] = preset.range(dayFromKey(today) ?? new Date()).map(dayKey);
                     return (
                       <Button
-                        key={preset.label}
+                        key={preset.key}
                         variant={from === range.from && to === range.to ? "secondary" : "ghost"}
                         size="sm"
                         className="justify-start font-normal"
@@ -383,7 +422,7 @@ export function ActivityDashboard({
                           setCalendarOpen(false);
                         }}
                       >
-                        {preset.label}
+                        {t(`activity.presets.${preset.key}`)}
                       </Button>
                     );
                   })}
@@ -417,9 +456,7 @@ export function ActivityDashboard({
                     }}
                   />
                   <p className="px-3 pb-3 text-xs text-muted-foreground">
-                    {anchor
-                      ? "Click another day to make a range, or close to keep this day."
-                      : "Click a day, then another to pick a range."}
+                    {anchor ? t("activity.pickSecond") : t("activity.pickFirst")}
                   </p>
                 </div>
               </div>
@@ -430,15 +467,15 @@ export function ActivityDashboard({
             size="icon"
             disabled={single ? !next : range.to >= today}
             onClick={() => (single ? next && pick(next, next) : shift(span))}
-            aria-label={single ? "Next active day" : `Next ${span} days`}
-            title={single ? "Next active day" : `Next ${span} days`}
+            aria-label={nextLabel}
+            title={nextLabel}
           >
             <ChevronRight aria-hidden />
           </Button>
         </div>
         {!isToday && (
           <Button variant="outline" onClick={() => pick(today, today)}>
-            Today
+            {t("activity.presets.today")}
           </Button>
         )}
         {projectOptions.length > 2 && (
@@ -446,7 +483,7 @@ export function ActivityDashboard({
             value={project}
             onChange={onProjectChange}
             options={projectOptions}
-            aria-label="Project"
+            aria-label={t("home.project")}
             className="max-w-56"
           />
         )}
@@ -455,11 +492,11 @@ export function ActivityDashboard({
             value={provider}
             onChange={setProvider}
             options={providerOptions}
-            aria-label="Agent"
+            aria-label={t("filters.agent")}
           />
         )}
         <span className="ml-auto text-xs text-muted-foreground">
-          {single ? longDate(fromDay) : `${span} days`}
+          {single ? longDate(fromDay) : t("activity.days", { count: span })}
         </span>
       </div>
 
@@ -467,12 +504,18 @@ export function ActivityDashboard({
         <EmptyState
           icon={CalendarClock}
           title={
-            isToday ? "No activity yet today" : single ? "No activity on this day" : "No activity in this range"
+            isToday
+              ? t("activity.noneToday")
+              : single
+                ? t("activity.noneOnDay")
+                : t("activity.noneInRange")
           }
           description={
             latest
-              ? `No agent wrote to a transcript ${single ? "on this day" : "in these days"} with these filters.`
-              : "No session matches these filters on any day."
+              ? single
+                ? t("activity.noneDetailDay")
+                : t("activity.noneDetailRange")
+              : t("activity.noneAnyDay")
           }
           action={
             latest ? (
@@ -481,7 +524,7 @@ export function ActivityDashboard({
                 size="sm"
                 onClick={() => pick(latest, latest)}
               >
-                Go to latest active day
+                {t("activity.goToLatest")}
               </Button>
             ) : undefined
           }
@@ -490,74 +533,101 @@ export function ActivityDashboard({
         <>
           <StatCardGrid>
             <StatCard
-              label="Agent time"
+              label={t("activity.agentTime")}
               value={formatDuration(totals.activeMs)}
-              sub="summed over sessions"
+              sub={t("activity.summed")}
               accent
             />
             <StatCard
-              label="Peak at once"
-              value={totals.peak.toLocaleString()}
+              label={t("activity.peakAtOnce")}
+              value={formatNumber(totals.peak)}
               sub={
                 totals.peakAt !== null
                   ? single
-                    ? `at ${clock(totals.peakAt)}`
-                    : `${monthDay(new Date(totals.peakAt))} at ${clock(totals.peakAt)}`
+                    ? t("activity.atTime", { time: clock(totals.peakAt) })
+                    : t("activity.onDayAtTime", {
+                        day: monthDay(new Date(totals.peakAt)),
+                        time: clock(totals.peakAt),
+                      })
                   : undefined
               }
             />
-            <StatCard label="Sessions" value={totals.sessions.toLocaleString()} />
-            <StatCard label="Projects" value={totals.projects.toLocaleString()} />
-            <StatCard label="Messages" value={totals.messages.toLocaleString()} />
-            <StatCard label="Tool calls" value={totals.toolCalls.toLocaleString()} />
+            <StatCard label={t("stats.sessions")} value={formatNumber(totals.sessions)} />
+            <StatCard label={t("stats.projects")} value={formatNumber(totals.projects)} />
+            <StatCard label={t("stats.messages")} value={formatNumber(totals.messages)} />
+            <StatCard label={t("stats.toolCalls")} value={formatNumber(totals.toolCalls)} />
             <StatCard
-              label="Est. cost"
+              label={t("stats.estCost")}
               value={formatCost(totals.costUSD)}
-              sub="at API list prices"
+              sub={t("stats.atListPrices")}
               onClick={() => setCostOpen(true)}
             />
             {allTokens > 0 && (
               <>
                 <StatCard
-                  label="Total tokens"
+                  label={t("tokens.total")}
                   value={tokens(allTokens)}
-                  sub={`${tokens(allInput)} in · ${tokens(totals.outputTokens)} out`}
-                  hint="Everything sent to and returned by the model: uncached input, cache writes, cache reads and output."
+                  sub={t("tokens.inOut", {
+                    input: tokens(allInput),
+                    output: tokens(totals.outputTokens),
+                  })}
+                  hint={t("tokens.totalHint")}
                 />
                 <StatCard
-                  label="Uncached input"
+                  label={t("tokens.uncached")}
                   value={tokens(totals.inputTokens)}
-                  sub={allInput > 0 ? `${percent(totals.inputTokens, allInput)} of input` : undefined}
-                  hint="Input the model had not seen before, billed at the full input rate."
+                  sub={
+                    allInput > 0
+                      ? t("tokens.ofInput", { percent: percent(totals.inputTokens, allInput) })
+                      : undefined
+                  }
+                  hint={t("tokens.uncachedHint")}
                 />
                 <StatCard
-                  label="Cache writes"
+                  label={t("tokens.cacheWrites")}
                   value={tokens(totals.cacheWriteTokens)}
-                  sub={allInput > 0 ? `${percent(totals.cacheWriteTokens, allInput)} of input` : undefined}
-                  hint="Input stored in the prompt cache so later requests can reuse it."
+                  sub={
+                    allInput > 0
+                      ? t("tokens.ofInput", { percent: percent(totals.cacheWriteTokens, allInput) })
+                      : undefined
+                  }
+                  hint={t("tokens.cacheWritesHint")}
                 />
                 <StatCard
-                  label="Cache reads"
+                  label={t("tokens.cacheReads")}
                   value={tokens(totals.cacheReadTokens)}
-                  sub={allInput > 0 ? `${percent(totals.cacheReadTokens, allInput)} of input` : undefined}
-                  hint="Input served from the prompt cache at a steep discount."
+                  sub={
+                    allInput > 0
+                      ? t("tokens.ofInput", { percent: percent(totals.cacheReadTokens, allInput) })
+                      : undefined
+                  }
+                  hint={t("tokens.cacheReadsHint")}
                 />
                 <StatCard
-                  label="Output"
+                  label={t("tokens.output")}
                   value={tokens(totals.outputTokens)}
-                  sub="generated"
-                  hint="Tokens the model wrote: replies, tool calls and reasoning."
+                  sub={t("tokens.generated")}
+                  hint={t("tokens.outputHint")}
                 />
               </>
             )}
           </StatCardGrid>
 
           {single ? (
-            <Panel title="Concurrency" note={`peak ${totals.peak} at once`}>
+            <Panel
+              title={t("activity.concurrency")}
+              note={t("activity.peakNote", { count: totals.peak })}
+            >
               <ConcurrencyChart slots={data.slots} peak={totals.peak} />
             </Panel>
           ) : (
-            <Panel title="Daily activity" note={`${data.days.filter((d) => d.sessions > 0).length} of ${span} days active`}>
+            <Panel
+              title={t("activity.daily")}
+              note={t("activity.daysActive", {
+                active: data.days.filter((d) => d.sessions > 0).length,
+                count: span,
+              })}
+            >
               <DailyChart days={data.days} peak={totals.peak} />
             </Panel>
           )}
@@ -575,16 +645,19 @@ export function ActivityDashboard({
             onOpenChange={setCostOpen}
           />
 
-          <Panel title="Sessions" note={`${totals.sessions} total`}>
+          <Panel
+            title={t("stats.sessions")}
+            note={t("analytics.total", { count: totals.sessions })}
+          >
             <Table className="min-w-[800px]">
               <TableHeader>
                 <TableRow className="text-xs uppercase tracking-wider hover:bg-transparent">
-                  {SESSION_COLUMNS.map((label, i) => (
+                  {SESSION_COLUMNS.map((column, i) => (
                     <TableHead
-                      key={label}
+                      key={column}
                       className={cn("text-muted-foreground", i > 2 && "text-right")}
                     >
-                      {label}
+                      {t(`activity.columns.${column}`)}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -617,8 +690,8 @@ export function ActivityDashboard({
                         ? `${clock(s.start)}–${clock(s.end)}`
                         : spanLabel(s.start, s.end)}
                     </TableCell>
-                    <TableCell className="text-right">{s.messages.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{s.toolCalls.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{formatNumber(s.messages)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(s.toolCalls)}</TableCell>
                     <TableCell className="text-right">{tokens(s.tokens)}</TableCell>
                     <TableCell className="text-right">{formatDuration(s.activeMs)}</TableCell>
                     <TableCell className="text-right font-medium">{formatCost(s.costUSD)}</TableCell>
@@ -629,29 +702,37 @@ export function ActivityDashboard({
           </Panel>
 
           <Panel
-            title="Breakdown"
+            title={t("activity.breakdown")}
             action={
               <Segmented
-                label="Break down by"
+                label={t("usage.breakDownBy")}
                 value={shareKey}
                 onChange={setShareKey}
-                options={SHARE_OPTIONS}
+                options={SHARE_KEYS.map((value) => ({ value, label: t(`activity.share.${value}`) }))}
               />
             }
           >
             <div className="grid gap-5 lg:grid-cols-3">
               {(
                 [
-                  ["Project", shares(data.byProject)],
-                  ["Model", shares(data.byModel)],
-                  ["Agent", shares(data.byAgent, (row) => providerStyle(row.name).shortLabel)],
+                  [t("usage.dimensions.project"), shares(data.byProject)],
+                  [t("usage.dimensions.model"), shares(data.byModel)],
+                  [
+                    t("usage.dimensions.agent"),
+                    shares(data.byAgent, (row) => providerStyle(row.name).shortLabel),
+                  ],
                 ] as const
               ).map(([title, items]) => (
                 <div key={title} className="min-w-0">
                   <h3 className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
                     {title}
                   </h3>
-                  <BarList items={items} limit={6} format={formatShare} emptyLabel="Nothing recorded" />
+                  <BarList
+                    items={items}
+                    limit={6}
+                    format={formatShare}
+                    emptyLabel={t("activity.nothingRecorded")}
+                  />
                 </div>
               ))}
             </div>

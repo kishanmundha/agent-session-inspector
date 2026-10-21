@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/table";
 import {
   METRICS,
-  METRIC_LABELS,
   RANGES,
   addDays,
   computeAnalytics,
@@ -35,56 +34,51 @@ import {
   type Metric,
   type SessionRow,
 } from "@/lib/analytics";
-import { formatCost, formatCount, formatDuration, formatTokens } from "@/lib/format";
-import { PROVIDER_ORDER, SUPPORTED_AGENTS, providerStyle } from "@/lib/provider-meta";
+import {
+  fixed,
+  formatCost,
+  formatCount,
+  formatDuration,
+  formatNumber,
+  formatTokens,
+} from "@/lib/format";
+import { PROVIDER_ORDER, providerStyle, supportedAgents } from "@/lib/provider-meta";
+import { useLocale, useT } from "@/i18n/client";
 import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
 import { anyValue, oneOf, useStoredState } from "@/lib/use-stored-state";
 import { cn } from "@/lib/utils";
 import { CalendarHeatmap, HourHeatmap, WeeklyBars } from "./analytics-charts";
 
-const METRIC_OPTIONS = METRICS.map((value) => ({ value, label: METRIC_LABELS[value] }));
-
 type TopKey = "messages" | "activeMs" | "outputTokens" | "costUSD";
 
-const TOP_OPTIONS: { value: TopKey; label: string }[] = [
-  { value: "messages", label: "Messages" },
-  { value: "activeMs", label: "Active time" },
-  { value: "outputTokens", label: "Output tokens" },
-  { value: "costUSD", label: "Cost" },
-];
+const TOP_KEYS: TopKey[] = ["messages", "activeMs", "outputTokens", "costUSD"];
 
 type McpKey = "servers" | "tools";
 
-const MCP_OPTIONS: { value: McpKey; label: string }[] = [
-  { value: "servers", label: "Servers" },
-  { value: "tools", label: "Tools" },
-];
+const MCP_KEYS: McpKey[] = ["servers", "tools"];
 
 type ProjectKey = "messages" | "costUSD";
 
-const PROJECT_OPTIONS: { value: ProjectKey; label: string }[] = [
-  { value: "messages", label: "Messages" },
-  { value: "costUSD", label: "Cost" },
-];
+const PROJECT_KEYS: ProjectKey[] = ["messages", "costUSD"];
 
 const AGENT_COLUMNS = [
-  "Agent",
-  "Sessions",
-  "Cost",
-  "Messages",
-  "Tool calls",
-  "Output",
-  "Active",
-  "Msgs/min",
-  "Tools/min",
-  "Top tools",
-];
+  "agent",
+  "sessions",
+  "cost",
+  "messages",
+  "toolCalls",
+  "output",
+  "active",
+  "msgsPerMin",
+  "toolsPerMin",
+  "topTools",
+] as const;
 
 function formatTop(key: TopKey, session: SessionRow): string {
   if (key === "costUSD") return formatCost(session.costUSD);
   if (key === "activeMs") return formatDuration(session.activeMs);
   if (key === "outputTokens") return formatTokens(session.outputTokens) ?? "0";
-  return session.messages.toLocaleString();
+  return formatNumber(session.messages);
 }
 
 /** Cross-session analytics: activity, top sessions, tools and agents. */
@@ -100,6 +94,8 @@ export function AnalyticsDashboard({
   onProjectChange: (project: string) => void;
   projectOptions: { value: string; label: string }[];
 }) {
+  const t = useT();
+  const locale = useLocale();
   const { sessions, error } = useAnalyticsSessions(reloadToken);
   const [costOpen, setCostOpen] = useState(false);
   const [range, setRange] = useStoredState<string>(
@@ -126,17 +122,17 @@ export function AnalyticsDashboard({
   const [topKey, setTopKey] = useStoredState<TopKey>(
     "analytics-top",
     "messages",
-    oneOf(TOP_OPTIONS.map((o) => o.value)),
+    oneOf(TOP_KEYS),
   );
   const [projectKey, setProjectKey] = useStoredState<ProjectKey>(
     "analytics-projects",
     "messages",
-    oneOf(PROJECT_OPTIONS.map((o) => o.value)),
+    oneOf(PROJECT_KEYS),
   );
   const [mcpKey, setMcpKey] = useStoredState<McpKey>(
     "analytics-mcp",
     "servers",
-    oneOf(MCP_OPTIONS.map((o) => o.value)),
+    oneOf(MCP_KEYS),
   );
 
   const filter: AnalyticsFilter = useMemo(
@@ -165,15 +161,19 @@ export function AnalyticsDashboard({
 
   const providerOptions = useMemo(
     () => [
-      { value: "all", label: "All agents" },
+      { value: "all", label: t("home.allAgents") },
       ...providers.map((id) => ({ value: id as string, label: providerStyle(id).shortLabel })),
     ],
-    [providers],
+    [providers, t],
   );
   const modelOptions = useMemo(
-    () => [{ value: "all", label: "All models" }, ...models.map((m) => ({ value: m, label: m }))],
-    [models],
+    () => [
+      { value: "all", label: t("filters.allModels") },
+      ...models.map((m) => ({ value: m, label: m })),
+    ],
+    [models, t],
   );
+  const metricOptions = METRICS.map((value) => ({ value, label: t(`metrics.${value}`) }));
 
   const topSessions = useMemo(
     () =>
@@ -190,7 +190,7 @@ export function AnalyticsDashboard({
     return (
       <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
-        <p className="text-sm">Could not load analytics. Use refresh to try again.</p>
+        <p className="text-sm">{t("analytics.loadError")}</p>
       </div>
     );
   }
@@ -212,8 +212,8 @@ export function AnalyticsDashboard({
     return (
       <EmptyState
         icon={BarChart3}
-        title="Nothing to chart yet"
-        description={`Analytics appear once a supported agent writes a transcript on this machine: ${SUPPORTED_AGENTS}.`}
+        title={t("analytics.emptyTitle")}
+        description={t("analytics.emptyDetail", { agents: supportedAgents(locale) })}
       />
     );
   }
@@ -230,7 +230,7 @@ export function AnalyticsDashboard({
           server.tools.map((tool) => ({ name: `${server.name} › ${tool.name}`, value: tool.value })),
         );
   const perMinute = (count: number, ms: number) =>
-    ms > 0 ? (count / activeMinutes(ms)).toFixed(1) : "—";
+    ms > 0 ? fixed(count / activeMinutes(ms), 1) : "—";
 
   return (
     <div className="space-y-4">
@@ -238,15 +238,15 @@ export function AnalyticsDashboard({
         <OptionSelect
           value={range}
           onChange={setRange}
-          options={RANGES}
-          aria-label="Date range"
+          options={RANGES.map((r) => ({ value: r.value, label: t(`ranges.${r.value}`) }))}
+          aria-label={t("filters.dateRange")}
         />
         {projectOptions.length > 2 && (
           <OptionSelect
             value={project}
             onChange={onProjectChange}
             options={projectOptions}
-            aria-label="Project"
+            aria-label={t("home.project")}
             className="max-w-56"
           />
         )}
@@ -255,7 +255,7 @@ export function AnalyticsDashboard({
             value={provider}
             onChange={setProvider}
             options={providerOptions}
-            aria-label="Agent"
+            aria-label={t("filters.agent")}
           />
         )}
         {models.length > 1 && (
@@ -263,7 +263,7 @@ export function AnalyticsDashboard({
             value={model}
             onChange={setModel}
             options={modelOptions}
-            aria-label="Model"
+            aria-label={t("filters.model")}
             className="max-w-56"
           />
         )}
@@ -273,55 +273,64 @@ export function AnalyticsDashboard({
           className="ml-auto"
         >
           <Download aria-hidden />
-          Export CSV
+          {t("filters.exportCsv")}
         </Button>
       </div>
 
       {totals.sessions === 0 ? (
         <EmptyState
           icon={BarChart3}
-          title="No activity for these filters"
-          description="Try a longer date range, or clear the project, agent and model filters."
+          title={t("analytics.noActivity")}
+          description={t("analytics.noActivityDetail")}
         />
       ) : (
         <>
           <StatCardGrid>
             <StatCard
-              label="Est. cost"
+              label={t("stats.estCost")}
               value={formatCost(totals.costUSD)}
               sub={
                 data.unpricedModels.length > 0
-                  ? `${data.unpricedModels.length} model${data.unpricedModels.length > 1 ? "s" : ""} unpriced`
-                  : "at API list prices"
+                  ? t("stats.modelsUnpriced", { count: data.unpricedModels.length })
+                  : t("stats.atListPrices")
               }
               accent
               onClick={() => setCostOpen(true)}
             />
-            <StatCard label="Sessions" value={totals.sessions.toLocaleString()} />
-            <StatCard label="Messages" value={formatCount(totals.messages)} />
+            <StatCard label={t("stats.sessions")} value={formatNumber(totals.sessions)} />
+            <StatCard label={t("stats.messages")} value={formatCount(totals.messages)} />
             <StatCard
-              label="Msgs / session"
-              value={messagesPerSession.mean.toFixed(1)}
-              sub={`median ${messagesPerSession.median} · p90 ${messagesPerSession.p90}`}
+              label={t("stats.msgsPerSession")}
+              value={fixed(messagesPerSession.mean, 1)}
+              sub={t("stats.medianP90", {
+                median: messagesPerSession.median,
+                p90: messagesPerSession.p90,
+              })}
             />
-            <StatCard label="Tool calls" value={formatCount(totals.toolCalls)} />
-            <StatCard label="Output tokens" value={formatTokens(totals.outputTokens) ?? "0"} />
+            <StatCard label={t("stats.toolCalls")} value={formatCount(totals.toolCalls)} />
             <StatCard
-              label="Active time"
+              label={t("stats.outputTokens")}
+              value={formatTokens(totals.outputTokens) ?? "0"}
+            />
+            <StatCard
+              label={t("stats.activeTime")}
               value={formatDuration(totals.activeMs)}
-              sub="excl. pauses > 5 min"
+              sub={t("stats.exclPauses")}
             />
             <StatCard
-              label="Active days"
-              value={totals.activeDays.toLocaleString()}
-              sub={`of ${data.days.length}`}
+              label={t("stats.activeDays")}
+              value={formatNumber(totals.activeDays)}
+              sub={t("stats.ofTotal", { total: data.days.length })}
             />
             <StatCard
-              label="Projects"
-              value={totals.projects.toLocaleString()}
+              label={t("stats.projects")}
+              value={formatNumber(totals.projects)}
               sub={
                 topProject && totals.messages > 0
-                  ? `${Math.round((topProject.messages / totals.messages) * 100)}% in ${topProject.name}`
+                  ? t("stats.shareIn", {
+                      percent: Math.round((topProject.messages / totals.messages) * 100),
+                      name: topProject.name,
+                    })
                   : undefined
               }
             />
@@ -338,7 +347,7 @@ export function AnalyticsDashboard({
             }
             scope={{
               sessions: totals.sessions,
-              period: RANGES.find((r) => r.value === range)?.label.toLowerCase() ?? "all time",
+              period: t(`rangePeriods.${range as (typeof RANGES)[number]["value"]}`),
             }}
             open={costOpen}
             onOpenChange={setCostOpen}
@@ -347,13 +356,13 @@ export function AnalyticsDashboard({
           <UnpricedNotice models={data.unpricedModels} />
 
           <Panel
-            title="Activity"
+            title={t("analytics.activity")}
             action={
               <Segmented
-                label="Activity metric"
+                label={t("analytics.activityMetric")}
                 value={calendarMetric}
                 onChange={setCalendarMetric}
-                options={METRIC_OPTIONS}
+                options={metricOptions}
               />
             }
           >
@@ -362,13 +371,13 @@ export function AnalyticsDashboard({
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Panel
-              title="By weekday and hour"
+              title={t("analytics.byWeekdayHour")}
               action={
                 <Segmented
-                  label="Weekday and hour metric"
+                  label={t("analytics.weekdayHourMetric")}
                   value={hourMetric}
                   onChange={setHourMetric}
-                  options={METRIC_OPTIONS}
+                  options={metricOptions}
                 />
               }
             >
@@ -376,13 +385,13 @@ export function AnalyticsDashboard({
             </Panel>
 
             <Panel
-              title="Top sessions"
+              title={t("analytics.topSessions")}
               action={
                 <Segmented
-                  label="Rank sessions by"
+                  label={t("analytics.rankSessionsBy")}
                   value={topKey}
                   onChange={setTopKey}
-                  options={TOP_OPTIONS}
+                  options={TOP_KEYS.map((value) => ({ value, label: t(`analytics.top.${value}`) }))}
                 />
               }
             >
@@ -416,14 +425,17 @@ export function AnalyticsDashboard({
             </Panel>
 
             <Panel
-              title="Projects"
-              note={`${totals.projects} total`}
+              title={t("stats.projects")}
+              note={t("analytics.total", { count: totals.projects })}
               action={
                 <Segmented
-                  label="Rank projects by"
+                  label={t("analytics.rankProjectsBy")}
                   value={projectKey}
                   onChange={setProjectKey}
-                  options={PROJECT_OPTIONS}
+                  options={PROJECT_KEYS.map((value) => ({
+                    value,
+                    label: t(`analytics.top.${value}`),
+                  }))}
                 />
               }
             >
@@ -434,12 +446,15 @@ export function AnalyticsDashboard({
               />
             </Panel>
 
-            <Panel title="Tool usage" note={`${totals.toolCalls.toLocaleString()} calls`}>
-              <BarList items={data.tools} limit={8} emptyLabel="No tool calls" />
+            <Panel
+              title={t("analytics.toolUsage")}
+              note={t("analytics.calls", { count: totals.toolCalls })}
+            >
+              <BarList items={data.tools} limit={8} emptyLabel={t("analytics.noToolCalls")} />
               {data.weeks.length > 1 && (
                 <>
                   <h3 className="mb-2 mt-5 text-xs uppercase tracking-wider text-muted-foreground">
-                    Weekly trend
+                    {t("analytics.weeklyTrend")}
                   </h3>
                   <WeeklyBars weeks={data.weeks} />
                 </>
@@ -447,54 +462,52 @@ export function AnalyticsDashboard({
             </Panel>
 
             <Panel
-              title="Skills"
-              note={`${skillCalls.toLocaleString()} call${skillCalls === 1 ? "" : "s"} · ${data.skills.length} skill${data.skills.length === 1 ? "" : "s"}`}
+              title={t("analytics.skills")}
+              note={`${t("analytics.calls", { count: skillCalls })} · ${t("analytics.skillCount", { count: data.skills.length })}`}
             >
-              <BarList
-                items={data.skills}
-                limit={8}
-                emptyLabel="No skill was loaded in this range"
-              />
+              <BarList items={data.skills} limit={8} emptyLabel={t("analytics.noSkills")} />
               {data.skills.length > 0 && (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Most used:{" "}
-                  <span className="font-mono text-foreground">{data.skills[0].name}</span>, in{" "}
-                  {data.skills[0].sessions} session{data.skills[0].sessions === 1 ? "" : "s"}.
+                  {t.rich(
+                    "analytics.mostUsedSkill",
+                    { m: (chunks) => <span className="font-mono text-foreground">{chunks}</span> },
+                    { name: data.skills[0].name, count: data.skills[0].sessions },
+                  )}
                 </p>
               )}
             </Panel>
 
             <Panel
-              title="MCP tools"
-              note={`${mcpCalls.toLocaleString()} call${mcpCalls === 1 ? "" : "s"} · ${data.mcpServers.length} server${data.mcpServers.length === 1 ? "" : "s"}`}
+              title={t("analytics.mcpTools")}
+              note={`${t("analytics.calls", { count: mcpCalls })} · ${t("analytics.serverCount", { count: data.mcpServers.length })}`}
               action={
                 data.mcpServers.length > 0 ? (
                   <Segmented
-                    label="Group MCP calls by"
+                    label={t("analytics.groupMcpBy")}
                     value={mcpKey}
                     onChange={setMcpKey}
-                    options={MCP_OPTIONS}
+                    options={MCP_KEYS.map((value) => ({ value, label: t(`analytics.mcp.${value}`) }))}
                   />
                 ) : undefined
               }
             >
-              <BarList items={mcpItems} limit={8} emptyLabel="No MCP tool was called in this range" />
+              <BarList items={mcpItems} limit={8} emptyLabel={t("analytics.noMcp")} />
             </Panel>
           </div>
 
-          <Panel title="Agent comparison">
+          <Panel title={t("analytics.agentComparison")}>
             <Table className="min-w-[720px]">
               <TableHeader>
                 <TableRow className="text-xs uppercase tracking-wider hover:bg-transparent">
-                  {AGENT_COLUMNS.map((label, i) => (
+                  {AGENT_COLUMNS.map((column, i) => (
                     <TableHead
-                      key={label}
+                      key={column}
                       className={cn(
                         "text-muted-foreground",
                         i > 0 && i < AGENT_COLUMNS.length - 1 && "text-right",
                       )}
                     >
-                      {label}
+                      {t(`analytics.columns.${column}`)}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -511,10 +524,10 @@ export function AnalyticsDashboard({
                         {providerStyle(a.provider).shortLabel}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right">{a.sessions.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{formatNumber(a.sessions)}</TableCell>
                     <TableCell className="text-right">{formatCost(a.costUSD)}</TableCell>
-                    <TableCell className="text-right">{a.messages.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{a.toolCalls.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">{formatNumber(a.messages)}</TableCell>
+                    <TableCell className="text-right">{formatNumber(a.toolCalls)}</TableCell>
                     <TableCell className="text-right">
                       {formatTokens(a.outputTokens) ?? "0"}
                     </TableCell>

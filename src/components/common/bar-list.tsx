@@ -1,3 +1,7 @@
+"use client";
+
+import { useT } from "@/i18n/client";
+import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export interface BarItem {
@@ -13,9 +17,9 @@ export function BarList({
   items,
   color = "bg-brand",
   max: explicitMax,
-  emptyLabel = "None",
+  emptyLabel,
   limit,
-  format = (value) => value.toLocaleString(),
+  format = formatNumber,
 }: {
   items: BarItem[];
   color?: string;
@@ -24,8 +28,9 @@ export function BarList({
   limit?: number;
   format?: (value: number) => string;
 }) {
+  const t = useT();
   if (items.length === 0) {
-    return <p className="text-xs text-muted-foreground">{emptyLabel}</p>;
+    return <p className="text-xs text-muted-foreground">{emptyLabel ?? t("common.none")}</p>;
   }
 
   const sorted = [...items].sort((a, b) => b.value - a.value);
@@ -55,7 +60,7 @@ export function BarList({
       ))}
       {limit && sorted.length > limit && (
         <p className="pt-1 text-xs text-muted-foreground">
-          +{sorted.length - limit} more
+          {t("common.more", { count: sorted.length - limit })}
         </p>
       )}
     </div>

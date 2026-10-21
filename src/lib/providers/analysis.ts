@@ -327,10 +327,9 @@ export function analyzeTokenUsage(
     const topTool = topToolsByCount[0];
     hints.push({
       severity: totalToolCalls > 150 ? "high" : "medium",
-      category: "Tool Calls",
-      title: `High tool call volume (${totalToolCalls} calls)`,
-      description: `Most used: ${topTool?.name} (${topTool?.count}×). Every call adds its arguments and result to the context of each later turn. Batch related operations and prefer targeted commands.`,
-      saving: "Varies",
+      id: "toolVolume",
+      values: { count: totalToolCalls, tool: topTool?.name ?? "", uses: topTool?.count ?? 0 },
+      saving: "varies",
       focus: { categories: ["tool", "external_tool"] },
     });
   }
@@ -341,10 +340,13 @@ export function analyzeTokenUsage(
       : 0;
     hints.push({
       severity: largeToolResults > 5 ? "high" : "medium",
-      category: "Tool Results",
-      title: `${largeToolResults} tool result${largeToolResults > 1 ? "s" : ""} over 10KB`,
-      description: `Large outputs (avg ${(avgSize / 1000).toFixed(1)}KB) dominate context. Read file ranges instead of whole files, and pipe shell output through head/tail.`,
-      saving: `~${Math.round((largeToolResults * 5000) / CHARS_PER_TOKEN / 1000)}K+ tokens`,
+      id: "largeResults",
+      values: {
+        count: largeToolResults,
+        avgKb: Math.round(avgSize / 100) / 10,
+        thousands: Math.round((largeToolResults * 5000) / CHARS_PER_TOKEN / 1000),
+      },
+      saving: "tokensPlus",
       focus: { categories: ["tool"], subKeys: ["tool.execution_complete"] },
     });
   }
@@ -354,9 +356,8 @@ export function analyzeTokenUsage(
     const worst = rereads.sort((a, b) => b[1] - a[1])[0];
     hints.push({
       severity: rereads.length > 3 ? "medium" : "low",
-      category: "Redundant Reads",
-      title: `${rereads.length} file${rereads.length > 1 ? "s" : ""} read 3+ times`,
-      description: `${worst[0].split("/").pop()} was read ${worst[1]} times. Re-reading a file the agent already has in context duplicates its whole content.`,
+      id: "rereads",
+      values: { count: rereads.length, file: worst[0].split("/").pop() ?? worst[0], reads: worst[1] },
       focus: { categories: ["tool"], search: worst[0].split("/").pop() },
     });
   }
@@ -364,11 +365,9 @@ export function analyzeTokenUsage(
   if (screenshotCount > 5) {
     hints.push({
       severity: "medium",
-      category: "Browser Tools",
-      title: `${screenshotCount} screenshots captured`,
-      description:
-        "Screenshots bill as image tokens. Prefer an accessibility/DOM snapshot when you only need page structure rather than pixels.",
-      saving: `~${screenshotCount * 800} tokens`,
+      id: "screenshots",
+      values: { count: screenshotCount, tokens: screenshotCount * 800 },
+      saving: "tokens",
       focus: { categories: ["tool", "assistant"], search: "screenshot" },
     });
   }
@@ -376,10 +375,8 @@ export function analyzeTokenUsage(
   if (thinkingChars > 20_000) {
     hints.push({
       severity: "low",
-      category: "Reasoning",
-      title: `~${Math.round(thinkingChars / CHARS_PER_TOKEN / 1000)}K tokens of reasoning`,
-      description:
-        "Extended reasoning is billed as output. Lower the reasoning effort for routine work and reserve it for genuinely hard steps.",
+      id: "reasoning",
+      values: { thousands: Math.round(thinkingChars / CHARS_PER_TOKEN / 1000) },
       focus: { categories: ["assistant"], subKeys: ["assistant.thinking"] },
     });
   }
@@ -387,10 +384,8 @@ export function analyzeTokenUsage(
   if (attachmentChars > 50_000) {
     hints.push({
       severity: "medium",
-      category: "Injected Context",
-      title: `~${Math.round(attachmentChars / 1000)}K chars of auto-attached context`,
-      description:
-        "Attachments (tool definitions, tool/skill listings, file snapshots, reminders) are injected by the agent. Trimming unused MCP servers and skills shrinks every request.",
+      id: "injected",
+      values: { thousands: Math.round(attachmentChars / 1000) },
       focus: { categories: ["context"] },
     });
   }
@@ -398,10 +393,8 @@ export function analyzeTokenUsage(
   if (errorCount > 2) {
     hints.push({
       severity: errorCount > 10 ? "medium" : "low",
-      category: "Reliability",
-      title: `${errorCount} API errors / retries`,
-      description:
-        "Each retry re-sends the full request context. Frequent retries inflate input tokens without producing output.",
+      id: "apiErrors",
+      values: { count: errorCount },
       focus: { categories: ["session"], subKeys: ["session.error"] },
     });
   }
@@ -411,10 +404,8 @@ export function analyzeTokenUsage(
     if (ratio < 0.5) {
       hints.push({
         severity: "low",
-        category: "Prompt Cache",
-        title: `Only ${Math.round(ratio * 100)}% of input came from cache`,
-        description:
-          "Cache hits are much cheaper than fresh input. Changing early context (system prompt, tool set, attached files) mid-session invalidates the cache prefix.",
+        id: "lowCache",
+        values: { percent: Math.round(ratio * 100) },
         focus: { categories: ["assistant"] },
       });
     }
@@ -423,9 +414,8 @@ export function analyzeTokenUsage(
   if (outputTokens > 50_000 && compactionCount === 0) {
     hints.push({
       severity: "medium",
-      category: "Context Management",
-      title: "No context compaction detected",
-      description: `Long session (${(outputTokens / 1000).toFixed(0)}K output tokens) with no compaction. Compacting summarizes history and cuts the per-turn input cost.`,
+      id: "noCompaction",
+      values: { thousands: Math.round(outputTokens / 1000) },
       focus: { categories: ["session"], search: "compaction" },
     });
   }
@@ -433,10 +423,8 @@ export function analyzeTokenUsage(
   if (compactionCount > 0) {
     hints.push({
       severity: "low",
-      category: "Context Management",
-      title: `Context compacted ${compactionCount} time${compactionCount > 1 ? "s" : ""}`,
-      description:
-        "Compaction is working as intended. For very long sessions, compacting more often keeps per-turn input smaller.",
+      id: "compacted",
+      values: { count: compactionCount },
       focus: {
         categories: ["session"],
         subKeys: ["session.compaction_start", "session.compaction_complete"],
@@ -448,18 +436,15 @@ export function analyzeTokenUsage(
     const perMsg = Math.round(systemMessageChars / systemMessageCount);
     hints.push({
       severity: "low",
-      category: "Platform Context",
-      title: "System context is host-managed",
-      description: `System context repeats each turn (~${(perMsg / 1000).toFixed(1)}K chars × ${systemMessageCount} turns). That is expected in the Copilot runtime and is usually not user-configurable.`,
+      id: "hostContext",
+      values: { perTurnK: Math.round(perMsg / 100) / 10, count: systemMessageCount },
       focus: { categories: ["system"], subKeys: ["system.message"] },
     });
   } else if (systemMessageChars > 40_000) {
     hints.push({
       severity: "medium",
-      category: "Instructions",
-      title: `~${Math.round(systemMessageChars / 1000)}K chars of system instructions`,
-      description:
-        "Instruction files (AGENTS.md / CLAUDE.md), skills and developer messages ride along on every request. Keep them short and scope-specific.",
+      id: "instructions",
+      values: { thousands: Math.round(systemMessageChars / 1000) },
       focus: { categories: ["system"], subKeys: ["system.message"] },
     });
   }
@@ -468,10 +453,8 @@ export function analyzeTokenUsage(
   if (bashCount > 30) {
     hints.push({
       severity: "low",
-      category: "Tool Calls",
-      title: `${bashCount} shell calls`,
-      description:
-        "Each shell call adds its output to context. Combine commands with && and limit output with head/tail.",
+      id: "shellCalls",
+      values: { count: bashCount },
       focus: { categories: ["tool"], subKeys: ["tool.execution_start"], search: "bash" },
     });
   }

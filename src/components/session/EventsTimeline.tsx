@@ -32,7 +32,10 @@ import { InputTokensIcon, OutputTokensIcon } from "@/components/common/token-ico
 import { SearchInput } from "@/components/common/search-input";
 import { Segmented } from "@/components/common/segmented";
 import { costTimeline, type CostTurn } from "@/lib/cost-timeline";
-import { formatBytes, formatCost } from "@/lib/format";
+import { fixed, formatBytes, formatCost, formatNumber, formatPercent } from "@/lib/format";
+import { formatLocale } from "@/i18n/current";
+import { useLocale, useT, type Translator } from "@/i18n/client";
+import type { MessageId } from "@/i18n/messages/en";
 import { useHotkeys } from "@/lib/use-hotkeys";
 import { useQueryParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
@@ -61,207 +64,167 @@ interface Props {
   clientVersion?: string;
 }
 
-// Per event type: display label plus light/dark-aware colour classes.
+// Per event type: light/dark-aware colour classes. The names are the `eventTypes.*` messages.
 const EVENT_CONFIG: Record<string, {
-  label: string;
   dotCls: string;      // circle dot
   typeCls: string;     // type label text color
 }> = {
   "session.start": {
-    label: "Session Start",
     dotCls: "bg-emerald-100 border-emerald-400 dark:bg-emerald-900/60 dark:border-emerald-700",
     typeCls: "text-emerald-700 dark:text-emerald-400",
   },
   "session.shutdown": {
-    label: "Session Shutdown",
     dotCls: "bg-red-100 border-red-400 dark:bg-red-900/60 dark:border-red-700",
     typeCls: "text-red-700 dark:text-red-400",
   },
   "session.resume": {
-    label: "Session Resume",
     dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
     typeCls: "text-violet-700 dark:text-violet-400",
   },
   "user.message": {
-    label: "User Message",
     dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
     typeCls: "text-violet-700 dark:text-violet-400",
   },
   "assistant.message": {
-    label: "Assistant",
     dotCls: "bg-sky-100 border-sky-400 dark:bg-sky-900/60 dark:border-sky-700",
     typeCls: "text-sky-700 dark:text-sky-400",
   },
   "assistant.turn_start": {
-    label: "Turn Start",
     dotCls: "bg-cyan-100 border-cyan-400 dark:bg-cyan-900/60 dark:border-cyan-700",
     typeCls: "text-cyan-700 dark:text-cyan-400",
   },
   "assistant.turn_end": {
-    label: "Turn End",
     dotCls: "bg-cyan-100 border-cyan-400 dark:bg-cyan-900/60 dark:border-cyan-700",
     typeCls: "text-cyan-700 dark:text-cyan-400",
   },
   "tool.execution_start": {
-    label: "Tool Start",
     dotCls: "bg-amber-100 border-amber-400 dark:bg-amber-900/60 dark:border-amber-700",
     typeCls: "text-amber-700 dark:text-amber-400",
   },
   "tool.execution_complete": {
-    label: "Tool Done",
     dotCls: "bg-amber-100 border-amber-400 dark:bg-amber-900/60 dark:border-amber-700",
     typeCls: "text-amber-700 dark:text-amber-400",
   },
   "external_tool.requested": {
-    label: "External Tool Request",
     dotCls: "bg-lime-100 border-lime-400 dark:bg-lime-900/60 dark:border-lime-700",
     typeCls: "text-lime-700 dark:text-lime-400",
   },
   "external_tool.completed": {
-    label: "External Tool Done",
     dotCls: "bg-lime-100 border-lime-400 dark:bg-lime-900/60 dark:border-lime-700",
     typeCls: "text-lime-700 dark:text-lime-400",
   },
   "permission.requested": {
-    label: "Permission",
     dotCls: "bg-orange-100 border-orange-400 dark:bg-orange-900/60 dark:border-orange-700",
     typeCls: "text-orange-700 dark:text-orange-400",
   },
   "permission.completed": {
-    label: "Permission Done",
     dotCls: "bg-orange-100 border-orange-400 dark:bg-orange-900/60 dark:border-orange-700",
     typeCls: "text-orange-700 dark:text-orange-400",
   },
   "hook.start": {
-    label: "Hook Start",
     dotCls: "bg-cyan-100 border-cyan-400 dark:bg-cyan-900/60 dark:border-cyan-700",
     typeCls: "text-cyan-700 dark:text-cyan-400",
   },
   "hook.end": {
-    label: "Hook End",
     dotCls: "bg-cyan-100 border-cyan-400 dark:bg-cyan-900/60 dark:border-cyan-700",
     typeCls: "text-cyan-700 dark:text-cyan-400",
   },
   "session.auto_mode_resolved": {
-    label: "Auto Mode",
     dotCls: "bg-fuchsia-100 border-fuchsia-400 dark:bg-fuchsia-900/60 dark:border-fuchsia-700",
     typeCls: "text-fuchsia-700 dark:text-fuchsia-400",
   },
   "session.binary_asset": {
-    label: "Binary Asset",
     dotCls: "bg-rose-100 border-rose-400 dark:bg-rose-900/60 dark:border-rose-700",
     typeCls: "text-rose-700 dark:text-rose-400",
   },
   "session.usage_checkpoint": {
-    label: "Usage Checkpoint",
     dotCls: "bg-teal-100 border-teal-400 dark:bg-teal-900/60 dark:border-teal-700",
     typeCls: "text-teal-700 dark:text-teal-400",
   },
   "subagent.deselected": {
-    label: "Subagent Deselected",
     dotCls: "bg-slate-100 border-slate-400 dark:bg-slate-900/60 dark:border-slate-700",
     typeCls: "text-slate-700 dark:text-slate-400",
   },
   "session.model_change": {
-    label: "Model Change",
     dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
     typeCls: "text-violet-700 dark:text-violet-400",
   },
   "session.compaction_start": {
-    label: "Compaction Start",
     dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
     typeCls: "text-violet-700 dark:text-violet-400",
   },
   "session.compaction_complete": {
-    label: "Compaction Complete",
     dotCls: "bg-purple-100 border-purple-400 dark:bg-purple-900/60 dark:border-purple-700",
     typeCls: "text-purple-700 dark:text-purple-400",
   },
   "system.message": {
-    label: "System",
     dotCls: "bg-slate-100 border-slate-400 dark:bg-slate-900/60 dark:border-slate-700",
     typeCls: "text-slate-700 dark:text-slate-400",
   },
   // Types produced by the Claude Code and Codex adapters.
   "assistant.thinking": {
-    label: "Thinking",
     dotCls: "bg-indigo-100 border-indigo-400 dark:bg-indigo-900/60 dark:border-indigo-700",
     typeCls: "text-indigo-700 dark:text-indigo-400",
   },
   "session.error": {
-    label: "Error",
     dotCls: "bg-red-100 border-red-400 dark:bg-red-900/60 dark:border-red-700",
     typeCls: "text-red-700 dark:text-red-400",
   },
   "context.attachment": {
-    label: "Attachment",
     dotCls: "bg-stone-100 border-stone-400 dark:bg-stone-900/60 dark:border-stone-700",
     typeCls: "text-stone-700 dark:text-stone-400",
   },
   "file.patch_applied": {
-    label: "Patch Applied",
     dotCls: "bg-emerald-100 border-emerald-400 dark:bg-emerald-900/60 dark:border-emerald-700",
     typeCls: "text-emerald-700 dark:text-emerald-400",
   },
   "web.search": {
-    label: "Web Search",
     dotCls: "bg-blue-100 border-blue-400 dark:bg-blue-900/60 dark:border-blue-700",
     typeCls: "text-blue-700 dark:text-blue-400",
   },
   "session.turn_context": {
-    label: "Turn Context",
     dotCls: "bg-fuchsia-100 border-fuchsia-400 dark:bg-fuchsia-900/60 dark:border-fuchsia-700",
     typeCls: "text-fuchsia-700 dark:text-fuchsia-400",
   },
   "session.world_state": {
-    label: "World State",
     dotCls: "bg-fuchsia-100 border-fuchsia-400 dark:bg-fuchsia-900/60 dark:border-fuchsia-700",
     typeCls: "text-fuchsia-700 dark:text-fuchsia-400",
   },
   "session.mode_change": {
-    label: "Mode Change",
     dotCls: "bg-violet-100 border-violet-400 dark:bg-violet-900/60 dark:border-violet-700",
     typeCls: "text-violet-700 dark:text-violet-400",
   },
   "session.turn_aborted": {
-    label: "Turn Aborted",
     dotCls: "bg-orange-100 border-orange-400 dark:bg-orange-900/60 dark:border-orange-700",
     typeCls: "text-orange-700 dark:text-orange-400",
   },
   "session.rollback": {
-    label: "Rollback",
     dotCls: "bg-orange-100 border-orange-400 dark:bg-orange-900/60 dark:border-orange-700",
     typeCls: "text-orange-700 dark:text-orange-400",
   },
   "subagent.activity": {
-    label: "Subagent",
     dotCls: "bg-zinc-100 border-zinc-400 dark:bg-zinc-900/60 dark:border-zinc-700",
     typeCls: "text-zinc-700 dark:text-zinc-400",
   },
   "session.plan_changed": {
-    label: "Plan Changed",
     dotCls: "bg-fuchsia-100 border-fuchsia-400 dark:bg-fuchsia-900/60 dark:border-fuchsia-700",
     typeCls: "text-fuchsia-700 dark:text-fuchsia-400",
   },
   "system.notification": {
-    label: "Notification",
     dotCls: "bg-slate-100 border-slate-400 dark:bg-slate-900/60 dark:border-slate-700",
     typeCls: "text-slate-700 dark:text-slate-400",
   },
   "subagent.session_start": {
-    label: "Subagent Start",
     dotCls: "bg-zinc-100 border-zinc-400 dark:bg-zinc-900/60 dark:border-zinc-700",
     typeCls: "text-zinc-700 dark:text-zinc-400",
   },
   "subagent.message": {
-    label: "Subagent Message",
     dotCls: "bg-zinc-100 border-zinc-400 dark:bg-zinc-900/60 dark:border-zinc-700",
     typeCls: "text-zinc-700 dark:text-zinc-400",
   },
 };
 
 const DEFAULT_CONFIG = {
-  label: "Event",
   dotCls: "bg-muted border-border",
   typeCls: "text-muted-foreground",
   chipCls: "border-border bg-muted text-muted-foreground",
@@ -334,20 +297,28 @@ const CATEGORY_VISUAL: Record<string, { dotCls: string; typeCls: string; chipCls
 const PAGE_SIZE = 150;
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], {
+  return new Date(iso).toLocaleTimeString(formatLocale(), {
     hour: "2-digit", minute: "2-digit", second: "2-digit",
   });
 }
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString([], { month: "short", day: "numeric" });
+function formatDate(iso: string, locale = formatLocale()) {
+  return new Date(iso).toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
-function formatFullDate(iso: string) {
-  return new Date(iso).toLocaleDateString([], {
+function formatFullDate(iso: string, locale = formatLocale()) {
+  return new Date(iso).toLocaleDateString(locale, {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 }
+
+/** The name of a known event type in the interface language. */
+function eventTypeLabel(t: Translator, type: string): string | undefined {
+  return EVENT_CONFIG[type] ? t(`eventTypes.${type.replace(".", "_")}` as MessageId) : undefined;
+}
+
+/** "1.5s", for the short spans the cards show. */
+const seconds = (ms: number) => `${fixed(ms / 1000, 1)}s`;
 
 function durationMs(a: string, b: string) {
   return new Date(b).getTime() - new Date(a).getTime();
@@ -394,12 +365,13 @@ function eventHasTokenUsage(event: AgentEvent): boolean {
 }
 
 function formatCompactNumber(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
+  if (n >= 1_000_000) return `${fixed(n / 1_000_000, 2)}M`;
+  if (n >= 1_000) return `${fixed(n / 1_000, 1)}K`;
+  return formatNumber(n);
 }
 
 function UserMessageCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const content = (data.content as string) || "";
   const [expanded, setExpanded] = useState(false);
   const preview = content.slice(0, 300);
@@ -411,7 +383,7 @@ function UserMessageCard({ data }: { data: Record<string, unknown> }) {
       </div>
       {hasMore && (
         <Button variant="link" size="xs" onClick={() => setExpanded(!expanded)} className="h-auto px-0 font-normal text-violet-600 dark:text-violet-400 mt-1">
-          {expanded ? "Show less" : `Show more (${content.length} chars)`}
+          {expanded ? t("timeline.showLess") : t("timeline.showMore", { count: content.length })}
         </Button>
       )}
     </div>
@@ -419,6 +391,7 @@ function UserMessageCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function AssistantMessageCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const content = (data.content as string) || "";
   const toolRequests = (data.toolRequests as unknown[]) || [];
   const model = data.model as string;
@@ -435,9 +408,9 @@ function AssistantMessageCard({ data }: { data: Record<string, unknown> }) {
         )}
         {outputTokens !== undefined && (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-violet-100 border border-violet-300 dark:bg-violet-950 dark:border-violet-800 rounded-full text-xs text-violet-700 dark:text-violet-300">
-            <span className="opacity-60">out</span>
-            <span className="font-semibold font-mono">{outputTokens.toLocaleString()}</span>
-            <span className="opacity-60">tokens</span>
+            <span className="opacity-60">{t("sessionCard.out")}</span>
+            <span className="font-semibold font-mono">{formatNumber(outputTokens)}</span>
+            <span className="opacity-60">{t("timeline.tokensWord", { count: outputTokens })}</span>
           </span>
         )}
       </div>
@@ -448,7 +421,7 @@ function AssistantMessageCard({ data }: { data: Record<string, unknown> }) {
           </div>
           {hasMore && (
             <Button variant="link" size="xs" onClick={() => setExpanded(!expanded)} className="h-auto px-0 font-normal text-sky-600 dark:text-sky-400 mt-1">
-              {expanded ? "Show less" : `Show more (${content.length} chars)`}
+              {expanded ? t("timeline.showLess") : t("timeline.showMore", { count: content.length })}
             </Button>
           )}
         </div>
@@ -470,8 +443,11 @@ function AssistantMessageCard({ data }: { data: Record<string, unknown> }) {
 }
 
 /** Text size with the token estimate the other cards use: four chars a token. */
-function sizeLabel(chars: number) {
-  return `${chars.toLocaleString()} chars · ~${formatCompactNumber(Math.round(chars / 4))} tokens`;
+function sizeLabel(t: Translator, chars: number) {
+  return t("timeline.sizeLabel", {
+    count: chars,
+    tokens: formatCompactNumber(Math.round(chars / 4)),
+  });
 }
 
 const TOOL_BLOCK_CLS =
@@ -479,24 +455,30 @@ const TOOL_BLOCK_CLS =
 
 /** Heading of one part of a tool card, with its size and a copy button. */
 function ToolSectionHeading({ label, note, copyValue }: { label: string; note?: string; copyValue: string }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2">
       <span className="text-xs text-amber-600 dark:text-amber-500">{label}</span>
       {note && <span className="text-[11px] tabular-nums text-muted-foreground">{note}</span>}
-      <CopyButton value={copyValue} label={`Copy ${label.toLowerCase()}`} className="-my-1" />
+      <CopyButton value={copyValue} label={t("common.copyNamed", { name: label })} className="-my-1" />
     </div>
   );
 }
 
 /** Arguments one per key, so a command or a file body keeps its line breaks. */
 function ToolArguments({ args, chars }: { args: Record<string, unknown>; chars?: number }) {
+  const t = useT();
   const entries = Object.entries(args);
   if (entries.length === 0) return null;
   const size = chars ?? JSON.stringify(args).length;
 
   return (
     <div>
-      <ToolSectionHeading label="Arguments" note={sizeLabel(size)} copyValue={JSON.stringify(args, null, 2)} />
+      <ToolSectionHeading
+        label={t("timeline.arguments")}
+        note={sizeLabel(t, size)}
+        copyValue={JSON.stringify(args, null, 2)}
+      />
       <dl className="mt-1 space-y-1.5">
         {entries.map(([key, value]) => {
           const text = typeof value === "string" ? value : JSON.stringify(value, null, 2) ?? "";
@@ -531,16 +513,17 @@ function ToolResultView({
   chars?: number;
   truncated?: boolean;
 }) {
+  const t = useT();
   const [showDetail, setShowDetail] = useState(false);
   const content = typeof result.content === "string" ? result.content : "";
   const images = result.images ?? [];
   const imageBytes = images.reduce((sum, image) => sum + (image.bytes ?? 0), 0);
   const size = chars ?? content.length;
   const note = [
-    size > 0 ? sizeLabel(size) : images.length === 0 ? "empty" : null,
+    size > 0 ? sizeLabel(t, size) : images.length === 0 ? t("timeline.empty") : null,
     result.format === "json" ? "JSON" : null,
     images.length > 0
-      ? `${images.length} image${images.length === 1 ? "" : "s"}${imageBytes > 0 ? ` (${formatBytes(imageBytes)})` : ""}`
+      ? `${t("timeline.images", { count: images.length })}${imageBytes > 0 ? ` (${formatBytes(imageBytes)})` : ""}`
       : null,
   ]
     .filter(Boolean)
@@ -548,19 +531,21 @@ function ToolResultView({
 
   return (
     <div>
-      <ToolSectionHeading label="Result" note={note} copyValue={content} />
+      <ToolSectionHeading label={t("timeline.result")} note={note} copyValue={content} />
       <div className="mt-1 space-y-1.5">
         {content && <pre className={TOOL_BLOCK_CLS}>{content}</pre>}
         {truncated && (
           <p className="text-[11px] text-amber-700 dark:text-amber-400">
-            Showing the first {content.length.toLocaleString()} of {size.toLocaleString()} chars.
-            The whole result is in the original record, under Raw.
+            {t("timeline.truncated", { shown: content.length, count: size })}
           </p>
         )}
         {images.map((image, i) => (
           <p key={i} className="text-[11px] text-muted-foreground">
-            Image {i + 1}: {image.mediaType ?? "unknown type"}
-            {image.bytes ? `, ${formatBytes(image.bytes)}` : ""} (not loaded)
+            {t("timeline.image", {
+              n: i + 1,
+              type: image.mediaType ?? t("timeline.unknownType"),
+              size: image.bytes ? `, ${formatBytes(image.bytes)}` : "",
+            })}
           </p>
         ))}
         {result.detail && (
@@ -572,7 +557,7 @@ function ToolResultView({
               aria-expanded={showDetail}
               className="h-auto px-0 font-normal text-muted-foreground"
             >
-              {showDetail ? "▼" : "▶"} Detail
+              {showDetail ? "▼" : "▶"} {t("timeline.detail")}
             </Button>
             {showDetail && <pre className={cn(TOOL_BLOCK_CLS, "mt-1")}>{result.detail}</pre>}
           </div>
@@ -583,6 +568,7 @@ function ToolResultView({
 }
 
 function ToolExecutionCard({ data, type }: { data: Record<string, unknown>; type: string }) {
+  const t = useT();
   const toolName = data.toolName as string;
   const args = data.arguments as Record<string, unknown> | undefined;
   const result = data.result as ToolResult | undefined;
@@ -598,7 +584,7 @@ function ToolExecutionCard({ data, type }: { data: Record<string, unknown>; type
               ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-400"
               : "bg-red-100 text-red-700 dark:bg-red-900/60 dark:text-red-400"
           }`}>
-            {success ? "success" : "failed"}
+            {success ? t("timeline.success") : t("timeline.failed")}
           </span>
         )}
       </div>
@@ -617,6 +603,7 @@ function ToolExecutionCard({ data, type }: { data: Record<string, unknown>; type
 }
 
 function SessionShutdownCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const tokenDetails = data.tokenDetails as Record<string, Record<string, number>> | undefined;
   const totalApiDurationMs = data.totalApiDurationMs as number | undefined;
   const totalPremiumRequests = data.totalPremiumRequests as number | undefined;
@@ -634,12 +621,20 @@ function SessionShutdownCard({ data }: { data: Record<string, unknown> }) {
         )}
         {totalPremiumRequests !== undefined && (
           <span className="text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">{totalPremiumRequests}</span> premium req
+            {t.rich(
+              "timeline.premiumReq",
+              { b: (chunks) => <span className="font-semibold text-foreground">{chunks}</span> },
+              { count: totalPremiumRequests },
+            )}
           </span>
         )}
         {totalApiDurationMs !== undefined && (
           <span className="text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">{(totalApiDurationMs / 1000).toFixed(1)}s</span> API
+            {t.rich(
+              "timeline.apiTime",
+              { b: (chunks) => <span className="font-semibold text-foreground">{chunks}</span> },
+              { time: seconds(totalApiDurationMs) },
+            )}
           </span>
         )}
       </div>
@@ -647,20 +642,20 @@ function SessionShutdownCard({ data }: { data: Record<string, unknown> }) {
         <div className="flex items-center gap-2 flex-wrap">
           {inputTokens !== undefined && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-cyan-100 border border-cyan-300 dark:bg-cyan-950 dark:border-cyan-800 rounded-full text-xs text-cyan-700 dark:text-cyan-300">
-              <span className="opacity-60">in</span>
-              <span className="font-semibold font-mono">{inputTokens.toLocaleString()}</span>
+              <span className="opacity-60">{t("sessionCard.in")}</span>
+              <span className="font-semibold font-mono">{formatNumber(inputTokens)}</span>
             </span>
           )}
           {outputTokens !== undefined && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-violet-100 border border-violet-300 dark:bg-violet-950 dark:border-violet-800 rounded-full text-xs text-violet-700 dark:text-violet-300">
-              <span className="opacity-60">out</span>
-              <span className="font-semibold font-mono">{outputTokens.toLocaleString()}</span>
+              <span className="opacity-60">{t("sessionCard.out")}</span>
+              <span className="font-semibold font-mono">{formatNumber(outputTokens)}</span>
             </span>
           )}
           {cacheReadTokens !== undefined && cacheReadTokens > 0 && (
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-100 border border-teal-300 dark:bg-teal-950 dark:border-teal-800 rounded-full text-xs text-teal-700 dark:text-teal-300">
-              <span className="opacity-60">cache</span>
-              <span className="font-semibold font-mono">{cacheReadTokens.toLocaleString()}</span>
+              <span className="opacity-60">{t("timeline.cache")}</span>
+              <span className="font-semibold font-mono">{formatNumber(cacheReadTokens)}</span>
             </span>
           )}
         </div>
@@ -670,6 +665,7 @@ function SessionShutdownCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function SystemMessageCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const role = data.role as string | undefined;
   const interactionId = data.interactionId as string | undefined;
   const content = (data.content as string) || "";
@@ -694,7 +690,7 @@ function SystemMessageCard({ data }: { data: Record<string, unknown> }) {
 
       <div className="rounded-md border border-slate-200/80 dark:border-slate-800/80 bg-background/70 px-3 py-2">
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
-          System Prompt
+          {t("timeline.systemPrompt")}
         </p>
         <pre className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed overflow-auto max-h-72 font-mono">
           {expanded ? content : preview}
@@ -709,7 +705,9 @@ function SystemMessageCard({ data }: { data: Record<string, unknown> }) {
           onClick={() => setExpanded(!expanded)}
           className="h-auto px-0 font-normal text-slate-700 dark:text-slate-300"
         >
-          {expanded ? "Show less" : `Show full system prompt (${content.length.toLocaleString()} chars)`}
+          {expanded
+            ? t("timeline.showLess")
+            : t("timeline.showFullPrompt", { count: content.length })}
         </Button>
       )}
     </div>
@@ -717,6 +715,7 @@ function SystemMessageCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function HookEventCard({ data, type }: { data: Record<string, unknown>; type: "hook.start" | "hook.end" }) {
+  const t = useT();
   const hookType = data.hookType as string | undefined;
   const hookInvocationId = data.hookInvocationId as string | undefined;
   const success = data.success as boolean | undefined;
@@ -740,7 +739,7 @@ function HookEventCard({ data, type }: { data: Record<string, unknown>; type: "h
               ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800"
               : "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800"
           }`}>
-            {success ? "success" : "failed"}
+            {success ? t("timeline.success") : t("timeline.failed")}
           </span>
         )}
         {hookInvocationId && (
@@ -752,7 +751,9 @@ function HookEventCard({ data, type }: { data: Record<string, unknown>; type: "h
 
       {type === "hook.start" && prompt && (
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Prompt Preview</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+            {t("timeline.promptPreview")}
+          </p>
           <pre className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed overflow-auto max-h-44 font-mono">
             {expanded ? prompt : preview}
             {hasMore && !expanded && "..."}
@@ -764,7 +765,7 @@ function HookEventCard({ data, type }: { data: Record<string, unknown>; type: "h
               onClick={() => setExpanded(!expanded)}
               className="h-auto px-0 font-normal text-cyan-700 dark:text-cyan-300 mt-1"
             >
-              {expanded ? "Show less" : `Show more (${prompt.length.toLocaleString()} chars)`}
+              {expanded ? t("timeline.showLess") : t("timeline.showMore", { count: prompt.length })}
             </Button>
           )}
         </div>
@@ -774,6 +775,7 @@ function HookEventCard({ data, type }: { data: Record<string, unknown>; type: "h
 }
 
 function AutoModeResolvedCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const chosenModel = data.chosenModel as string | undefined;
   const reasoningBucket = data.reasoningBucket as string | undefined;
   const predictedLabel = data.predictedLabel as string | undefined;
@@ -791,24 +793,28 @@ function AutoModeResolvedCard({ data }: { data: Record<string, unknown> }) {
         )}
         {reasoningBucket && (
           <Badge variant="outline" className="text-xs font-mono">
-            reasoning: {reasoningBucket}
+            {t("timeline.field", { name: t("timeline.reasoning"), value: reasoningBucket })}
           </Badge>
         )}
         {predictedLabel && (
           <span className="text-xs text-muted-foreground">
-            label: <span className="font-mono text-foreground">{predictedLabel}</span>
+            {t("timeline.labelField")}{" "}
+            <span className="font-mono text-foreground">{predictedLabel}</span>
           </span>
         )}
         {typeof confidence === "number" && (
           <span className="text-xs text-muted-foreground">
-            confidence: <span className="font-mono text-foreground">{Math.round(confidence * 100)}%</span>
+            {t("timeline.confidence")}{" "}
+            <span className="font-mono text-foreground">{formatPercent(confidence)}</span>
           </span>
         )}
       </div>
 
       {candidateModels.length > 0 && (
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Candidate Models</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+            {t("timeline.candidateModels")}
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {candidateModels.slice(0, 8).map((candidate, idx) => (
               <span
@@ -824,7 +830,9 @@ function AutoModeResolvedCard({ data }: { data: Record<string, unknown> }) {
 
       {categoryScores && Object.keys(categoryScores).length > 0 && (
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Category Scores</p>
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+            {t("timeline.categoryScores")}
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {Object.entries(categoryScores).slice(0, 6).map(([name, value]) => (
               <div
@@ -843,6 +851,7 @@ function AutoModeResolvedCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function ExternalToolCard({ data, type }: { data: Record<string, unknown>; type: "external_tool.requested" | "external_tool.completed" }) {
+  const t = useT();
   const requestId = data.requestId as string | undefined;
   const toolName = data.toolName as string | undefined;
   const toolCallId = data.toolCallId as string | undefined;
@@ -858,7 +867,7 @@ function ExternalToolCard({ data, type }: { data: Record<string, unknown>; type:
             ? "bg-lime-100 text-lime-800 border-lime-300 dark:bg-lime-900/60 dark:text-lime-300 dark:border-lime-800"
             : "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/60 dark:text-emerald-300 dark:border-emerald-800"
         }`}>
-          {type === "external_tool.requested" ? "requested" : "completed"}
+          {type === "external_tool.requested" ? t("timeline.requested") : t("timeline.completed")}
         </span>
         {toolName && (
           <Badge variant="secondary" className="text-xs font-mono">
@@ -899,6 +908,7 @@ function ExternalToolCard({ data, type }: { data: Record<string, unknown>; type:
 }
 
 function SessionBinaryAssetCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const assetId = data.assetId as string | undefined;
   const assetType = data.type as string | undefined;
   const mimeType = data.mimeType as string | undefined;
@@ -914,12 +924,18 @@ function SessionBinaryAssetCard({ data }: { data: Record<string, unknown> }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
         {byteLength !== undefined && (
           <div className="rounded-sm border border-rose-200 dark:border-rose-900 px-2 py-1 bg-rose-100/60 dark:bg-rose-950/25">
-            size: <span className="font-mono text-foreground">{byteLength.toLocaleString()} bytes</span>
+            {t("timeline.sizeField")}{" "}
+            <span className="font-mono text-foreground">
+              {t("timeline.bytes", { count: byteLength })}
+            </span>
           </div>
         )}
         {rawData && (
           <div className="rounded-sm border border-rose-200 dark:border-rose-900 px-2 py-1 bg-rose-100/60 dark:bg-rose-950/25">
-            payload: <span className="font-mono text-foreground">{rawData.length.toLocaleString()} chars</span>
+            {t("timeline.payload")}{" "}
+            <span className="font-mono text-foreground">
+              {t("checkpoints.chars", { count: rawData.length })}
+            </span>
           </div>
         )}
       </div>
@@ -933,6 +949,7 @@ function SessionBinaryAssetCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function UsageCheckpointCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const usage = data.usage as Record<string, number> | undefined;
   const contextWindow = data.contextWindow as number | undefined;
   const totalNanoAiu = data.totalNanoAiu as number | undefined;
@@ -945,10 +962,10 @@ function UsageCheckpointCard({ data }: { data: Record<string, unknown> }) {
       {usage && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
           {[
-            ["in", usage.inputTokens],
-            ["cached", usage.cachedInputTokens],
-            ["out", usage.outputTokens],
-            ["reasoning", usage.reasoningTokens],
+            [t("sessionCard.in"), usage.inputTokens],
+            [t("timeline.cached"), usage.cachedInputTokens],
+            [t("sessionCard.out"), usage.outputTokens],
+            [t("timeline.reasoning"), usage.reasoningTokens],
           ]
             .filter(([, value]) => typeof value === "number" && value > 0)
             .map(([label, value]) => (
@@ -964,7 +981,7 @@ function UsageCheckpointCard({ data }: { data: Record<string, unknown> }) {
             ))}
           {contextWindow && (
             <span className="text-muted-foreground">
-              window {formatCompactNumber(contextWindow)}
+              {t("timeline.window", { size: formatCompactNumber(contextWindow) })}
             </span>
           )}
         </div>
@@ -972,18 +989,21 @@ function UsageCheckpointCard({ data }: { data: Record<string, unknown> }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs">
         {aiu !== undefined && (
           <div className="rounded-sm border border-teal-200 dark:border-teal-900 px-2 py-1 bg-teal-100/60 dark:bg-teal-950/25">
-            total AIU: <span className="font-mono text-foreground">{formatCompactNumber(aiu)}</span>
+            {t("timeline.totalAiu")}{" "}
+            <span className="font-mono text-foreground">{formatCompactNumber(aiu)}</span>
           </div>
         )}
         {totalPremiumRequests !== undefined && (
           <div className="rounded-sm border border-teal-200 dark:border-teal-900 px-2 py-1 bg-teal-100/60 dark:bg-teal-950/25">
-            premium req: <span className="font-mono text-foreground">{totalPremiumRequests}</span>
+            {t("timeline.premiumField")}{" "}
+            <span className="font-mono text-foreground">{totalPremiumRequests}</span>
           </div>
         )}
       </div>
       {modelCacheState && (
         <div className="text-xs text-muted-foreground">
-          cache state entries: <span className="font-mono text-foreground">{modelCacheState.length}</span>
+          {t("timeline.cacheEntries")}{" "}
+          <span className="font-mono text-foreground">{modelCacheState.length}</span>
         </div>
       )}
     </div>
@@ -991,6 +1011,7 @@ function UsageCheckpointCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function ModelChangeCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const previousModel = data.previousModel as string | undefined;
   const newModel = data.newModel as string | undefined;
   const reasoningEffort = data.reasoningEffort as string | null | undefined;
@@ -999,16 +1020,18 @@ function ModelChangeCard({ data }: { data: Record<string, unknown> }) {
   return (
     <div className="space-y-2">
       <div className="text-sm text-foreground">
-        <span className="font-mono">{previousModel || "unknown"}</span>
+        <span className="font-mono">{previousModel || t("timeline.unknown")}</span>
         <span className="mx-2 text-muted-foreground">→</span>
-        <span className="font-mono font-semibold">{newModel || "unknown"}</span>
+        <span className="font-mono font-semibold">{newModel || t("timeline.unknown")}</span>
       </div>
       <div className="flex items-center gap-2 flex-wrap text-xs">
         <span className="px-2 py-0.5 rounded-sm border border-violet-200 dark:border-violet-900 bg-violet-100/60 dark:bg-violet-950/25 text-muted-foreground">
-          effort: <span className="font-mono text-foreground">{reasoningEffort ?? "default"}</span>
+          {t("timeline.effort")}{" "}
+          <span className="font-mono text-foreground">{reasoningEffort ?? t("timeline.default")}</span>
         </span>
         <span className="px-2 py-0.5 rounded-sm border border-violet-200 dark:border-violet-900 bg-violet-100/60 dark:bg-violet-950/25 text-muted-foreground">
-          context: <span className="font-mono text-foreground">{contextTier ?? "default"}</span>
+          {t("timeline.contextField")}{" "}
+          <span className="font-mono text-foreground">{contextTier ?? t("timeline.default")}</span>
         </span>
       </div>
     </div>
@@ -1016,6 +1039,7 @@ function ModelChangeCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function CompactionStartCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const model = data.model as string | undefined;
   const systemTokens = data.systemTokens as number | undefined;
   const conversationTokens = data.conversationTokens as number | undefined;
@@ -1030,24 +1054,31 @@ function CompactionStartCard({ data }: { data: Record<string, unknown> }) {
         {model && <Badge variant="secondary" className="text-xs font-mono">{model}</Badge>}
         {total > 0 && (
           <span className="text-xs text-muted-foreground">
-            total: <span className="font-mono text-foreground">{formatCompactNumber(total)}</span> tokens
+            {t.rich(
+              "timeline.totalTokens",
+              { b: (chunks) => <span className="font-mono text-foreground">{chunks}</span> },
+              { amount: formatCompactNumber(total) },
+            )}
           </span>
         )}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-xs">
         {systemTokens !== undefined && (
           <div className="rounded-sm border border-violet-200 dark:border-violet-900 px-2 py-1 bg-violet-100/60 dark:bg-violet-950/25">
-            system: <span className="font-mono text-foreground">{formatCompactNumber(systemTokens)}</span>
+            {t("timeline.systemField")}{" "}
+            <span className="font-mono text-foreground">{formatCompactNumber(systemTokens)}</span>
           </div>
         )}
         {conversationTokens !== undefined && (
           <div className="rounded-sm border border-violet-200 dark:border-violet-900 px-2 py-1 bg-violet-100/60 dark:bg-violet-950/25">
-            convo: <span className="font-mono text-foreground">{formatCompactNumber(conversationTokens)}</span>
+            {t("timeline.convoField")}{" "}
+            <span className="font-mono text-foreground">{formatCompactNumber(conversationTokens)}</span>
           </div>
         )}
         {toolDefinitionsTokens !== undefined && (
           <div className="rounded-sm border border-violet-200 dark:border-violet-900 px-2 py-1 bg-violet-100/60 dark:bg-violet-950/25">
-            tools: <span className="font-mono text-foreground">{formatCompactNumber(toolDefinitionsTokens)}</span>
+            {t("timeline.toolsField")}{" "}
+            <span className="font-mono text-foreground">{formatCompactNumber(toolDefinitionsTokens)}</span>
           </div>
         )}
       </div>
@@ -1056,6 +1087,7 @@ function CompactionStartCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function CompactionCompleteCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const success = data.success as boolean | undefined;
   const error = data.error as string | undefined;
   const statusCode = data.statusCode as number | undefined;
@@ -1070,11 +1102,11 @@ function CompactionCompleteCard({ data }: { data: Record<string, unknown> }) {
             ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800"
             : "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800"
         }`}>
-          {success ? "success" : "failed"}
+          {success ? t("timeline.success") : t("timeline.failed")}
         </span>
         {statusCode !== undefined && (
           <span className="text-xs text-muted-foreground">
-            status: <span className="font-mono text-foreground">{statusCode}</span>
+            {t("timeline.status")} <span className="font-mono text-foreground">{statusCode}</span>
           </span>
         )}
       </div>
@@ -1100,14 +1132,16 @@ function CompactionCompleteCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function SubagentDeselectedCard() {
+  const t = useT();
   return (
     <div className="text-xs text-muted-foreground">
-      Active subagent context was cleared and focus returned to the main agent.
+      {t("timeline.subagentDeselected")}
     </div>
   );
 }
 
 function AssistantTurnCard({ data, type }: { data: Record<string, unknown>; type: "assistant.turn_start" | "assistant.turn_end" }) {
+  const t = useT();
   const model = data.model as string | undefined;
   const turnId = data.turnId as number | string | undefined;
   const interactionId = data.interactionId as string | undefined;
@@ -1120,11 +1154,11 @@ function AssistantTurnCard({ data, type }: { data: Record<string, unknown>; type
             ? "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-300 dark:border-emerald-800"
             : "bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-900/60 dark:text-slate-300 dark:border-slate-700"
         }`}>
-          {type === "assistant.turn_start" ? "turn started" : "turn finished"}
+          {type === "assistant.turn_start" ? t("timeline.turnStarted") : t("timeline.turnFinished")}
         </span>
         {turnId !== undefined && (
           <span className="text-xs text-muted-foreground">
-            turn: <span className="font-mono text-foreground">{String(turnId)}</span>
+            {t("timeline.turnField")} <span className="font-mono text-foreground">{String(turnId)}</span>
           </span>
         )}
         {model && (
@@ -1143,6 +1177,7 @@ function AssistantTurnCard({ data, type }: { data: Record<string, unknown>; type
 }
 
 function ThinkingCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const content = (data.content as string) || "";
   const charLength = (data.charLength as number) ?? content.length;
   const [expanded, setExpanded] = useState(false);
@@ -1152,7 +1187,7 @@ function ThinkingCard({ data }: { data: Record<string, unknown> }) {
   if (!content) {
     return (
       <p className="text-xs text-muted-foreground">
-        Reasoning was recorded but its content is encrypted in the transcript.
+        {t("timeline.encrypted")}
       </p>
     );
   }
@@ -1160,7 +1195,7 @@ function ThinkingCard({ data }: { data: Record<string, unknown> }) {
   return (
     <div className="space-y-1.5">
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-        Reasoning · {charLength.toLocaleString()} chars
+        {t("timeline.reasoningChars", { count: charLength })}
       </p>
       <div className="text-sm italic leading-relaxed text-muted-foreground whitespace-pre-wrap">
         {expanded ? content : preview}
@@ -1173,7 +1208,7 @@ function ThinkingCard({ data }: { data: Record<string, unknown> }) {
           onClick={() => setExpanded(!expanded)}
           className="h-auto px-0 font-normal text-indigo-600 dark:text-indigo-400"
         >
-          {expanded ? "Show less" : `Show more (${charLength.toLocaleString()} chars)`}
+          {expanded ? t("timeline.showLess") : t("timeline.showMore", { count: charLength })}
         </Button>
       )}
     </div>
@@ -1181,7 +1216,8 @@ function ThinkingCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function ErrorCard({ data }: { data: Record<string, unknown> }) {
-  const message = (data.message as string) || "Error";
+  const t = useT();
+  const message = (data.message as string) || t("eventTypes.session_error");
   const detail = data.detail as string | undefined;
   return (
     <div className="space-y-1.5">
@@ -1195,6 +1231,7 @@ function ErrorCard({ data }: { data: Record<string, unknown> }) {
 
 /** Chip list that stays scannable when a delta adds a hundred tool names. */
 function NameChips({ items, label }: { items: string[]; label?: string }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   if (items.length === 0) return null;
   const visible = expanded ? items : items.slice(0, 12);
@@ -1223,7 +1260,7 @@ function NameChips({ items, label }: { items: string[]; label?: string }) {
             onClick={() => setExpanded(true)}
             className="text-[11px] font-normal text-muted-foreground"
           >
-            +{items.length - visible.length} more
+            {t("common.more", { count: items.length - visible.length })}
           </Button>
         )}
       </div>
@@ -1245,6 +1282,7 @@ function ExpandableText({
   mono?: boolean;
   accentCls?: string;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   if (!text) return null;
   const hasMore = text.length > limit;
@@ -1268,7 +1306,7 @@ function ExpandableText({
           onClick={() => setExpanded(!expanded)}
           className={cn("h-auto px-0 font-normal", accentCls)}
         >
-          {expanded ? "Show less" : `Show more (${total.toLocaleString()} chars)`}
+          {expanded ? t("timeline.showLess") : t("timeline.showMore", { count: total })}
         </Button>
       )}
     </div>
@@ -1276,6 +1314,7 @@ function ExpandableText({
 }
 
 function AttachmentCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const attachmentType = (data.attachmentType as string) || "attachment";
   const label = (data.label as string) || attachmentType;
   const subject = data.subject as string | undefined;
@@ -1295,7 +1334,7 @@ function AttachmentCard({ data }: { data: Record<string, unknown> }) {
         </span>
         {charLength > 0 && (
           <span className="text-xs text-muted-foreground">
-            ~{Math.round(charLength / 4).toLocaleString()} tokens
+            {t("timeline.approxTokens", { count: Math.round(charLength / 4) })}
           </span>
         )}
       </div>
@@ -1316,6 +1355,7 @@ function AttachmentCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function PatchAppliedCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const success = data.success as boolean | undefined;
   const changes = (data.changes as { file: string; type: string }[]) || [];
   const stdout = (data.stdout as string) || "";
@@ -1330,10 +1370,10 @@ function PatchAppliedCard({ data }: { data: Record<string, unknown> }) {
               : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-400"
           }`}
         >
-          {success === false ? "failed" : "applied"}
+          {success === false ? t("timeline.failed") : t("timeline.applied")}
         </span>
         <span className="text-xs text-muted-foreground">
-          {changes.length} file{changes.length === 1 ? "" : "s"}
+          {t("edits.files", { count: changes.length })}
         </span>
       </div>
       {changes.length > 0 && (
@@ -1360,6 +1400,7 @@ function PatchAppliedCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function WebSearchCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const query = (data.query as string) || "";
   const resultCount = data.resultCount as number | undefined;
   return (
@@ -1367,7 +1408,7 @@ function WebSearchCard({ data }: { data: Record<string, unknown> }) {
       <p className="text-sm text-foreground">{query}</p>
       {resultCount !== undefined && (
         <p className="text-xs text-muted-foreground">
-          {resultCount} result{resultCount === 1 ? "" : "s"} returned
+          {t("timeline.resultsReturned", { count: resultCount })}
         </p>
       )}
     </div>
@@ -1396,10 +1437,11 @@ function FactGrid({ facts }: { facts: [string, unknown][] }) {
 }
 
 function ModeChangeCard({ data }: { data: Record<string, unknown> }) {
-  const mode = (data.mode as string) || "unknown";
+  const t = useT();
+  const mode = (data.mode as string) || t("timeline.unknown");
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Mode set to</span>
+      <span className="text-muted-foreground">{t("timeline.modeSetTo")}</span>
       <Badge variant="secondary" className="font-mono">
         {mode}
       </Badge>
@@ -1408,6 +1450,7 @@ function ModeChangeCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function TurnContextCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const sandbox = data.sandboxPolicy as Record<string, unknown> | undefined;
   const approval = data.approvalPolicy as Record<string, unknown> | undefined;
   const writableRoots = (sandbox?.writable_roots as string[]) ?? [];
@@ -1426,13 +1469,14 @@ function TurnContextCard({ data }: { data: Record<string, unknown> }) {
         ]}
       />
       {writableRoots.length > 0 && (
-        <NameChips items={writableRoots} label="writable roots" />
+        <NameChips items={writableRoots} label={t("timeline.writableRoots")} />
       )}
     </div>
   );
 }
 
 function WorldStateCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const sections = (data.sections as string[]) ?? [];
   const content = (data.content as string) || "";
   const charLength = (data.charLength as number) ?? 0;
@@ -1446,10 +1490,10 @@ function WorldStateCard({ data }: { data: Record<string, unknown> }) {
           ["date", data.currentDate],
           ["timezone", data.timezone],
           ["snapshot", data.full === true ? "full" : "delta"],
-          ["size", charLength ? `${charLength.toLocaleString()} chars` : undefined],
+          ["size", charLength ? t("checkpoints.chars", { count: charLength }) : undefined],
         ]}
       />
-      <NameChips items={sections} label="state sections" />
+      <NameChips items={sections} label={t("timeline.stateSections")} />
       <ExpandableText text={content} charLength={charLength} />
     </div>
   );
@@ -1484,44 +1528,52 @@ function SubagentCard({ data, type }: { data: Record<string, unknown>; type: str
 }
 
 function TurnAbortedCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const durationMs = data.durationMs as number | undefined;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <span className="rounded-sm bg-orange-100 px-1.5 py-0.5 font-medium text-orange-800 dark:bg-orange-900/60 dark:text-orange-300">
-        {(data.reason as string) ?? "aborted"}
+        {(data.reason as string) ?? t("timeline.aborted")}
       </span>
       {durationMs !== undefined && (
         <span className="text-muted-foreground">
-          after{" "}
-          <span className="font-mono text-foreground">
-            {(durationMs / 1000).toFixed(1)}s
-          </span>
+          {t.rich(
+            "timeline.after",
+            { b: (chunks) => <span className="font-mono text-foreground">{chunks}</span> },
+            { time: seconds(durationMs) },
+          )}
         </span>
       )}
       {data.turnId !== undefined && (
-        <span className="font-mono text-muted-foreground">turn {String(data.turnId)}</span>
+        <span className="font-mono text-muted-foreground">
+          {t("timeline.turnId", { id: String(data.turnId) })}
+        </span>
       )}
     </div>
   );
 }
 
 function RollbackCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const turns = data.turns as number | undefined;
   return (
     <p className="text-sm text-foreground">
-      Conversation rolled back{" "}
-      <span className="font-semibold">{turns ?? "?"}</span> turn
-      {turns === 1 ? "" : "s"}.
+      {t.rich(
+        "timeline.rolledBack",
+        { b: (chunks) => <span className="font-semibold">{chunks}</span> },
+        { count: turns ?? 0, turns: turns ?? "?" },
+      )}
     </p>
   );
 }
 
 function PlanChangedCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Plan</span>
+      <span className="text-muted-foreground">{t("timeline.labels.plan")}</span>
       <Badge variant="secondary" className="font-mono">
-        {(data.operation as string) ?? "changed"}
+        {(data.operation as string) ?? t("timeline.changed")}
       </Badge>
     </div>
   );
@@ -1546,6 +1598,7 @@ function NotificationCard({ data }: { data: Record<string, unknown> }) {
 }
 
 function GenericDataCard({ data }: { data: Record<string, unknown> }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const json = JSON.stringify(data, null, 2);
   const preview = json.slice(0, 300);
@@ -1557,7 +1610,7 @@ function GenericDataCard({ data }: { data: Record<string, unknown> }) {
       </pre>
       {hasMore && (
         <Button variant="link" size="xs" onClick={() => setExpanded(!expanded)} className="h-auto px-0 font-normal text-muted-foreground hover:text-foreground mt-1">
-          {expanded ? "Collapse" : "Expand"}
+          {expanded ? t("timeline.collapse") : t("timeline.expand")}
         </Button>
       )}
     </div>
@@ -1571,7 +1624,7 @@ function shorten(value: unknown, max = 150) {
 }
 
 /** The argument most worth showing for a tool call, mirroring the CLI's own bias. */
-function firstArg(input?: Record<string, unknown>) {
+function firstArg(t: Translator, input?: Record<string, unknown>) {
   if (!input) return "";
   for (const key of [
     "command",
@@ -1591,7 +1644,7 @@ function firstArg(input?: Record<string, unknown>) {
     if (input[key]) return `${key}: ${shorten(input[key], 90)}`;
   }
   const keys = Object.keys(input);
-  return keys.length ? shorten(JSON.stringify(input), 90) : "(no args)";
+  return keys.length ? shorten(JSON.stringify(input), 90) : t("timeline.noArgs");
 }
 
 /** Lines in a block of text; a trailing newline does not start another one. */
@@ -1634,9 +1687,9 @@ function lineDelta(input?: Record<string, unknown>): { added: number; removed: n
 }
 
 /** How much text a completed call returned, for a collapsed row; empty when none. */
-function resultSize(data: Record<string, unknown>): string {
+function resultSize(t: Translator, data: Record<string, unknown>): string {
   const chars = typeof data.resultChars === "number" ? data.resultChars : 0;
-  return chars > 0 ? `${formatCompactNumber(chars)} chars` : "";
+  return chars > 0 ? t("timeline.compactChars", { amount: formatCompactNumber(chars) }) : "";
 }
 
 /** A result this long is a real share of the context window. */
@@ -1646,67 +1699,79 @@ const LARGE_RESULT_CHARS = 20_000;
  * One-line description of an event, so the timeline can stay collapsed by
  * default and still be readable at a glance.
  */
-function eventSummary(event: AgentEvent): {
+function eventSummary(
+  t: Translator,
+  event: AgentEvent,
+): {
   label: string;
   preview: string;
   delta?: { added: number; removed: number } | null;
 } {
   const d = event.data;
-  const fallback = EVENT_CONFIG[event.type]?.label ?? splitEventType(event.type).subCategory;
+  const fallback = eventTypeLabel(t, event.type) ?? splitEventType(event.type).subCategory;
+  const label = (key: Parameters<typeof timelineLabel>[1]) => timelineLabel(t, key);
+  const chars = (count: number) => t("checkpoints.chars", { count });
 
   switch (event.type) {
     case "user.message":
-      return { label: "User", preview: shorten(d.content) };
+      return { label: label("user"), preview: shorten(d.content) };
     case "assistant.message": {
       const toolRequests = (d.toolRequests as { name?: string }[]) ?? [];
       const content = shorten(d.content);
-      if (content) return { label: "Assistant", preview: content };
+      if (content) return { label: label("assistant"), preview: content };
       if (toolRequests.length) {
         return {
-          label: "Assistant",
-          preview: `requests ${toolRequests.map((t) => t.name).filter(Boolean).join(", ")}`,
+          label: label("assistant"),
+          preview: t("timeline.requests", {
+            tools: toolRequests.map((r) => r.name).filter(Boolean).join(", "),
+          }),
         };
       }
-      return { label: "Assistant", preview: "(no text)" };
+      return { label: label("assistant"), preview: t("timeline.noText") };
     }
     case "assistant.turn_start":
     case "assistant.turn_end": {
       const turn = d.turnId;
       return {
-        label: event.type === "assistant.turn_start" ? "Turn start" : "Turn end",
-        preview: [turn !== undefined ? `turn ${turn}` : "", d.model as string]
+        label: event.type === "assistant.turn_start" ? label("turnStart") : label("turnEnd"),
+        preview: [turn !== undefined ? t("timeline.turnId", { id: String(turn) }) : "", d.model as string]
           .filter(Boolean)
           .join(" · "),
       };
     }
     case "tool.execution_start":
       return {
-        label: (d.toolName as string) || "Tool",
-        preview: firstArg(d.arguments as Record<string, unknown> | undefined),
+        label: (d.toolName as string) || label("tool"),
+        preview: firstArg(t, d.arguments as Record<string, unknown> | undefined),
         delta: lineDelta(d.arguments as Record<string, unknown> | undefined),
       };
     case "tool.execution_complete":
       return {
-        label: (d.toolName as string) || "Tool",
-        preview: [d.success === false ? "failed" : "completed", resultSize(d)].filter(Boolean).join(" · "),
+        label: (d.toolName as string) || label("tool"),
+        preview: [
+          d.success === false ? t("timeline.failed") : t("timeline.completed"),
+          resultSize(t, d),
+        ]
+          .filter(Boolean)
+          .join(" · "),
       };
     case "external_tool.requested":
     case "external_tool.completed":
       return {
-        label: (d.toolName as string) || "External tool",
+        label: (d.toolName as string) || label("externalTool"),
         preview:
           event.type === "external_tool.requested"
-            ? firstArg(d.arguments as Record<string, unknown> | undefined)
-            : ["completed", resultSize(d)].filter(Boolean).join(" · "),
+            ? firstArg(t, d.arguments as Record<string, unknown> | undefined)
+            : [t("timeline.completed"), resultSize(t, d)].filter(Boolean).join(" · "),
       };
     case "session.start":
     case "session.resume": {
       const ctx = d.context as Record<string, unknown> | undefined;
       return {
-        label: event.type === "session.start" ? "Session start" : "Session resume",
+        label: event.type === "session.start" ? label("sessionStart") : label("sessionResume"),
         preview: [
-          ctx?.branch ? `branch ${ctx.branch}` : "",
-          d.selectedModel ? `model ${d.selectedModel}` : "",
+          ctx?.branch ? t("timeline.branch", { branch: String(ctx.branch) }) : "",
+          d.selectedModel ? t("timeline.model", { model: String(d.selectedModel) }) : "",
         ]
           .filter(Boolean)
           .join(" · "),
@@ -1714,11 +1779,11 @@ function eventSummary(event: AgentEvent): {
     }
     case "session.shutdown":
       return {
-        label: "Shutdown",
+        label: label("shutdown"),
         preview: [
           d.shutdownType as string,
           d.totalPremiumRequests !== undefined
-            ? `${d.totalPremiumRequests} premium req`
+            ? t("timeline.premiumCount", { count: Number(d.totalPremiumRequests) })
             : "",
         ]
           .filter(Boolean)
@@ -1726,21 +1791,21 @@ function eventSummary(event: AgentEvent): {
       };
     case "session.auto_mode_resolved":
       return {
-        label: "Auto mode",
+        label: label("autoMode"),
         preview: [
           d.chosenModel as string,
-          d.predictedLabel ? `label ${d.predictedLabel}` : "",
+          d.predictedLabel ? t("timeline.labelValue", { label: String(d.predictedLabel) }) : "",
         ]
           .filter(Boolean)
           .join(" · "),
       };
     case "session.binary_asset":
       return {
-        label: "Binary asset",
+        label: label("binaryAsset"),
         preview: [
           d.mimeType as string,
           typeof d.byteLength === "number"
-            ? `${(d.byteLength / 1024).toFixed(0)} KB`
+            ? `${formatNumber(Math.round(d.byteLength / 1024))} KB`
             : "",
         ]
           .filter(Boolean)
@@ -1750,35 +1815,43 @@ function eventSummary(event: AgentEvent): {
       const usage = d.usage as Record<string, number> | undefined;
       if (usage) {
         return {
-          label: "Usage checkpoint",
-          preview: `in ${formatCompactNumber(usage.inputTokens ?? 0)} · out ${formatCompactNumber(usage.outputTokens ?? 0)}`,
+          label: label("usageCheckpoint"),
+          preview: t("timeline.inOut", {
+            input: formatCompactNumber(usage.inputTokens ?? 0),
+            output: formatCompactNumber(usage.outputTokens ?? 0),
+          }),
         };
       }
       return {
-        label: "Usage checkpoint",
+        label: label("usageCheckpoint"),
         preview:
           d.totalPremiumRequests !== undefined
-            ? `${d.totalPremiumRequests} premium req`
-            : "usage snapshot",
+            ? t("timeline.premiumCount", { count: Number(d.totalPremiumRequests) })
+            : t("timeline.usageSnapshot"),
       };
     }
     case "session.model_change":
       return {
-        label: "Model change",
-        preview: `${d.previousModel ?? "unknown"} → ${d.newModel ?? "unknown"}`,
+        label: label("modelChange"),
+        preview: `${d.previousModel ?? t("timeline.unknown")} → ${d.newModel ?? t("timeline.unknown")}`,
       };
     case "session.compaction_start":
-      return { label: "Compaction", preview: `started · ${d.model ?? ""}`.trim() };
+      return {
+        label: label("compaction"),
+        preview: `${t("timeline.started")} · ${d.model ?? ""}`.trim(),
+      };
     case "session.compaction_complete":
       return {
-        label: "Compaction",
-        preview: d.success ? "completed" : `failed${d.error ? `: ${shorten(d.error, 80)}` : ""}`,
+        label: label("compaction"),
+        preview: d.success
+          ? t("timeline.completed")
+          : `${t("timeline.failed")}${d.error ? `: ${shorten(d.error, 80)}` : ""}`,
       };
     case "system.message": {
-      const chars = (d.charLength as number) || String(d.content ?? "").length;
+      const count = (d.charLength as number) || String(d.content ?? "").length;
       return {
-        label: "System",
-        preview: `${d.role ?? "system"} · ${chars.toLocaleString()} chars`,
+        label: label("system"),
+        preview: `${d.role ?? "system"} · ${chars(count)}`,
       };
     }
     case "hook.start":
@@ -1786,19 +1859,19 @@ function eventSummary(event: AgentEvent): {
       const input = d.input as Record<string, unknown> | undefined;
       if (event.type === "hook.end") {
         return {
-          label: (d.hookType as string) || "Hook",
-          preview: d.success === false ? "failed" : "success",
+          label: (d.hookType as string) || label("hook"),
+          preview: d.success === false ? t("timeline.failed") : t("timeline.success"),
         };
       }
       return {
-        label: (d.hookType as string) || "Hook",
-        preview: shorten(input?.prompt, 90) || "started",
+        label: (d.hookType as string) || label("hook"),
+        preview: shorten(input?.prompt, 90) || t("timeline.started"),
       };
     }
     case "permission.requested": {
       const pr = d.permissionRequest as Record<string, unknown> | undefined;
       return {
-        label: "Permission",
+        label: label("permission"),
         preview: [pr?.kind as string, shorten(pr?.intention, 90)]
           .filter(Boolean)
           .join(" · "),
@@ -1806,28 +1879,28 @@ function eventSummary(event: AgentEvent): {
     }
     case "permission.completed": {
       const res = d.result as Record<string, unknown> | undefined;
-      return { label: "Permission", preview: (res?.kind as string) ?? "resolved" };
+      return { label: label("permission"), preview: (res?.kind as string) ?? t("timeline.resolved") };
     }
     case "subagent.deselected":
-      return { label: "Subagent", preview: "focus returned to main agent" };
+      return { label: label("subagent"), preview: t("timeline.focusReturned") };
     case "subagent.activity":
       return {
-        label: "Subagent",
+        label: label("subagent"),
         preview: [d.kind as string, d.agentPath as string].filter(Boolean).join(" · "),
       };
     case "subagent.session_start":
       return {
-        label: "Subagent start",
+        label: label("subagentStart"),
         preview: [d.agentNickname as string, d.agentPath as string, d.cwd as string]
           .filter(Boolean)
           .join(" · "),
       };
     case "session.plan_changed":
-      return { label: "Plan", preview: String(d.operation ?? "changed") };
+      return { label: label("plan"), preview: String(d.operation ?? t("timeline.changed")) };
     case "system.notification": {
       const kind = d.kind as Record<string, unknown> | undefined;
       return {
-        label: "Notification",
+        label: label("notification"),
         preview:
           [kind?.type as string, kind?.description as string]
             .filter(Boolean)
@@ -1836,24 +1909,26 @@ function eventSummary(event: AgentEvent): {
     }
     case "assistant.thinking": {
       const content = shorten(d.content);
-      const chars = (d.charLength as number) ?? 0;
+      const count = (d.charLength as number) ?? 0;
       return {
-        label: "Thinking",
-        preview: content || (chars ? `${chars.toLocaleString()} chars (encrypted)` : "reasoning"),
+        label: label("thinking"),
+        preview:
+          content ||
+          (count ? t("timeline.encryptedChars", { count }) : t("timeline.reasoning")),
       };
     }
     case "session.error":
-      return { label: "Error", preview: shorten(d.detail || d.message, 90) };
+      return { label: label("error"), preview: shorten(d.detail || d.message, 90) };
     case "context.attachment": {
-      const chars = (d.charLength as number) ?? 0;
+      const count = (d.charLength as number) ?? 0;
       const itemCount = (d.itemCount as number) ?? 0;
       const detail =
         (d.subject as string) ||
-        (itemCount ? `${itemCount} ${d.itemsLabel ?? "items"}` : "") ||
+        (itemCount ? `${formatNumber(itemCount)} ${d.itemsLabel ?? t("timeline.items")}` : "") ||
         shorten(d.content, 70);
       return {
-        label: (d.label as string) || "Attachment",
-        preview: [detail, chars ? `${chars.toLocaleString()} chars` : ""]
+        label: (d.label as string) || label("attachment"),
+        preview: [detail, count ? chars(count) : ""]
           .filter(Boolean)
           .join(" · "),
       };
@@ -1862,48 +1937,93 @@ function eventSummary(event: AgentEvent): {
       const changes = (d.changes as { file: string }[]) ?? [];
       const first = changes[0]?.file.split("/").pop();
       return {
-        label: "Patch",
+        label: label("patch"),
         preview:
           changes.length > 1
-            ? `${changes.length} files · ${first}, …`
-            : first ?? (d.success === false ? "failed" : "applied"),
+            ? `${t("edits.files", { count: changes.length })} · ${first}, …`
+            : first ?? (d.success === false ? t("timeline.failed") : t("timeline.applied")),
       };
     }
     case "web.search":
-      return { label: "Web search", preview: shorten(d.query, 90) };
+      return { label: label("webSearch"), preview: shorten(d.query, 90) };
     case "session.turn_context":
       return {
-        label: "Turn context",
-        preview: [d.model as string, d.effort ? `effort ${d.effort}` : ""]
+        label: label("turnContext"),
+        preview: [d.model as string, d.effort ? t("timeline.effortValue", { effort: String(d.effort) }) : ""]
           .filter(Boolean)
           .join(" · "),
       };
     case "session.world_state":
       return {
-        label: "World state",
+        label: label("worldState"),
         preview: (() => {
           const sections = ((d.sections as string[]) ?? []).length;
           return [
-            d.full === true ? "full snapshot" : "delta",
-            `${sections} section${sections === 1 ? "" : "s"}`,
-            `${((d.charLength as number) ?? 0).toLocaleString()} chars`,
+            d.full === true ? t("timeline.fullSnapshot") : t("timeline.delta"),
+            t("timeline.sections", { count: sections }),
+            chars((d.charLength as number) ?? 0),
           ].join(" · ");
         })(),
       };
     case "session.mode_change":
-      return { label: "Mode", preview: String(d.mode ?? "changed") };
+      return { label: label("mode"), preview: String(d.mode ?? t("timeline.changed")) };
     case "session.turn_aborted":
       return {
-        label: "Turn aborted",
-        preview: [d.reason as string, d.durationMs ? `${Math.round((d.durationMs as number) / 1000)}s` : ""]
+        label: label("turnAborted"),
+        preview: [
+          d.reason as string,
+          d.durationMs ? `${formatNumber(Math.round((d.durationMs as number) / 1000))}s` : "",
+        ]
           .filter(Boolean)
           .join(" · "),
       };
     case "session.rollback":
-      return { label: "Rollback", preview: `${d.turns ?? "?"} turn(s)` };
+      return {
+        label: label("rollback"),
+        preview: t("timeline.rollbackTurns", { count: Number(d.turns ?? 0), turns: String(d.turns ?? "?") }),
+      };
     default:
       return { label: fallback, preview: shorten(JSON.stringify(d), 90) };
   }
+}
+
+/** The short names a collapsed row leads with. */
+function timelineLabel(
+  t: Translator,
+  key:
+    | "user"
+    | "assistant"
+    | "turnStart"
+    | "turnEnd"
+    | "tool"
+    | "externalTool"
+    | "sessionStart"
+    | "sessionResume"
+    | "shutdown"
+    | "autoMode"
+    | "binaryAsset"
+    | "usageCheckpoint"
+    | "modelChange"
+    | "compaction"
+    | "system"
+    | "hook"
+    | "permission"
+    | "subagent"
+    | "subagentStart"
+    | "plan"
+    | "notification"
+    | "thinking"
+    | "error"
+    | "attachment"
+    | "patch"
+    | "webSearch"
+    | "turnContext"
+    | "worldState"
+    | "mode"
+    | "turnAborted"
+    | "rollback",
+) {
+  return t(`timeline.labels.${key}`);
 }
 
 /** Token counts to show inline on a collapsed row, if the event reports any. */
@@ -1941,6 +2061,7 @@ const ORIGINAL_PREVIEW_CHARS = 200_000;
  * event above is what the app made of them: capped, and with images left out.
  */
 function OriginalRecord({ sources }: { sources: string[] }) {
+  const t = useT();
   const params = useParams<{ provider?: string; id?: string }>();
   const [state, setState] = useState<{ status: "idle" | "loading" | "failed" } | { status: "loaded"; text: string }>({
     status: "idle",
@@ -1963,13 +2084,15 @@ function OriginalRecord({ sources }: { sources: string[] }) {
   return (
     <div className="mt-2.5">
       <div className="mb-1.5 flex items-center gap-2">
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Original record</p>
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          {t("timeline.originalRecord")}
+        </p>
         {state.status === "loaded" ? (
           <>
             <span className="text-[11px] tabular-nums text-muted-foreground">
-              {state.text.length.toLocaleString()} chars
+              {t("checkpoints.chars", { count: state.text.length })}
             </span>
-            <CopyButton value={state.text} label="Copy the original record" className="-my-1" />
+            <CopyButton value={state.text} label={t("timeline.copyOriginal")} className="-my-1" />
           </>
         ) : (
           <Button
@@ -1979,11 +2102,11 @@ function OriginalRecord({ sources }: { sources: string[] }) {
             disabled={state.status === "loading"}
             className="h-auto px-0 font-normal"
           >
-            {state.status === "loading" ? "Loading…" : "Load from transcript"}
+            {state.status === "loading" ? t("common.loading") : t("timeline.loadFromTranscript")}
           </Button>
         )}
         {state.status === "failed" && (
-          <span className="text-[11px] text-destructive">Could not read the record.</span>
+          <span className="text-[11px] text-destructive">{t("eventAbout.readFailed")}</span>
         )}
       </div>
       {state.status === "loaded" && (
@@ -1993,7 +2116,7 @@ function OriginalRecord({ sources }: { sources: string[] }) {
           </pre>
           {state.text.length > ORIGINAL_PREVIEW_CHARS && (
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Showing the first {ORIGINAL_PREVIEW_CHARS.toLocaleString()} chars; Copy takes the whole record.
+              {t("timeline.previewLimit", { count: ORIGINAL_PREVIEW_CHARS })}
             </p>
           )}
         </>
@@ -2035,6 +2158,7 @@ function EventCard({
   expandAll: { nonce: number; mode: "open" | "closed" } | null;
   clientVersion?: string;
 }) {
+  const t = useT();
   const cfg = EVENT_CONFIG[event.type] || DEFAULT_CONFIG;
   const gap = prevTimestamp ? durationMs(prevTimestamp, event.timestamp) : null;
   const [showRaw, setShowRaw] = useState(false);
@@ -2053,7 +2177,7 @@ function EventCard({
   const setOpen = (next: boolean) =>
     setOpenState({ nonce: expandAll?.nonce ?? 0, open: next });
 
-  const summary = eventSummary(event);
+  const summary = eventSummary(t, event);
   const tokenBadge = eventTokenBadge(event);
   const costUSD = typeof event.data.costUSD === "number" ? event.data.costUSD : null;
   const typeParts = splitEventType(event.type);
@@ -2104,9 +2228,11 @@ function EventCard({
           <div className="text-xs text-muted-foreground space-y-1">
             {ctx && (
               <div>
-                Branch: <span className="text-foreground">{ctx.branch as string}</span>
+                {t("timeline.branchField")}{" "}
+                <span className="text-foreground">{ctx.branch as string}</span>
                 {" · "}
-                Model: <span className="text-foreground">{event.data.selectedModel as string}</span>
+                {t("timeline.modelField")}{" "}
+                <span className="text-foreground">{event.data.selectedModel as string}</span>
               </div>
             )}
           </div>
@@ -2254,7 +2380,7 @@ function EventCard({
           {summary.delta && (
             <span
               className="shrink-0 font-mono text-[11px] tabular-nums"
-              title="Lines written and replaced by this call"
+              title={t("timeline.linesHint")}
             >
               <span className="text-emerald-700 dark:text-emerald-400">+{summary.delta.added}</span>
               {summary.delta.removed > 0 && (
@@ -2263,7 +2389,7 @@ function EventCard({
             </span>
           )}
 
-          {merged && result && resultSize(result.data) && (
+          {merged && result && resultSize(t, result.data) && (
             <span
               className={cn(
                 "hidden shrink-0 font-mono text-[11px] tabular-nums md:inline",
@@ -2271,9 +2397,9 @@ function EventCard({
                   ? "text-amber-700 dark:text-amber-400"
                   : "text-muted-foreground",
               )}
-              title={`The result is ${sizeLabel(result.data.resultChars as number)}`}
+              title={t("timeline.resultIs", { size: sizeLabel(t, result.data.resultChars as number) })}
             >
-              {resultSize(result.data)}
+              {resultSize(t, result.data)}
             </span>
           )}
 
@@ -2287,37 +2413,39 @@ function EventCard({
               )}
               title={
                 !result
-                  ? "No result was recorded for this call"
+                  ? t("timeline.noResultHint")
                   : failed
-                    ? "The call failed"
-                    : "Time from the call to its result"
+                    ? t("timeline.callFailed")
+                    : t("timeline.tookHint")
               }
             >
               {!result
-                ? "no result"
+                ? t("timeline.noResult")
                 : failed
-                  ? "failed"
+                  ? t("timeline.failed")
                   : took !== null && took >= 1000
-                    ? `${(took / 1000).toFixed(1)}s`
-                    : "done"}
+                    ? seconds(took)
+                    : t("timeline.done")}
             </span>
           )}
 
           {tokenBadge && (
             <span
               className="hidden shrink-0 items-center gap-1.5 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline-flex"
-              title={`${tokenBadge.input.toLocaleString()} input tokens · ${tokenBadge.output.toLocaleString()} output tokens`}
+              title={`${t("sessionCard.inputTokens", { count: tokenBadge.input })} · ${t("sessionCard.outputTokens", { count: tokenBadge.output })}`}
             >
               {tokenBadge.input > 0 && (
                 <span className="inline-flex items-center gap-0.5">
                   <InputTokensIcon className="size-3" aria-hidden />
-                  <span className="opacity-70">in</span> {formatCompactNumber(tokenBadge.input)}
+                  <span className="opacity-70">{t("sessionCard.in")}</span>{" "}
+                  {formatCompactNumber(tokenBadge.input)}
                 </span>
               )}
               {tokenBadge.output > 0 && (
                 <span className="inline-flex items-center gap-0.5">
                   <OutputTokensIcon className="size-3" aria-hidden />
-                  <span className="opacity-70">out</span> {formatCompactNumber(tokenBadge.output)}
+                  <span className="opacity-70">{t("sessionCard.out")}</span>{" "}
+                  {formatCompactNumber(tokenBadge.output)}
                 </span>
               )}
             </span>
@@ -2333,8 +2461,8 @@ function EventCard({
               )}
               title={
                 event.data.inherited === true
-                  ? "Estimated cost of this request in the forked session it was copied from; not part of this session's cost"
-                  : "Estimated cost of this request at API list prices"
+                  ? t("timeline.inheritedCostHint")
+                  : t("timeline.costHint")
               }
             >
               {formatCost(costUSD)}
@@ -2344,7 +2472,7 @@ function EventCard({
           {runningUSD !== undefined && (
             <span
               className="hidden shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground md:inline"
-              title="Estimated cost of the session up to and including this request"
+              title={t("timeline.runningHint")}
             >
               Σ {formatCost(runningUSD)}
             </span>
@@ -2353,18 +2481,21 @@ function EventCard({
           {turn && turn.costUSD > 0 && (
             <span
               className="hidden shrink-0 font-mono text-[11px] tabular-nums text-emerald-700 dark:text-emerald-400 sm:inline"
-              title={`Estimated cost of the ${turn.requests} ${turn.requests === 1 ? "request" : "requests"} made to answer this prompt; ${formatCost(turn.totalUSD)} for the session by the end of the turn`}
+              title={t("timeline.turnCostHint", {
+                count: turn.requests,
+                total: formatCost(turn.totalUSD),
+              })}
             >
-              turn {formatCost(turn.costUSD)}
+              {t("timeline.turnCost", { amount: formatCost(turn.costUSD) })}
             </span>
           )}
 
           {gap !== null && gap > 5000 && (
             <span
               className="hidden shrink-0 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-muted-foreground sm:inline"
-              title="Gap since the previous event"
+              title={t("timeline.gapHint")}
             >
-              +{gap > 60000 ? `${(gap / 60000).toFixed(1)}m` : `${(gap / 1000).toFixed(1)}s`}
+              +{gap > 60000 ? `${fixed(gap / 60000, 1)}m` : seconds(gap)}
             </span>
           )}
 
@@ -2383,7 +2514,7 @@ function EventCard({
               <div className="px-3 py-2.5">{content}</div>
             ) : (
               <p className="px-3 py-2.5 text-xs text-muted-foreground">
-                No structured detail for this event — see the raw event below.
+                {t("timeline.noDetail")}
               </p>
             )}
 
@@ -2401,7 +2532,7 @@ function EventCard({
                 className="text-muted-foreground"
               >
                 <Info className="size-3.5" aria-hidden />
-                About
+                {t("timeline.about")}
               </Button>
               <Button
                 variant="ghost"
@@ -2411,7 +2542,7 @@ function EventCard({
                 className="text-muted-foreground"
               >
                 <Braces className="size-3.5" aria-hidden />
-                {showRaw ? "Hide raw" : "Raw"}
+                {showRaw ? t("timeline.hideRaw") : t("timeline.raw")}
               </Button>
               <CopyButton
                 value={() => {
@@ -2420,13 +2551,13 @@ function EventCard({
                   url.searchParams.set("event", event.id);
                   return url.toString();
                 }}
-                label="Copy a link to this event"
+                label={t("timeline.copyLink")}
                 icon={Link2}
               >
-                Link
+                {t("timeline.link")}
               </CopyButton>
-              <CopyButton value={rawJson} label="Copy raw JSON">
-                Copy
+              <CopyButton value={rawJson} label={t("timeline.copyRaw")}>
+                {t("common.copy")}
               </CopyButton>
             </div>
 
@@ -2436,7 +2567,7 @@ function EventCard({
             {showRaw && (
               <div className="border-t border-border px-3 py-2.5">
                 <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Raw event
+                  {t("timeline.rawEvent")}
                 </p>
                 <pre className="max-h-64 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted p-2.5 font-mono text-xs leading-relaxed text-foreground [overflow-wrap:anywhere]">
                   {rawJson}
@@ -2511,6 +2642,7 @@ export function EventsTimeline({
   running = false,
   clientVersion,
 }: Props) {
+  const t = useT();
   // A fork numbers its copy of an event differently from its parent, so a link
   // followed from one session into the other falls back to the transcript
   // record the event was read from, the part of the id before the last colon.
@@ -2831,6 +2963,8 @@ export function EventsTimeline({
     k: () => focusEventRow(-1),
   });
 
+  // The day labels are formatted here, so a language switch rebuilds them.
+  const locale = useLocale();
   const groups = useMemo(() => {
     // A run of events from one day and one turn; `start` is its offset in `shown`.
     const g: {
@@ -2843,14 +2977,14 @@ export function EventsTimeline({
       events: AgentEvent[];
     }[] = [];
     shown.forEach((ev, start) => {
-      const d = formatDate(ev.timestamp);
+      const d = formatDate(ev.timestamp, locale);
       const turn = cost.turnOf.get(ev.id);
       const inherited = ev.data.inherited === true;
       const last = g[g.length - 1];
       if (!last || last.date !== d || last.turn !== turn || last.inherited !== inherited)
         g.push({
           date: d,
-          fullDate: formatFullDate(ev.timestamp),
+          fullDate: formatFullDate(ev.timestamp, locale),
           turn,
           inherited,
           start,
@@ -2859,7 +2993,7 @@ export function EventsTimeline({
       else last.events.push(ev);
     });
     return g;
-  }, [shown, cost]);
+  }, [shown, cost, locale]);
 
   // Everything set inside the filter panel, shown on its button.
   const panelFilterCount =
@@ -2884,8 +3018,10 @@ export function EventsTimeline({
   const loadMore = hiddenCount > 0 && (
     <div className="flex flex-col items-center gap-2 py-6">
       <p className="text-xs text-muted-foreground">
-        Showing {tail ? "the last " : ""}
-        {shown.length.toLocaleString()} of {filtered.length.toLocaleString()} matching events
+        {t(tail ? "timeline.showingLast" : "timeline.showing", {
+          shown: shown.length,
+          count: filtered.length,
+        })}
       </p>
       <div className="flex gap-2">
         <Button
@@ -2893,7 +3029,9 @@ export function EventsTimeline({
           size="sm"
           onClick={() => showMore(visibleCount + PAGE_SIZE)}
         >
-          Load {Math.min(PAGE_SIZE, hiddenCount)} {tail ? "earlier" : "more"}
+          {t(tail ? "timeline.loadEarlier" : "timeline.loadMore", {
+            count: Math.min(PAGE_SIZE, hiddenCount),
+          })}
         </Button>
         <Button
           variant="ghost"
@@ -2901,7 +3039,7 @@ export function EventsTimeline({
           onClick={() => showMore(filtered.length)}
           className="text-muted-foreground"
         >
-          Show all
+          {t("timeline.showAll")}
         </Button>
       </div>
     </div>
@@ -2924,21 +3062,17 @@ export function EventsTimeline({
             value={search}
             onChange={setSearch}
             shortcut
-            placeholder="Search events…"
-            aria-label="Search events"
+            placeholder={t("timeline.searchPlaceholder")}
+            aria-label={t("timeline.search")}
             className="w-full sm:w-56"
           />
 
           <Segmented
-            label="Transcript view"
+            label={t("timeline.view")}
             size="default"
             value={mode}
             onChange={setMode}
-            options={[
-              { value: "normal", label: "Normal" },
-              { value: "compact", label: "Compact" },
-              { value: "focused", label: "Focused" },
-            ]}
+            options={VIEW_MODES.map((value) => ({ value, label: t(`timeline.modes.${value}`) }))}
           />
 
           <Button
@@ -2952,7 +3086,7 @@ export function EventsTimeline({
             )}
           >
             <SlidersHorizontal className="size-3.5" aria-hidden />
-            Filters
+            {t("timeline.filters")}
             {panelFilterCount > 0 && (
               <span className="rounded-sm bg-foreground/10 px-1 tabular-nums">
                 {panelFilterCount}
@@ -2970,7 +3104,7 @@ export function EventsTimeline({
           {activeFilterCount > 0 && (
             <Button variant="ghost" onClick={clearFilters} className="text-muted-foreground">
               <X className="size-3.5" aria-hidden />
-              Clear
+              {t("timeline.clear")}
             </Button>
           )}
 
@@ -2980,12 +3114,8 @@ export function EventsTimeline({
                 active={live}
                 onClick={() => onLiveChange(!live)}
                 icon={Radio}
-                label="Follow live"
-                title={
-                  running
-                    ? "Follow the session: keep the newest events in view (l)"
-                    : "Watch for new events and keep the newest in view (l)"
-                }
+                label={t("timeline.followLive")}
+                title={running ? t("timeline.followRunning") : t("timeline.followIdle")}
                 pulse={running}
                 iconOnly
               />
@@ -2997,7 +3127,9 @@ export function EventsTimeline({
                     variant="outline"
                     size="icon"
                     onClick={() => setOrder(order === "asc" ? "desc" : "asc")}
-                    aria-label={order === "asc" ? "Show newest first" : "Show oldest first"}
+                    aria-label={
+                      order === "asc" ? t("timeline.showNewestFirst") : t("timeline.showOldestFirst")
+                    }
                     className="text-muted-foreground"
                   >
                     {order === "asc" ? (
@@ -3009,7 +3141,7 @@ export function EventsTimeline({
                 }
               />
               <TooltipContent>
-                {order === "asc" ? "Oldest first" : "Newest first"} (o)
+                {order === "asc" ? t("timeline.oldestFirst") : t("timeline.newestFirst")} (o)
               </TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -3021,14 +3153,14 @@ export function EventsTimeline({
                     onClick={() =>
                       setExpandAll({ nonce: Date.now(), mode: "open" })
                     }
-                    aria-label="Expand all events"
+                    aria-label={t("timeline.expandAllEvents")}
                     className="text-muted-foreground"
                   >
                     <ChevronsUpDown className="size-3.5" aria-hidden />
                   </Button>
                 }
               />
-              <TooltipContent>Expand all</TooltipContent>
+              <TooltipContent>{t("requests.expandAll")}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger
@@ -3039,19 +3171,19 @@ export function EventsTimeline({
                     onClick={() =>
                       setExpandAll({ nonce: Date.now(), mode: "closed" })
                     }
-                    aria-label="Collapse all events"
+                    aria-label={t("timeline.collapseAllEvents")}
                     className="text-muted-foreground"
                   >
                     <ChevronsDownUp className="size-3.5" aria-hidden />
                   </Button>
                 }
               />
-              <TooltipContent>Collapse all</TooltipContent>
+              <TooltipContent>{t("requests.collapseAll")}</TooltipContent>
             </Tooltip>
             <span className="ml-1 text-xs tabular-nums text-muted-foreground">
               {filtered.length === events.length
-                ? `${events.length} events`
-                : `${filtered.length} of ${events.length} events`}
+                ? t("timeline.eventCount", { count: events.length })
+                : t("timeline.eventCountFiltered", { shown: filtered.length, count: events.length })}
             </span>
           </div>
         </div>
@@ -3064,23 +3196,23 @@ export function EventsTimeline({
                   active={!showSystem}
                   onClick={() => setShowSystem(!showSystem)}
                   icon={Filter}
-                  label="Hide context"
-                  title="Hide system prompts, auto-attached context and world-state snapshots"
+                  label={t("timeline.hideContext")}
+                  title={t("timeline.hideContextHint")}
                 />
               )}
               <ToolbarToggle
                 active={onlyTokenEvents}
                 onClick={() => setOnlyTokenEvents(!onlyTokenEvents)}
                 icon={ListFilter}
-                label="Token events"
-                title="Show only events that report token usage"
+                label={t("timeline.tokenEvents")}
+                title={t("timeline.tokenEventsHint")}
               />
               <ToolbarToggle
                 active={onlyFailures}
                 onClick={() => setOnlyFailures(!onlyFailures)}
                 icon={CircleX}
-                label="Failures"
-                title="Show only tool calls that failed"
+                label={t("timeline.failures")}
+                title={t("timeline.failuresHint")}
               />
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
@@ -3119,7 +3251,7 @@ export function EventsTimeline({
             {activeCategories.length > 0 && subCategoryCounts.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Sub-type
+                  {t("timeline.subType")}
                 </span>
                 {subCategoryCounts.map(({ category, subCategory, count }) => {
                   const key = `${category}.${subCategory}`;
@@ -3182,10 +3314,10 @@ export function EventsTimeline({
                 className="pointer-events-auto rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground shadow-sm"
                 title={
                   group.inherited
-                    ? `${group.fullDate} · history copied from the forked session; its cost was billed there and is not part of this session`
+                    ? `${group.fullDate} · ${t("timeline.inheritedHint")}`
                     : group.turn === undefined
                       ? group.fullDate
-                      : `${group.fullDate} · prompt ${group.turn} and everything the agent did to answer it`
+                      : `${group.fullDate} · ${t("timeline.turnHint", { turn: group.turn })}`
                 }
               >
                 {group.date}
@@ -3194,7 +3326,7 @@ export function EventsTimeline({
                     <span className="mx-1.5 opacity-50" aria-hidden>
                       ·
                     </span>
-                    Inherited
+                    {t("cost.inherited")}
                     {forkPointHref && (
                       <>
                         <span className="mx-1.5 opacity-50" aria-hidden>
@@ -3202,10 +3334,10 @@ export function EventsTimeline({
                         </span>
                         <Link
                           href={forkPointHref}
-                          title="Open the session this one was forked from, at the last event it copied"
+                          title={t("timeline.forkPointHint")}
                           className="inline-flex items-center gap-0.5 text-foreground underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-ring"
                         >
-                          Open fork point
+                          {t("timeline.forkPoint")}
                           <ArrowUpRight className="size-3" aria-hidden />
                         </Link>
                       </>
@@ -3217,7 +3349,9 @@ export function EventsTimeline({
                     <span className="mx-1.5 opacity-50" aria-hidden>
                       ·
                     </span>
-                    <span className="text-foreground">Turn {group.turn}</span>
+                    <span className="text-foreground">
+                      {t("costByTurn.turn", { turn: group.turn })}
+                    </span>
                   </>
                 )}
               </span>
@@ -3232,7 +3366,7 @@ export function EventsTimeline({
                 <Fragment key={event.id}>
                   {opensGroup && (
                     <div className="border-l-2 border-border pb-1 pl-6 font-mono text-[11px] text-amber-700 dark:text-amber-400">
-                      parallel · {parallel.size} calls
+                      {t("timeline.parallel", { count: parallel.size })}
                     </div>
                   )}
                   <EventCard
@@ -3266,13 +3400,13 @@ export function EventsTimeline({
               <SearchX className="size-5" aria-hidden />
             </div>
             <p className="text-sm font-medium text-foreground">
-              No events match your filters
+              {t("timeline.noMatches")}
             </p>
             <p className="max-w-sm text-xs text-muted-foreground">
-              {events.length.toLocaleString()} events are recorded in this session.
+              {t("timeline.recorded", { count: events.length })}
             </p>
             <Button variant="outline" size="sm" onClick={clearFilters} className="mt-2">
-              Clear filters
+              {t("timeline.clearFilters")}
             </Button>
           </div>
         )}

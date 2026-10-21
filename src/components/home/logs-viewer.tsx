@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { SearchInput } from "@/components/common/search-input";
 import { Skeleton } from "@/components/common/skeleton";
 import { formatBytes, timeAgo } from "@/lib/format";
+import { useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 export interface LogFile {
@@ -48,6 +49,7 @@ export function LogsViewer({
   logs: LogFile[];
   loading: boolean;
 }) {
+  const t = useT();
   const [fileFilter, setFileFilter] = useState("");
   const [picked, setPicked] = useState<string | null>(null);
   // What has actually been fetched. Comparing it to `selected` derives the
@@ -130,8 +132,8 @@ export function LogsViewer({
     return (
       <EmptyState
         icon={FileText}
-        title="No log files"
-        description="Nothing has been written to ~/.copilot/logs yet."
+        title={t("logs.emptyTitle")}
+        description={t("logs.emptyDetail")}
       />
     );
   }
@@ -143,8 +145,8 @@ export function LogsViewer({
         <SearchInput
           value={fileFilter}
           onChange={setFileFilter}
-          placeholder="Filter files…"
-          aria-label="Filter log files"
+          placeholder={t("logs.filterFiles")}
+          aria-label={t("logs.filterFilesLabel")}
         />
         <ScrollArea className="min-h-0 flex-1 rounded-xl border border-border">
           <div className="space-y-1 p-2">
@@ -178,7 +180,7 @@ export function LogsViewer({
             })}
             {visibleFiles.length === 0 && (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-                No files match “{fileFilter}”
+                {t("logs.noFiles", { query: fileFilter })}
               </p>
             )}
           </div>
@@ -196,7 +198,7 @@ export function LogsViewer({
               {errorCount > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-sm border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
                   <AlertCircle className="size-3" aria-hidden />
-                  {errorCount} error{errorCount === 1 ? "" : "s"}
+                  {t("logs.errors", { count: errorCount })}
                 </span>
               )}
               {/* Every control here is the `sm` size, so the row shares one height. */}
@@ -205,8 +207,8 @@ export function LogsViewer({
                   value={lineFilter}
                   onChange={setLineFilter}
                   size="sm"
-                  placeholder="Filter lines…"
-                  aria-label="Filter log lines"
+                  placeholder={t("logs.filterLines")}
+                  aria-label={t("logs.filterLinesLabel")}
                   className="min-w-0 flex-1 sm:w-44 sm:flex-none"
                 />
                 <Tooltip>
@@ -220,11 +222,11 @@ export function LogsViewer({
                         className="bg-background text-muted-foreground aria-pressed:border-destructive/40 aria-pressed:bg-destructive/10 aria-pressed:text-destructive"
                       >
                         <AlertCircle aria-hidden />
-                        Problems
+                        {t("logs.problems")}
                       </Toggle>
                     }
                   />
-                  <TooltipContent>Show only errors and warnings</TooltipContent>
+                  <TooltipContent>{t("logs.problemsHint")}</TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger
@@ -234,22 +236,22 @@ export function LogsViewer({
                         size="sm"
                         pressed={wrap}
                         onPressedChange={setWrap}
-                        aria-label="Wrap long lines"
+                        aria-label={t("logs.wrap")}
                         className="bg-background text-muted-foreground aria-pressed:text-foreground"
                       >
                         <WrapText aria-hidden />
                       </Toggle>
                     }
                   />
-                  <TooltipContent>Wrap long lines</TooltipContent>
+                  <TooltipContent>{t("logs.wrap")}</TooltipContent>
                 </Tooltip>
-                <CopyButton value={content} label="Copy log" size="sm" />
+                <CopyButton value={content} label={t("logs.copy")} size="sm" />
               </div>
             </div>
 
             {(lineFilter || errorsOnly) && (
               <div className="border-b border-border bg-background px-3 py-1 text-[11px] text-muted-foreground">
-                {lines.length.toLocaleString()} of {allLines.length.toLocaleString()} lines
+                {t("logs.linesShown", { shown: lines.length, count: allLines.length })}
               </div>
             )}
 
@@ -257,11 +259,11 @@ export function LogsViewer({
               {loadingLog ? (
                 <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
                   <Loader2 className="size-4 animate-spin" aria-hidden />
-                  Loading…
+                  {t("common.loading")}
                 </div>
               ) : lines.length === 0 ? (
                 <p className="p-6 text-center text-sm text-muted-foreground">
-                  No lines match the current filter.
+                  {t("logs.noLines")}
                 </p>
               ) : (
                 <div className="p-3 font-mono text-xs">
@@ -294,7 +296,7 @@ export function LogsViewer({
           </>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            Select a log file to view
+            {t("logs.select")}
           </div>
         )}
       </div>

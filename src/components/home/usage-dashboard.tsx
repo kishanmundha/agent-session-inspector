@@ -22,11 +22,12 @@ import {
 } from "@/components/ui/table";
 import { RANGES, addDays, startOfDay } from "@/lib/analytics";
 import { downloadCsv } from "@/lib/download";
-import { formatCost, formatTokens } from "@/lib/format";
-import { SUPPORTED_AGENTS, PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
+import { formatCost, formatNumber, formatPercent, formatTokens } from "@/lib/format";
+import { PROVIDER_ORDER, providerStyle, supportedAgents } from "@/lib/provider-meta";
+import { formatLocale } from "@/i18n/current";
+import { useLocale, useT } from "@/i18n/client";
 import {
   DIMENSIONS,
-  DIMENSION_LABELS,
   computeUsage,
   toWeeks,
   usageModelsOf,
@@ -48,17 +49,12 @@ import {
   type Series,
 } from "./usage-charts";
 
-const UNIT_OPTIONS: { value: Unit; label: string }[] = [
-  { value: "costUSD", label: "Cost" },
-  { value: "tokens", label: "Tokens" },
-];
-
-const DIMENSION_OPTIONS = DIMENSIONS.map((value) => ({ value, label: DIMENSION_LABELS[value] }));
+const UNITS: Unit[] = ["costUSD", "tokens"];
 
 /** Above this many days the chart groups by week, so bars stay wide enough to read. */
 const MAX_DAILY_BARS = 92;
 
-const SESSION_COLUMNS = ["Session", "Input", "Cached", "Output", "Cost"];
+const SESSION_COLUMNS = ["session", "input", "cached", "output", "cost"] as const;
 
 const tokens = (n: number) => formatTokens(n) ?? "0";
 
@@ -75,6 +71,8 @@ export function UsageDashboard({
   onProjectChange: (project: string) => void;
   projectOptions: { value: string; label: string }[];
 }) {
+  const t = useT();
+  const locale = useLocale();
   const { sessions, error } = useAnalyticsSessions(reloadToken);
   const [costOpen, setCostOpen] = useState(false);
   const [range, setRange] = useStoredState<string>(
@@ -91,7 +89,7 @@ export function UsageDashboard({
   const [unit, setUnit] = useStoredState<Unit>(
     "usage-unit",
     "costUSD",
-    oneOf(UNIT_OPTIONS.map((o) => o.value)),
+    oneOf(UNITS),
   );
   const [dimension, setDimension] = useStoredState<Dimension>("usage-dimension", "project", oneOf(DIMENSIONS));
 
@@ -119,17 +117,17 @@ export function UsageDashboard({
   );
   const providerOptions = useMemo(
     () => [
-      { value: "all", label: "All agents" },
+      { value: "all", label: t("home.allAgents") },
       ...providers.map((id) => ({ value: id as string, label: providerStyle(id).shortLabel })),
     ],
-    [providers],
+    [providers, t],
   );
   const modelOptions = useMemo(
     () => [
-      { value: "all", label: "All models" },
+      { value: "all", label: t("filters.allModels") },
       ...usageModelsOf(sessions ?? []).map((m) => ({ value: m, label: m })),
     ],
-    [sessions],
+    [sessions, t],
   );
 
   const labelOf = (name: string) =>
@@ -161,7 +159,7 @@ export function UsageDashboard({
     return (
       <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3">
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
-        <p className="text-sm">Could not load usage. Use refresh to try again.</p>
+        <p className="text-sm">{t("usage.loadError")}</p>
       </div>
     );
   }
@@ -183,8 +181,8 @@ export function UsageDashboard({
     return (
       <EmptyState
         icon={Wallet}
-        title="No usage yet"
-        description={`Cost and token usage appear once a supported agent writes a transcript on this machine: ${SUPPORTED_AGENTS}.`}
+        title={t("usage.emptyTitle")}
+        description={t("usage.emptyDetail", { agents: supportedAgents(locale) })}
       />
     );
   }
@@ -199,7 +197,11 @@ export function UsageDashboard({
     color: SERIES_COLORS[i],
   }));
   if (ranked.length > series.length) {
-    series.push({ name: OTHER, label: `Other (${ranked.length - series.length})`, color: OTHER_COLOR });
+    series.push({
+      name: OTHER,
+      label: t("usage.other", { count: ranked.length - series.length }),
+      color: OTHER_COLOR,
+    });
   }
   const colorOf = (name: string) => series.find((s) => s.name === name)?.color ?? OTHER_COLOR;
   const rankedTotal = ranked.reduce((sum, row) => sum + row[unit], 0);
@@ -207,13 +209,18 @@ export function UsageDashboard({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <OptionSelect value={range} onChange={setRange} options={RANGES} aria-label="Date range" />
+        <OptionSelect
+          value={range}
+          onChange={setRange}
+          options={RANGES.map((r) => ({ value: r.value, label: t(`ranges.${r.value}`) }))}
+          aria-label={t("filters.dateRange")}
+        />
         {projectOptions.length > 2 && (
           <OptionSelect
             value={project}
             onChange={onProjectChange}
             options={projectOptions}
-            aria-label="Project"
+            aria-label={t("home.project")}
             className="max-w-56"
           />
         )}
@@ -222,7 +229,7 @@ export function UsageDashboard({
             value={provider}
             onChange={setProvider}
             options={providerOptions}
-            aria-label="Agent"
+            aria-label={t("filters.agent")}
           />
         )}
         {modelOptions.length > 2 && (
@@ -230,12 +237,18 @@ export function UsageDashboard({
             value={model}
             onChange={setModel}
             options={modelOptions}
-            aria-label="Model"
+            aria-label={t("filters.model")}
             className="max-w-56"
           />
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Segmented label="Measure" value={unit} onChange={setUnit} options={UNIT_OPTIONS} size="default" />
+          <Segmented
+            label={t("usage.measure")}
+            value={unit}
+            onChange={setUnit}
+            options={UNITS.map((value) => ({ value, label: t(`usage.units.${value}`) }))}
+            size="default"
+          />
           <Button
             variant="outline"
             onClick={() =>
@@ -243,7 +256,7 @@ export function UsageDashboard({
             }
           >
             <Download aria-hidden />
-            Export CSV
+            {t("filters.exportCsv")}
           </Button>
         </div>
       </div>
@@ -251,60 +264,60 @@ export function UsageDashboard({
       {totals.tokens === 0 ? (
         <EmptyState
           icon={Wallet}
-          title="No usage for these filters"
-          description="Try a longer date range, or clear the project, agent and model filters."
+          title={t("usage.noUsage")}
+          description={t("analytics.noActivityDetail")}
         />
       ) : (
         <>
           <StatCardGrid>
             <StatCard
-              label="Est. cost"
+              label={t("stats.estCost")}
               value={formatCost(totals.costUSD)}
               sub={
                 unpriced.length > 0
-                  ? `${unpriced.length} model${unpriced.length > 1 ? "s" : ""} unpriced`
-                  : "at API list prices"
+                  ? t("stats.modelsUnpriced", { count: unpriced.length })
+                  : t("stats.atListPrices")
               }
               accent
               onClick={() => setCostOpen(true)}
             />
             <StatCard
-              label="Daily burn"
+              label={t("usage.dailyBurn")}
               value={formatCost(totals.activeDays ? totals.costUSD / totals.activeDays : 0)}
-              sub={`avg over ${totals.activeDays} active day${totals.activeDays === 1 ? "" : "s"}`}
+              sub={t("usage.avgOverDays", { count: totals.activeDays })}
             />
             <StatCard
-              label="Peak day"
+              label={t("usage.peakDay")}
               value={formatCost(peakDay?.costUSD ?? 0)}
-              sub={peakDay?.start.toLocaleDateString([], {
+              sub={peakDay?.start.toLocaleDateString(formatLocale(), {
                 weekday: "short",
                 month: "short",
                 day: "numeric",
               })}
             />
             <StatCard
-              label="Input tokens"
+              label={t("usage.inputTokens")}
               value={tokens(totals.inputTokens)}
-              sub={`+${tokens(totals.cacheReadTokens)} cached`}
+              sub={t("usage.plusCached", { amount: tokens(totals.cacheReadTokens) })}
             />
             <StatCard
-              label="Output tokens"
+              label={t("stats.outputTokens")}
               value={tokens(totals.outputTokens)}
               sub={
                 totals.cacheWriteTokens > 0
-                  ? `${tokens(totals.cacheWriteTokens)} cache writes`
+                  ? t("usage.cacheWrites", { amount: tokens(totals.cacheWriteTokens) })
                   : undefined
               }
             />
             <StatCard
-              label="Cache hit"
-              value={`${(data.cacheHitRate * 100).toFixed(1)}%`}
-              sub="of input read from cache"
+              label={t("usage.cacheHit")}
+              value={formatPercent(data.cacheHitRate, 1)}
+              sub={t("usage.cacheHitSub")}
             />
             <StatCard
-              label="Sessions"
-              value={totals.sessions.toLocaleString()}
-              sub={`${formatCost(totals.costUSD / totals.sessions)} avg`}
+              label={t("stats.sessions")}
+              value={formatNumber(totals.sessions)}
+              sub={t("usage.avg", { amount: formatCost(totals.costUSD / totals.sessions) })}
             />
           </StatCardGrid>
 
@@ -318,7 +331,7 @@ export function UsageDashboard({
             }
             scope={{
               sessions: totals.sessions,
-              period: RANGES.find((r) => r.value === range)?.label.toLowerCase() ?? "all time",
+              period: t(`rangePeriods.${range as (typeof RANGES)[number]["value"]}`),
             }}
             open={costOpen}
             onOpenChange={setCostOpen}
@@ -327,14 +340,17 @@ export function UsageDashboard({
           <UnpricedNotice models={unpriced} />
 
           <Panel
-            title={unit === "costUSD" ? "Cost over time" : "Tokens over time"}
-            note={periods === data.days ? "per day" : "per week"}
+            title={t(`usage.overTime.${unit}`)}
+            note={periods === data.days ? t("usage.perDay") : t("usage.perWeek")}
             action={
               <Segmented
-                label="Break down by"
+                label={t("usage.breakDownBy")}
                 value={dimension}
                 onChange={setDimension}
-                options={DIMENSION_OPTIONS}
+                options={DIMENSIONS.map((value) => ({
+                  value,
+                  label: t(`usage.dimensions.${value}`),
+                }))}
               />
             }
           >
@@ -347,8 +363,8 @@ export function UsageDashboard({
           </Panel>
 
           <Panel
-            title={`${unit === "costUSD" ? "Cost" : "Tokens"} by ${DIMENSION_LABELS[dimension].toLowerCase()}`}
-            note={`${ranked.length} total`}
+            title={t(`usage.by.${unit}.${dimension}`)}
+            note={t("analytics.total", { count: ranked.length })}
           >
             <div className="grid gap-4 lg:grid-cols-2">
               <Treemap
@@ -375,13 +391,13 @@ export function UsageDashboard({
                       {labelOf(row.name)}
                     </span>
                     <span className="shrink-0 text-muted-foreground">
-                      {row.sessions} session{row.sessions === 1 ? "" : "s"}
+                      {t("metrics.sessionsCount", { count: row.sessions })}
                     </span>
                     <span className="w-14 shrink-0 text-right font-medium tabular-nums">
                       {formatUnit(unit, row[unit])}
                     </span>
                     <span className="w-11 shrink-0 text-right tabular-nums text-muted-foreground">
-                      {((row[unit] / rankedTotal) * 100).toFixed(1)}%
+                      {formatPercent(row[unit] / rankedTotal, 1)}
                     </span>
                   </li>
                 ))}
@@ -389,16 +405,16 @@ export function UsageDashboard({
             </div>
           </Panel>
 
-          <Panel title={`Top sessions by ${unit === "costUSD" ? "cost" : "tokens"}`}>
+          <Panel title={t(`usage.topSessions.${unit}`)}>
             <Table className="min-w-[640px]">
               <TableHeader>
                 <TableRow className="text-xs uppercase tracking-wider hover:bg-transparent">
-                  {SESSION_COLUMNS.map((label, i) => (
+                  {SESSION_COLUMNS.map((column, i) => (
                     <TableHead
-                      key={label}
+                      key={column}
                       className={cn("text-muted-foreground", i > 0 && "text-right")}
                     >
-                      {label}
+                      {t(`usage.columns.${column}`)}
                     </TableHead>
                   ))}
                 </TableRow>

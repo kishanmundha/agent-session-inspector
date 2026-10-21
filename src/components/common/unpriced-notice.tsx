@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { CATALOG, PRICE_SOURCES, sourceOf } from "@/lib/price-sources";
 import { DEFAULT_OVERRIDE_PATH } from "@/lib/range-cost";
+import { useT } from "@/i18n/client";
 
 /** What usage recorded without a model id is filed under; it has no key to price. */
 const UNKNOWN_MODEL = "unknown";
@@ -33,14 +34,13 @@ function Code({ children }: { children: React.ReactNode }) {
  * dialog that explains where to find one and how to add it.
  */
 export function UnpricedNotice({ models }: { models: string[] }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [info, setInfo] = useState<PricingInfo | null>(null);
   const requested = useRef("");
 
   if (models.length === 0) return null;
-  const many = models.length > 1;
   const named = models.filter((m) => m !== UNKNOWN_MODEL);
-  const manyNamed = named.length > 1;
 
   function openDialog() {
     setOpen(true);
@@ -53,6 +53,7 @@ export function UnpricedNotice({ models }: { models: string[] }) {
       .catch(() => setInfo(null));
   }
 
+  const code = { c: (chunks: React.ReactNode) => <Code>{chunks}</Code> };
   const overridePath = info?.overridePath ?? DEFAULT_OVERRIDE_PATH;
   const keys = [...new Set(named.map((m) => info?.keys[m] ?? m.toLowerCase()))];
   const template = JSON.stringify(
@@ -66,9 +67,11 @@ export function UnpricedNotice({ models }: { models: string[] }) {
       <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
         <p className="min-w-0 flex-1">
-          No price is known for{" "}
-          <span className="font-mono text-foreground">{models.join(", ")}</span>, so cost figures
-          leave {many ? "them" : "it"} out. Token counts still include {many ? "them" : "it"}.
+          {t.rich(
+            "unpriced.notice",
+            { m: (chunks) => <span className="font-mono text-foreground">{chunks}</span> },
+            { models: models.join(", "), count: models.length },
+          )}
         </p>
         {named.length > 0 && (
           <Button
@@ -79,7 +82,7 @@ export function UnpricedNotice({ models }: { models: string[] }) {
             className="-my-1 shrink-0"
           >
             <Info aria-hidden />
-            Add {manyNamed ? "prices" : "a price"}
+            {t("unpriced.addPrice", { count: named.length })}
           </Button>
         )}
       </div>
@@ -88,17 +91,15 @@ export function UnpricedNotice({ models }: { models: string[] }) {
         {/* Only the body scrolls, so the title and close button stay put. */}
         <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
           <div className="space-y-1.5 border-b border-border px-5 pt-5 pb-3">
-            <DialogTitle>Add {manyNamed ? "the missing prices" : "the missing price"}</DialogTitle>
+            <DialogTitle>{t("unpriced.dialogTitle", { count: named.length })}</DialogTitle>
             <DialogDescription>
-              Costs are estimated from a price table bundled with the app. A model the table does
-              not list is left out of every cost figure until you give it a price in your own
-              override file. Nothing is fetched: you look the price up and enter it once.
+              {t("unpriced.dialogDescription")}
             </DialogDescription>
           </div>
 
           <div className="flex min-h-0 shrink! flex-col gap-4 overflow-y-auto px-5 pt-4 pb-5 *:shrink-0">
             <section className="space-y-2">
-              <h3 className="text-xs font-medium text-foreground">1. Find the price</h3>
+              <h3 className="text-xs font-medium text-foreground">{t("unpriced.step1")}</h3>
               <ul className="overflow-hidden rounded-lg border border-border text-xs">
                 {keys.map((key) => {
                   const source = sourceOf(key);
@@ -113,7 +114,7 @@ export function UnpricedNotice({ models }: { models: string[] }) {
                         {...externalLink}
                         className="inline-flex shrink-0 items-center gap-1 rounded-sm font-medium text-foreground underline underline-offset-2 hover:text-brand focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                       >
-                        {source.label} pricing
+                        {t("unpriced.sourcePricing", { source: source.label })}
                         <ExternalLink className="size-3" aria-hidden />
                       </a>
                     </li>
@@ -121,7 +122,7 @@ export function UnpricedNotice({ models }: { models: string[] }) {
                 })}
               </ul>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                All price lists:{" "}
+                {t("unpriced.allPriceLists")}{" "}
                 {[...PRICE_SOURCES, CATALOG].map((source, i) => (
                   <span key={source.label}>
                     {i > 0 && " · "}
@@ -134,18 +135,21 @@ export function UnpricedNotice({ models }: { models: string[] }) {
                     </a>
                   </span>
                 ))}
-                . Use the pay-per-token API price in US dollars per million tokens.
+                {t("unpriced.useApiPrice")}
               </p>
             </section>
 
             <section className="space-y-2 border-t border-border pt-3">
-              <h3 className="text-xs font-medium text-foreground">2. Add it to pricing.json</h3>
+              <h3 className="text-xs font-medium text-foreground">{t("unpriced.step2")}</h3>
               <div className="flex items-center gap-1 text-xs leading-relaxed text-muted-foreground">
                 <p className="min-w-0 flex-1">
-                  Create <Code>{overridePath}</Code> if it does not exist, or add{" "}
-                  {manyNamed ? "these entries" : "this entry"} to the one you have, and replace the zeros.
+                  {t.rich(
+                    "unpriced.createFile",
+                    { c: (chunks) => <Code>{chunks}</Code> },
+                    { path: overridePath, count: named.length },
+                  )}
                 </p>
-                <CopyButton value={overridePath} label="Copy path" />
+                <CopyButton value={overridePath} label={t("unpriced.copyPath")} />
               </div>
               <div className="relative">
                 <pre className="overflow-x-auto rounded-lg border border-border bg-muted/50 p-3 pr-10 font-mono text-[11px] leading-relaxed text-foreground">
@@ -153,38 +157,24 @@ export function UnpricedNotice({ models }: { models: string[] }) {
                 </pre>
                 <CopyButton
                   value={template}
-                  label="Copy pricing.json"
+                  label={t("unpriced.copyFile")}
                   className="absolute top-1.5 right-1.5"
                 />
               </div>
               <ul className="list-disc space-y-1 pl-4 text-xs leading-relaxed text-muted-foreground">
-                <li>
-                  <Code>input</Code> and <Code>output</Code> are required. <Code>cacheRead</Code>,{" "}
-                  <Code>cacheWrite</Code> and <Code>cacheWrite1h</Code> are optional: the first two
-                  fall back to the input price, and <Code>cacheWrite1h</Code> to{" "}
-                  <Code>cacheWrite</Code>.
-                </li>
-                <li>
-                  A model you run yourself costs nothing per token: leave <Code>input</Code> and{" "}
-                  <Code>output</Code> at 0 to count it as free.
-                </li>
-                <li>
-                  To record a price change, give the model a list of entries and mark the later one
-                  with <Code>&quot;from&quot;: &quot;YYYY-MM-DD&quot;</Code>. Older sessions keep
-                  the old price.
-                </li>
+                <li>{t.rich("unpriced.fieldsNote", code)}</li>
+                <li>{t.rich("unpriced.freeNote", code)}</li>
+                <li>{t.rich("unpriced.priceChangeNote", code)}</li>
               </ul>
             </section>
 
             <p className="border-t border-border pt-3 text-xs leading-relaxed text-muted-foreground">
-              <span className="font-medium text-foreground">3. Reload this page.</span> The file is
-              read on every load, so no restart is needed. Entries in it also replace the bundled
-              price of any model they name.
+              <span className="font-medium text-foreground">{t("unpriced.step3")}</span>{" "}
+              {t("unpriced.reloadNote")}
               {named.length < models.length && (
                 <>
                   {" "}
-                  Usage listed as <Code>{UNKNOWN_MODEL}</Code> was recorded without a model name, so
-                  it cannot be given a price.
+                  {t.rich("unpriced.unknownNote", code, { model: UNKNOWN_MODEL })}
                 </>
               )}
             </p>

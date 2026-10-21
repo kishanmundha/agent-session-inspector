@@ -23,23 +23,27 @@ import {
   firstLine,
   formatCost,
   formatDuration,
+  fixed,
   formatFullDateTime,
+  formatNumber,
   timeAgo,
 } from "@/lib/format";
-import { OUTCOME_LABELS, healthSummary, type HealthFocus } from "@/lib/health";
+import { healthSummary, type HealthFocus } from "@/lib/health";
+import { useLocale, useT } from "@/i18n/client";
 import { providerStyle } from "@/lib/provider-meta";
 import { resumeCommand } from "@/lib/session-state";
 import { cn } from "@/lib/utils";
 import type { CostSummary, SessionMeta, SessionStats } from "./types";
 
 function tokens(n: number) {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
+  if (n >= 1_000_000) return `${fixed(n / 1_000_000, 2)}M`;
+  if (n >= 1_000) return `${fixed(n / 1_000, 1)}K`;
+  return formatNumber(n);
 }
 
 /** Shows the session's files in the file manager of the machine running the app. */
 function RevealButton({ meta }: { meta: Pick<SessionMeta, "provider" | "id"> }) {
+  const t = useT();
   const [failed, setFailed] = useState(false);
 
   async function reveal() {
@@ -65,14 +69,12 @@ function RevealButton({ meta }: { meta: Pick<SessionMeta, "provider" | "id"> }) 
             className={cn("text-muted-foreground", failed && "text-destructive")}
           >
             <FolderSearch className="size-3.5" aria-hidden />
-            Reveal
+            {t("sessionHeader.reveal")}
           </Button>
         }
       />
       <TooltipContent>
-        {failed
-          ? "Could not open a file manager here. Copy the path instead."
-          : "Show this session's files in the file manager"}
+        {failed ? t("sessionHeader.revealFailed") : t("sessionHeader.revealHint")}
       </TooltipContent>
     </Tooltip>
   );
@@ -105,6 +107,8 @@ export function SessionHeader({
   /** Shows the events behind a health signal in the timeline. */
   onFocusEvents?: (focus: HealthFocus) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const rawName = firstLine(meta.name);
   const title = meta.title ?? rawName;
   const subtitle = meta.title ? rawName : undefined;
@@ -135,7 +139,7 @@ export function SessionHeader({
             <h1 className="text-lg font-bold leading-tight text-foreground sm:text-xl">
               {title ?? (
                 <span className="font-normal italic text-muted-foreground">
-                  Unnamed session
+                  {t("sessionCard.unnamed")}
                 </span>
               )}
             </h1>
@@ -148,25 +152,25 @@ export function SessionHeader({
               <span className="truncate font-mono text-xs text-muted-foreground">
                 {meta.id}
               </span>
-              <CopyButton value={meta.id} label="Copy session id" />
+              <CopyButton value={meta.id} label={t("sessionHeader.copyId")} />
               {resume && (
                 <CopyButton
                   value={resume}
-                  label="Copy the command that resumes this session in a terminal"
+                  label={t("sessionHeader.resumeHint")}
                   icon={Terminal}
                   className="ml-1"
                 >
-                  Resume
+                  {t("sessionHeader.resume")}
                 </CopyButton>
               )}
               {storagePath && (
                 <>
                   <CopyButton
                     value={storagePath}
-                    label={`Copy where this session is stored: ${storagePath}`}
+                    label={t("sessionHeader.pathHint", { path: storagePath })}
                     icon={FolderOpen}
                   >
-                    Path
+                    {t("sessionHeader.path")}
                   </CopyButton>
                   {revealable && <RevealButton meta={meta} />}
                 </>
@@ -178,7 +182,7 @@ export function SessionHeader({
             {running && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
                 <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
-                Running
+                {t("sessionHeader.running")}
               </span>
             )}
             <span
@@ -240,7 +244,7 @@ export function SessionHeader({
                 render={
                   <span className="inline-flex items-center gap-1.5">
                     <Clock className="size-3.5 opacity-70" aria-hidden />
-                    Updated {timeAgo(meta.updated_at)}
+                    {t("sessionCard.updated", { date: timeAgo(meta.updated_at) })}
                   </span>
                 }
               />
@@ -253,68 +257,71 @@ export function SessionHeader({
           <div className="mt-4">
             <StatCardGrid>
               <StatCard
-                label="Events"
-                value={stats.eventCount.toLocaleString()}
-                sub="recorded in session"
+                label={t("sessionHeader.events")}
+                value={formatNumber(stats.eventCount)}
+                sub={t("sessionHeader.eventsSub")}
               />
               <StatCard
-                label="Messages"
-                value={(
-                  stats.totalUserMessages + stats.totalAssistantMessages
-                ).toLocaleString()}
-                sub={`${stats.totalUserMessages} user · ${stats.totalAssistantMessages} assistant`}
+                label={t("stats.messages")}
+                value={formatNumber(stats.totalUserMessages + stats.totalAssistantMessages)}
+                sub={t("sessionHeader.messagesSub", {
+                  user: stats.totalUserMessages,
+                  assistant: stats.totalAssistantMessages,
+                })}
               />
               <StatCard
-                label="Tool calls"
-                value={stats.totalToolCalls.toLocaleString()}
-                sub="local + external"
+                label={t("stats.toolCalls")}
+                value={formatNumber(stats.totalToolCalls)}
+                sub={t("sessionHeader.toolCallsSub")}
               />
               <StatCard
-                label="Total tokens"
+                label={t("tokens.total")}
                 value={total > 0 ? tokens(total) : "—"}
                 sub={
                   allInput > 0 && output > 0
-                    ? `${tokens(allInput)} in · ${tokens(output)} out`
-                    : "in + out + cache"
+                    ? t("tokens.inOut", { input: tokens(allInput), output: tokens(output) })
+                    : t("sessionHeader.totalTokensSub")
                 }
-                hint="Everything sent to and returned by the model: uncached input, cache writes, cache reads and output."
+                hint={t("tokens.totalHint")}
                 accent
               />
               {context && (
                 <StatCard
-                  label="Context"
+                  label={t("sessionHeader.context")}
                   value={tokens(context.latest)}
                   sub={
                     context.peak > context.latest
-                      ? `sent by the last request · peak ${tokens(context.peak)}`
-                      : "sent by the last request"
+                      ? t("sessionHeader.contextPeak", { peak: tokens(context.peak) })
+                      : t("sessionHeader.contextSub")
                   }
                 />
               )}
               {cost && (cost.inherited || cost.byModel.some((m) => m.costUSD !== null)) && (
                 <StatCard
-                  label="Est. cost"
+                  label={t("stats.estCost")}
                   value={`${formatCost(cost.totalUSD)}${cost.unpricedModels.length > 0 ? "+" : ""}`}
                   sub={
                     cost.unpricedModels.length > 0
-                      ? `excludes ${cost.unpricedModels.join(", ")}`
+                      ? t("sessionCard.excludes", { models: cost.unpricedModels.join(", ") })
                       : cost.inherited
-                        ? `+ ${formatCost(cost.inherited.totalUSD)} inherited`
+                        ? t("sessionHeader.plusInherited", {
+                            amount: formatCost(cost.inherited.totalUSD),
+                          })
                         : (cost.customPriced?.length ?? 0) > 0
-                          ? "with your custom prices"
-                          : "at API list prices"
+                          ? t("sessionHeader.customPrices")
+                          : t("stats.atListPrices")
                   }
                   onClick={() => setCostOpen(true)}
                 />
               )}
               {health && (
                 <StatCard
-                  label="Health"
+                  label={t("sessionHeader.health")}
                   value={healthSummary(health)}
                   sub={
                     health.signals.length > 0
-                      ? `${OUTCOME_LABELS[health.outcome].toLowerCase()} · ${health.signals.length} signal${health.signals.length === 1 ? "" : "s"}`
-                      : OUTCOME_LABELS[health.outcome].toLowerCase()
+                      ? `${t(`health.outcomes.${health.outcome}`).toLocaleLowerCase(locale)} · ${t("sessionHeader.signals", { count: health.signals.length })}`
+                      : t(`health.outcomes.${health.outcome}`).toLocaleLowerCase(locale)
                   }
                   onClick={() => setHealthOpen(true)}
                 />
@@ -323,55 +330,59 @@ export function SessionHeader({
                   empty "—" cards are noise. */}
               {input > 0 && (
                 <StatCard
-                  label="Uncached input"
+                  label={t("tokens.uncached")}
                   value={tokens(input)}
-                  sub={allInput > input ? `of ${tokens(allInput)} total input` : "new prompt text"}
-                  hint="Input the model had not seen before, billed at the full input rate. Total input also counts cache writes and cache reads, which are billed at their own rates."
+                  sub={
+                    allInput > input
+                      ? t("sessionHeader.ofTotalInput", { amount: tokens(allInput) })
+                      : t("sessionHeader.newPromptText")
+                  }
+                  hint={t("sessionHeader.uncachedHint")}
                 />
               )}
               {cacheWrite > 0 && (
                 <StatCard
-                  label="Cache writes"
+                  label={t("tokens.cacheWrites")}
                   value={tokens(cacheWrite)}
-                  sub="context stored"
-                  hint="Input stored in the prompt cache so later requests can reuse it. Billed a little above the input rate."
+                  sub={t("sessionHeader.contextStored")}
+                  hint={t("sessionHeader.cacheWritesHint")}
                 />
               )}
               {cacheRead > 0 && (
                 <StatCard
-                  label="Cache reads"
+                  label={t("tokens.cacheReads")}
                   value={tokens(cacheRead)}
-                  sub="reused context"
-                  hint="Input served from the prompt cache at a steep discount. The whole conversation is re-sent on every request, so this grows fastest."
+                  sub={t("sessionHeader.reusedContext")}
+                  hint={t("sessionHeader.cacheReadsHint")}
                 />
               )}
               {output > 0 && (
                 <StatCard
-                  label="Output"
+                  label={t("tokens.output")}
                   value={tokens(output)}
-                  sub="generated"
-                  hint="Tokens the model wrote: replies, tool calls and reasoning."
+                  sub={t("tokens.generated")}
+                  hint={t("tokens.outputHint")}
                 />
               )}
               {stats.totalPremiumRequests > 0 && (
                 <StatCard
-                  label="Premium req"
-                  value={stats.totalPremiumRequests.toLocaleString()}
-                  sub="billed requests"
+                  label={t("sessionHeader.premium")}
+                  value={formatNumber(stats.totalPremiumRequests)}
+                  sub={t("sessionHeader.premiumSub")}
                 />
               )}
               {stats.totalApiDurationMs > 0 && (
                 <StatCard
-                  label="API time"
+                  label={t("sessionHeader.apiTime")}
                   value={formatDuration(stats.totalApiDurationMs)}
-                  sub="waiting on the model"
+                  sub={t("sessionHeader.apiTimeSub")}
                 />
               )}
               {activeMs != null && activeMs > 0 && (
                 <StatCard
-                  label="Time span"
+                  label={t("sessionHeader.timeSpan")}
                   value={formatDuration(activeMs)}
-                  sub="first to last event"
+                  sub={t("sessionHeader.timeSpanSub")}
                 />
               )}
             </StatCardGrid>

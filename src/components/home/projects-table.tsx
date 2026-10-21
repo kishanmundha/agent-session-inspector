@@ -16,22 +16,25 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatCost, formatDateTime, formatTokens, timeAgo } from "@/lib/format";
+import { formatCost, formatDateTime, formatNumber, formatTokens, timeAgo } from "@/lib/format";
 import type { ProjectSummary } from "@/lib/projects";
-import { SUPPORTED_AGENTS, providerStyle } from "@/lib/provider-meta";
+import { providerStyle, supportedAgents } from "@/lib/provider-meta";
+import { useLocale, useT } from "@/i18n/client";
 import { cn } from "@/lib/utils";
 
 type SortKey = "recent" | "sessions" | "cost" | "tokens" | "name";
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "recent", label: "Most recent" },
-  { value: "sessions", label: "Most sessions" },
-  { value: "cost", label: "Highest cost" },
-  { value: "tokens", label: "Most tokens" },
-  { value: "name", label: "Name (A–Z)" },
-];
+const SORT_KEYS: SortKey[] = ["recent", "sessions", "cost", "tokens", "name"];
 
-const COLUMNS = ["Project", "Sessions", "Cost", "Input", "Output", "Tool calls", "Last active"];
+const COLUMNS = [
+  "project",
+  "sessions",
+  "cost",
+  "input",
+  "output",
+  "toolCalls",
+  "lastActive",
+] as const;
 
 const tokens = (n: number) => formatTokens(n) ?? "0";
 
@@ -48,6 +51,8 @@ export function ProjectsTable({
   selected: string;
   onSelect: (name: string) => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("recent");
 
@@ -90,8 +95,8 @@ export function ProjectsTable({
     return (
       <EmptyState
         icon={FolderGit2}
-        title="No projects yet"
-        description={`Projects appear once a supported agent writes a transcript on this machine: ${SUPPORTED_AGENTS}.`}
+        title={t("projects.emptyTitle")}
+        description={t("projects.emptyDetail", { agents: supportedAgents(locale) })}
       />
     );
   }
@@ -102,34 +107,34 @@ export function ProjectsTable({
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="Search project or path…"
-          aria-label="Search projects"
+          placeholder={t("projects.searchPlaceholder")}
+          aria-label={t("projects.search")}
           className="w-full max-w-sm"
         />
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="hidden sm:inline" aria-hidden>
-            Sort
+            {t("home.sort")}
           </span>
           <OptionSelect
             value={sort}
             onChange={setSort}
-            options={SORT_OPTIONS}
-            aria-label="Sort projects"
+            options={SORT_KEYS.map((key) => ({ value: key, label: t(`projects.sort.${key}`) }))}
+            aria-label={t("projects.sortLabel")}
           />
         </div>
         <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-          {rows.length} of {projects.length}
+          {t("common.nOfTotal", { shown: rows.length, total: projects.length })}
         </span>
       </div>
 
       {rows.length === 0 ? (
         <EmptyState
           icon={FolderGit2}
-          title="No matching projects"
-          description={`Nothing matches “${search}”. Try a folder name or part of its path.`}
+          title={t("projects.noMatches")}
+          description={t("projects.noMatchDetail", { query: search })}
           action={
             <Button variant="outline" size="sm" onClick={() => setSearch("")}>
-              Clear search
+              {t("common.clearSearch")}
             </Button>
           }
         />
@@ -138,12 +143,12 @@ export function ProjectsTable({
           <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow className="text-xs uppercase tracking-wider hover:bg-transparent">
-                {COLUMNS.map((label, i) => (
+                {COLUMNS.map((column, i) => (
                   <TableHead
-                    key={label}
+                    key={column}
                     className={cn("text-muted-foreground", i > 0 && "text-right")}
                   >
-                    {label}
+                    {t(`projects.columns.${column}`)}
                   </TableHead>
                 ))}
               </TableRow>
@@ -171,18 +176,18 @@ export function ProjectsTable({
                         />
                       ))}
                       <span className="truncate font-mono" title={p.path}>
-                        {p.path ?? "location not recorded"}
+                        {p.path ?? t("projects.noLocation")}
                       </span>
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">{p.sessions.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{formatNumber(p.sessions)}</TableCell>
                   <TableCell className="text-right font-medium">
                     {formatCost(p.costUSD)}
                     {p.unpriced && "+"}
                   </TableCell>
                   <TableCell className="text-right">{tokens(p.inputTokens)}</TableCell>
                   <TableCell className="text-right">{tokens(p.outputTokens)}</TableCell>
-                  <TableCell className="text-right">{p.toolCalls.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{formatNumber(p.toolCalls)}</TableCell>
                   <TableCell className="whitespace-nowrap text-right text-muted-foreground">
                     <Tooltip>
                       <TooltipTrigger render={<span>{timeAgo(p.lastActive) || "—"}</span>} />
