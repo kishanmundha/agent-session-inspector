@@ -2144,7 +2144,7 @@ function EventCard({
   parallel?: boolean;
   /** The event a copied link points at. */
   target?: boolean;
-  /** A tool call shown as one row with its outcome, as the compact view does. */
+  /** A tool call shown as one row with its outcome, as the normal view does. */
   merged?: boolean;
   /** The event that completed this call; absent while it runs or if it never returned. */
   result?: AgentEvent;
@@ -2609,11 +2609,11 @@ const INJECTED_CONTEXT_TYPES = new Set([
 const CALL_START_TYPES = new Set(["tool.execution_start", "external_tool.requested"]);
 const CALL_END_TYPES = new Set(["tool.execution_complete", "external_tool.completed"]);
 
-/** What the compact view keeps besides tool calls: the conversation itself. */
+/** What the normal view keeps besides tool calls: the conversation itself. */
 const CONVERSATION_TYPES = new Set(["user.message", "assistant.thinking", "assistant.message"]);
 
-type ViewMode = "normal" | "compact" | "focused";
-const VIEW_MODES: ViewMode[] = ["normal", "compact", "focused"];
+type ViewMode = "detailed" | "normal" | "focused";
+const VIEW_MODES: ViewMode[] = ["detailed", "normal", "focused"];
 
 /** Moves keyboard focus to the event row `step` away, starting from the first one on screen. */
 function focusEventRow(step: number) {
@@ -2661,7 +2661,8 @@ export function EventsTimeline({
       : undefined;
   }, [events, forkParentHref]);
 
-  // The view mode is mirrored to `?mode=`, so a refresh keeps it.
+  // The view mode is mirrored to `?mode=`, so a refresh keeps it. Links from
+  // before the rename say `compact` for what is now the normal view.
   const [modeParam, setModeParam] = useQueryParam("mode", "normal");
   const [mode, setMode] = useState<ViewMode>(
     VIEW_MODES.includes(modeParam as ViewMode) ? (modeParam as ViewMode) : "normal",
@@ -2748,7 +2749,7 @@ export function EventsTimeline({
     return ids;
   }, [events]);
 
-  // Each tool call matched to the event that completed it, so the compact view
+  // Each tool call matched to the event that completed it, so the normal view
   // can show the pair as one row. Matched by call id, else by tool name.
   const callResults = useMemo(() => {
     const results = new Map<string, AgentEvent>();
@@ -2797,7 +2798,7 @@ export function EventsTimeline({
   // What the chosen view keeps, before any filter. The filter chips are built
   // from this, so they only ever offer what the view can show.
   const inView = useMemo(() => {
-    if (mode === "normal") return typedEvents;
+    if (mode === "detailed") return typedEvents;
     return typedEvents.filter((event) => {
       if (mode === "focused") return focusedIds.has(event.id);
       if (callResults.consumed.has(event.id)) return false;
@@ -2879,8 +2880,8 @@ export function EventsTimeline({
       (focusRequest.categories ?? []).includes("system")
       || (focusRequest.subKeys ?? []).includes("system.message");
     if (wantsSystem) setShowSystem(true);
-    // What a hint or a search points at is usually not part of the focused view.
-    setMode("normal");
+    // What a hint or a search points at may be hidden by the shorter views.
+    setMode("detailed");
     // Reveal the chips so it is obvious which filters the hint applied.
     setFiltersOpen(true);
   }
@@ -2900,7 +2901,7 @@ export function EventsTimeline({
       }
       if (terms.length > 0) {
         // A merged row answers for its result too.
-        const result = mode === "compact" ? callResults.results.get(event.id) : undefined;
+        const result = mode === "normal" ? callResults.results.get(event.id) : undefined;
         const text = (JSON.stringify(event) + (result ? JSON.stringify(result) : "")).toLowerCase();
         return terms.every((term) => text.includes(term));
       }
@@ -3011,7 +3012,7 @@ export function EventsTimeline({
     setOnlyTokenEvents(false);
     setOnlyFailures(false);
     setShowSystem(true);
-    setMode("normal");
+    setMode("detailed");
   }
 
   const hiddenCount = filtered.length - shown.length;
@@ -3375,8 +3376,8 @@ export function EventsTimeline({
                     expandAll={expandAll}
                     parallel={Boolean(parallel)}
                     target={event.id === targetEventId}
-                    merged={mode === "compact" && CALL_START_TYPES.has(event.type)}
-                    result={mode === "compact" ? callResults.results.get(event.id) : undefined}
+                    merged={mode === "normal" && CALL_START_TYPES.has(event.type)}
+                    result={mode === "normal" ? callResults.results.get(event.id) : undefined}
                     runningUSD={cost.runningUSD.get(event.id)}
                     costShare={
                       cost.runningUSD.has(event.id) && typeof event.data.costUSD === "number"

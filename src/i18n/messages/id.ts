@@ -911,7 +911,7 @@ export const id: Messages = {
     groups: { timeline: "Linimasa", navigation: "Navigasi" },
     keys: {
       search: "Cari event di sesi ini",
-      view: "Ganti tampilan: normal, ringkas, fokus",
+      view: "Ganti tampilan: detail, normal, fokus",
       order: "Balik urutan: terlama atau terbaru dulu",
       live: "Ikuti sesi secara langsung",
       move: "Pindah ke event berikutnya atau sebelumnya",
@@ -1113,7 +1113,7 @@ export const id: Messages = {
     searchPlaceholder: "Cari event…",
     search: "Cari event",
     view: "Tampilan transkrip",
-    modes: { normal: "Normal", compact: "Ringkas", focused: "Fokus" },
+    modes: { detailed: "Detail", normal: "Normal", focused: "Fokus" },
     filters: "Filter",
     clear: "Hapus",
     followLive: "Ikuti langsung",

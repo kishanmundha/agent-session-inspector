@@ -921,7 +921,7 @@ export const ja: Messages = {
     groups: { timeline: "タイムライン", navigation: "ナビゲーション" },
     keys: {
       search: "このセッションのイベントを検索",
-      view: "表示を切り替え: 標準、コンパクト、要点",
+      view: "表示を切り替え: 詳細、標準、要点",
       order: "並び順を反転: 古い順または新しい順",
       live: "セッションをライブで追跡",
       move: "次または前のイベントへ移動",
@@ -1124,7 +1124,7 @@ export const ja: Messages = {
     searchPlaceholder: "イベントを検索…",
     search: "イベントを検索",
     view: "トランスクリプトの表示",
-    modes: { normal: "標準", compact: "コンパクト", focused: "要点" },
+    modes: { detailed: "詳細", normal: "標準", focused: "要点" },
     filters: "フィルター",
     clear: "クリア",
     followLive: "ライブで追跡",

@@ -991,7 +991,7 @@ export const ptBR: Messages = {
     groups: { timeline: "Linha do tempo", navigation: "Navegação" },
     keys: {
       search: "Pesquisar eventos nesta sessão",
-      view: "Alternar a visualização: normal, compacta, focada",
+      view: "Alternar a visualização: detalhada, normal, focada",
       order: "Inverter a ordem: mais antigos ou mais recentes primeiro",
       live: "Acompanhar a sessão ao vivo",
       move: "Ir para o evento seguinte ou anterior",
@@ -1204,7 +1204,7 @@ export const ptBR: Messages = {
     searchPlaceholder: "Pesquisar eventos…",
     search: "Pesquisar eventos",
     view: "Visualização da transcrição",
-    modes: { normal: "Normal", compact: "Compacta", focused: "Focada" },
+    modes: { detailed: "Detalhada", normal: "Normal", focused: "Focada" },
     filters: "Filtros",
     clear: "Limpar",
     followLive: "Acompanhar ao vivo",

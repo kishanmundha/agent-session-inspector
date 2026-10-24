@@ -917,7 +917,7 @@ export const az: Messages = {
     groups: { timeline: "Zaman xətti", navigation: "Naviqasiya" },
     keys: {
       search: "Bu sessiyada hadisələri axtar",
-      view: "Görünüşü dəyiş: adi, yığcam, fokuslu",
+      view: "Görünüşü dəyiş: ətraflı, adi, fokuslu",
       order: "Sıranı çevir: əvvəlcə köhnə və ya yeni",
       live: "Sessiyanı canlı izlə",
       move: "Növbəti və ya əvvəlki hadisəyə keç",
@@ -1119,7 +1119,7 @@ export const az: Messages = {
     searchPlaceholder: "Hadisələrdə axtar…",
     search: "Hadisələrdə axtar",
     view: "Transkript görünüşü",
-    modes: { normal: "Adi", compact: "Yığcam", focused: "Fokuslu" },
+    modes: { detailed: "Ətraflı", normal: "Adi", focused: "Fokuslu" },
     filters: "Süzgəclər",
     clear: "Təmizlə",
     followLive: "Canlı izlə",

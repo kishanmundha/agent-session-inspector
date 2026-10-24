@@ -974,7 +974,7 @@ export const en = {
     groups: { timeline: "Timeline", navigation: "Navigation" },
     keys: {
       search: "Search events in this session",
-      view: "Cycle the transcript view: normal, compact, focused",
+      view: "Cycle the transcript view: detailed, normal, focused",
       order: "Flip the order: oldest or newest first",
       live: "Follow the session live",
       move: "Move to the next or previous event",
@@ -1185,7 +1185,7 @@ export const en = {
     searchPlaceholder: "Search events…",
     search: "Search events",
     view: "Transcript view",
-    modes: { normal: "Normal", compact: "Compact", focused: "Focused" },
+    modes: { detailed: "Detailed", normal: "Normal", focused: "Focused" },
     filters: "Filters",
     clear: "Clear",
     followLive: "Follow live",

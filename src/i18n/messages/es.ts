@@ -982,7 +982,7 @@ export const es: Messages = {
     groups: { timeline: "Línea de tiempo", navigation: "Navegación" },
     keys: {
       search: "Buscar eventos en esta sesión",
-      view: "Cambiar la vista: normal, compacta, enfocada",
+      view: "Cambiar la vista: detallada, normal, enfocada",
       order: "Invertir el orden: más antiguos o más recientes primero",
       live: "Seguir la sesión en directo",
       move: "Ir al evento siguiente o anterior",
@@ -1195,7 +1195,7 @@ export const es: Messages = {
     searchPlaceholder: "Buscar eventos…",
     search: "Buscar eventos",
     view: "Vista de la transcripción",
-    modes: { normal: "Normal", compact: "Compacta", focused: "Enfocada" },
+    modes: { detailed: "Detallada", normal: "Normal", focused: "Enfocada" },
     filters: "Filtros",
     clear: "Borrar",
     followLive: "Seguir en directo",

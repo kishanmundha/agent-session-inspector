@@ -884,7 +884,7 @@ export const zhTW: Messages = {
     groups: { timeline: "時間軸", navigation: "導覽" },
     keys: {
       search: "搜尋此工作階段中的事件",
-      view: "切換對話紀錄檢視：一般、精簡、重點",
+      view: "切換對話紀錄檢視：詳細、一般、重點",
       order: "切換順序：最舊或最新在前",
       live: "即時追蹤工作階段",
       move: "移至下一個或上一個事件",
@@ -1083,7 +1083,7 @@ export const zhTW: Messages = {
     searchPlaceholder: "搜尋事件…",
     search: "搜尋事件",
     view: "對話紀錄檢視",
-    modes: { normal: "一般", compact: "精簡", focused: "重點" },
+    modes: { detailed: "詳細", normal: "一般", focused: "重點" },
     filters: "篩選",
     clear: "清除",
     followLive: "即時追蹤",

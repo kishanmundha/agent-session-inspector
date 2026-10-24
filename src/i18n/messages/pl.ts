@@ -1108,7 +1108,7 @@ export const pl: Messages = {
     groups: { timeline: "Oś czasu", navigation: "Nawigacja" },
     keys: {
       search: "Szukaj zdarzeń w tej sesji",
-      view: "Zmień widok: normalny, zwarty, skupiony",
+      view: "Zmień widok: szczegółowy, normalny, skupiony",
       order: "Odwróć kolejność: najstarsze lub najnowsze najpierw",
       live: "Śledź sesję na żywo",
       move: "Przejdź do następnego lub poprzedniego zdarzenia",
@@ -1356,7 +1356,7 @@ export const pl: Messages = {
     searchPlaceholder: "Szukaj zdarzeń…",
     search: "Szukaj zdarzeń",
     view: "Widok transkrypcji",
-    modes: { normal: "Normalny", compact: "Zwarty", focused: "Skupiony" },
+    modes: { detailed: "Szczegółowy", normal: "Normalny", focused: "Skupiony" },
     filters: "Filtry",
     clear: "Wyczyść",
     followLive: "Śledź na żywo",

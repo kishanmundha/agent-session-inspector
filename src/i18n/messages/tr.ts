@@ -913,7 +913,7 @@ export const tr: Messages = {
     groups: { timeline: "Zaman çizelgesi", navigation: "Gezinme" },
     keys: {
       search: "Bu oturumdaki olaylarda ara",
-      view: "Görünümü değiştir: normal, sıkı, odaklı",
+      view: "Görünümü değiştir: ayrıntılı, normal, odaklı",
       order: "Sırayı çevir: önce en eski veya en yeni",
       live: "Oturumu canlı izle",
       move: "Sonraki veya önceki olaya geç",
@@ -1115,7 +1115,7 @@ export const tr: Messages = {
     searchPlaceholder: "Olaylarda ara…",
     search: "Olaylarda ara",
     view: "Döküm görünümü",
-    modes: { normal: "Normal", compact: "Sıkı", focused: "Odaklı" },
+    modes: { detailed: "Ayrıntılı", normal: "Normal", focused: "Odaklı" },
     filters: "Filtreler",
     clear: "Temizle",
     followLive: "Canlı izle",

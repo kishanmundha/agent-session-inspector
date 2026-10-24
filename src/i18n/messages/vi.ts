@@ -910,7 +910,7 @@ export const vi: Messages = {
     groups: { timeline: "Dòng thời gian", navigation: "Điều hướng" },
     keys: {
       search: "Tìm sự kiện trong phiên này",
-      view: "Đổi chế độ xem: thường, gọn, trọng tâm",
+      view: "Đổi chế độ xem: chi tiết, thường, trọng tâm",
       order: "Đảo thứ tự: cũ nhất hoặc mới nhất trước",
       live: "Theo dõi phiên trực tiếp",
       move: "Đến sự kiện kế tiếp hoặc trước đó",
@@ -1112,7 +1112,7 @@ export const vi: Messages = {
     searchPlaceholder: "Tìm sự kiện…",
     search: "Tìm sự kiện",
     view: "Chế độ xem bản ghi",
-    modes: { normal: "Thường", compact: "Gọn", focused: "Trọng tâm" },
+    modes: { detailed: "Chi tiết", normal: "Thường", focused: "Trọng tâm" },
     filters: "Bộ lọc",
     clear: "Xóa",
     followLive: "Theo dõi trực tiếp",

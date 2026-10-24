@@ -907,7 +907,7 @@ export const th: Messages = {
     groups: { timeline: "ไทม์ไลน์", navigation: "การนำทาง" },
     keys: {
       search: "ค้นหาเหตุการณ์ในเซสชันนี้",
-      view: "สลับมุมมอง: ปกติ กระชับ เน้นสาระ",
+      view: "สลับมุมมอง: ละเอียด ปกติ เน้นสาระ",
       order: "สลับลำดับ: เก่าสุดหรือใหม่สุดก่อน",
       live: "ติดตามเซสชันแบบสด",
       move: "ไปยังเหตุการณ์ถัดไปหรือก่อนหน้า",
@@ -1109,7 +1109,7 @@ export const th: Messages = {
     searchPlaceholder: "ค้นหาเหตุการณ์…",
     search: "ค้นหาเหตุการณ์",
     view: "มุมมองบันทึก",
-    modes: { normal: "ปกติ", compact: "กระชับ", focused: "เน้นสาระ" },
+    modes: { detailed: "ละเอียด", normal: "ปกติ", focused: "เน้นสาระ" },
     filters: "ตัวกรอง",
     clear: "ล้าง",
     followLive: "ติดตามแบบสด",

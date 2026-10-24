@@ -975,7 +975,7 @@ export const de: Messages = {
     groups: { timeline: "Zeitleiste", navigation: "Navigation" },
     keys: {
       search: "Ereignisse in dieser Sitzung durchsuchen",
-      view: "Ansicht wechseln: normal, kompakt, fokussiert",
+      view: "Ansicht wechseln: detailliert, normal, fokussiert",
       order: "Reihenfolge umkehren: älteste oder neueste zuerst",
       live: "Sitzung live verfolgen",
       move: "Zum nächsten oder vorherigen Ereignis",
@@ -1185,7 +1185,7 @@ export const de: Messages = {
     searchPlaceholder: "Ereignisse durchsuchen…",
     search: "Ereignisse durchsuchen",
     view: "Transkriptansicht",
-    modes: { normal: "Normal", compact: "Kompakt", focused: "Fokussiert" },
+    modes: { detailed: "Detailliert", normal: "Normal", focused: "Fokussiert" },
     filters: "Filter",
     clear: "Zurücksetzen",
     followLive: "Live verfolgen",

@@ -905,7 +905,7 @@ export const ko: Messages = {
     groups: { timeline: "타임라인", navigation: "탐색" },
     keys: {
       search: "이 세션의 이벤트 검색",
-      view: "보기 전환: 일반, 간결, 핵심",
+      view: "보기 전환: 상세, 일반, 핵심",
       order: "순서 뒤집기: 오래된순 또는 최신순",
       live: "세션 실시간 따라가기",
       move: "다음 또는 이전 이벤트로 이동",
@@ -1106,7 +1106,7 @@ export const ko: Messages = {
     searchPlaceholder: "이벤트 검색…",
     search: "이벤트 검색",
     view: "트랜스크립트 보기",
-    modes: { normal: "일반", compact: "간결", focused: "핵심" },
+    modes: { detailed: "상세", normal: "일반", focused: "핵심" },
     filters: "필터",
     clear: "지우기",
     followLive: "실시간 따라가기",

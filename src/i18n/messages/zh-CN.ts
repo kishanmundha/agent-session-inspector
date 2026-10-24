@@ -879,7 +879,7 @@ export const zhCN: Messages = {
     groups: { timeline: "时间线", navigation: "导航" },
     keys: {
       search: "搜索此会话中的事件",
-      view: "切换转录视图：标准、紧凑、聚焦",
+      view: "切换转录视图：详细、标准、聚焦",
       order: "切换顺序：最早或最新在前",
       live: "实时跟踪会话",
       move: "移到下一个或上一个事件",
@@ -1078,7 +1078,7 @@ export const zhCN: Messages = {
     searchPlaceholder: "搜索事件…",
     search: "搜索事件",
     view: "转录视图",
-    modes: { normal: "标准", compact: "紧凑", focused: "聚焦" },
+    modes: { detailed: "详细", normal: "标准", focused: "聚焦" },
     filters: "筛选",
     clear: "清除",
     followLive: "实时跟踪",
