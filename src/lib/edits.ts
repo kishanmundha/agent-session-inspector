@@ -36,7 +36,7 @@ const EDIT_TOOL =
   /^(edit|write|multiedit|notebookedit|update|create|patch|apply_patch|replace|search_replace|str_replace\w*|(copilot_)?(write|edit|create|replace|insert)\w*(file|string|edit|notebook)\w*)$/i;
 
 /** Tools that run a shell command, which may write files of its own. */
-const SHELL_TOOL =
+export const SHELL_TOOL =
   /^(bash|sh|zsh|shell|exec|exec_command|shell_command|local_shell|terminal|run_in_terminal|run_terminal_cmd|run_terminal_command\w*|run_shell_command|run_command|execute_command|container\.exec)$/i;
 
 const PATCH_FILE = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm;
@@ -64,7 +64,7 @@ const patchedFiles = (patch: string) => [
 ];
 
 /** The command line of a shell-tool call, whether given as text or as argv. */
-function shellCommand(data: Record<string, unknown>): string | undefined {
+export function shellCommand(data: Record<string, unknown>): string | undefined {
   const raw = data.arguments;
   if (typeof raw === "string") return raw;
   const args = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};

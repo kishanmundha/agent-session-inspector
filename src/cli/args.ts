@@ -19,6 +19,8 @@ export interface Options {
   by: Grouping;
   sort: Sort;
   limit: number;
+  /** Commands listed under each shell tool in the tools report; 0 hides them. */
+  commands: number;
   json: boolean;
   help: boolean;
 }
@@ -31,6 +33,7 @@ const DEFAULTS: Options = {
   by: "day",
   sort: "recent",
   limit: 20,
+  commands: 5,
   json: false,
   help: false,
 };
@@ -96,6 +99,13 @@ export function parseOptions(argv: string[]): Options {
       case "--limit":
         opts.limit = positiveInt(flag, value());
         break;
+      case "-c":
+      case "--commands": {
+        const n = Number(value());
+        if (!Number.isInteger(n) || n < 0) throw new UsageError(`${flag} needs a whole number`);
+        opts.commands = n;
+        break;
+      }
       case "--json":
         opts.json = true;
         break;

@@ -9,7 +9,8 @@ import {
 } from "@/lib/format";
 import { PROVIDER_STYLES } from "@/lib/provider-meta";
 import { listAnalyticsSessions, listSessions } from "@/lib/providers";
-import type { AnalyticsSession, SessionMeta } from "@/lib/providers/types";
+import type { AnalyticsSession, SessionMeta, ToolOutputRow } from "@/lib/providers/types";
+import { CHARS_PER_TOKEN, toolCostUSD, toolLabel } from "@/lib/tool-names";
 import { rangeLabel, type Grouping, type Options } from "./args";
 import { bar, bold, dim, facts, table } from "./table";
 
@@ -406,5 +407,96 @@ export function sessionsReport(opts: Options) {
     matching.length > shown.length
       ? dim(`${shown.length} of ${matching.length} sessions; --limit shows more.`)
       : null,
+  );
+}
+
+// ---------------------------------------------------------------- tools
+
+export function toolsReport(opts: Options) {
+  const all = listAnalyticsSessions();
+  const stats = computeAnalytics(all, {
+    days: opts.days,
+    provider: opts.agent,
+    project: resolveProject(opts.project, all.map((s) => s.project)),
+    model: opts.model,
+  });
+  const rows = stats.toolOutput.filter((r) => r.results > 0 || r.carriedTokens > 0);
+
+  if (opts.json) {
+    printJson({
+      days: opts.days,
+      charsPerToken: CHARS_PER_TOKEN,
+      tools: rows.slice(0, opts.limit),
+      total: rows.length,
+      unpricedModels: stats.unpricedModels,
+    });
+    return;
+  }
+
+  const heading = `${bold("Tool output")} ${dim(`· ${rangeLabel(opts.days)} · most re-sent first`)}`;
+  if (rows.length === 0) {
+    print(heading, "No tool output in this range.");
+    return;
+  }
+
+  const shown = rows.slice(0, opts.limit);
+  const peak = Math.max(...shown.map((r) => r.carriedTokens));
+  const est = (chars: number) => tokens(Math.round(chars / CHARS_PER_TOKEN));
+  const cells = (
+    row: Omit<ToolOutputRow, "commands">,
+    name: string,
+    sessions: string,
+    chart: string,
+  ) => [
+    name,
+    sessions,
+    formatCount(row.results),
+    est(row.inputChars),
+    est(row.chars),
+    row.results > 0 ? est(row.chars / row.results) : "—",
+    est(row.largest),
+    tokens(row.carriedTokens),
+    toolCostUSD(row) === null ? "—" : formatCost(toolCostUSD(row)!),
+    chart,
+  ];
+  const body: string[][] = [];
+  for (const row of shown) {
+    body.push(cells(row, toolLabel(row.name), formatCount(row.sessions), bar(row.carriedTokens, peak)));
+    // An MCP server's own tools, or a shell tool's commands, heaviest first, under it.
+    for (const tool of row.tools?.slice(0, 3) ?? []) {
+      const name = tool.name.slice(row.name.length + 2);
+      body.push(cells(tool, dim(`  › ${name}`), formatCount(tool.sessions), ""));
+    }
+    for (const command of row.commands?.slice(0, opts.commands) ?? []) {
+      body.push(cells(command, dim(`  › ${command.name}`), formatCount(command.sessions), ""));
+    }
+  }
+  print(
+    heading,
+    table(
+      [
+        { header: "Tool", max: 40 },
+        { header: "Sessions", align: "right" },
+        { header: "Results", align: "right" },
+        { header: "Input", align: "right" },
+        { header: "Output", align: "right" },
+        { header: "Avg", align: "right" },
+        { header: "Largest", align: "right" },
+        { header: "Re-sent", align: "right" },
+        { header: "Est. cost", align: "right" },
+        { header: "" },
+      ],
+      body,
+    ),
+    dim(
+      `Tokens are estimated at ${CHARS_PER_TOKEN} characters each. Input is what the model wrote for ` +
+        "the calls, output what they returned. Re-sent counts both once for each later model request " +
+        "until a compaction. Cost is re-sending at the cache-read rate plus writing the input at the " +
+        "output rate.",
+    ),
+    rows.length > shown.length
+      ? dim(`${shown.length} of ${rows.length} tools; --limit shows more.`)
+      : null,
+    unpricedNote(stats.unpricedModels),
   );
 }

@@ -150,10 +150,108 @@ export interface ActivitySlot {
   /** MCP tool calls keyed `server__tool`; absent when the slot made none. */
   mcp?: Record<string, number>;
   /**
+   * Tool output by tool (MCP tools as `mcp__server__tool`); absent when the
+   * slot neither received a result nor re-sent one.
+   */
+  toolOutput?: Record<string, ToolOutputTally>;
+  /**
    * Estimated list-price cost of the slot's usage. Never cached: the analytics
    * endpoint prices it on each read, so a price change applies at once.
    */
   costUSD?: number;
+  /**
+   * What re-sending each tool's earlier input and results cost in this slot,
+   * priced the same way as `costUSD` and keyed like `toolOutput`; a shell
+   * tool's commands are keyed `tool\ncommand`.
+   */
+  toolCarriedUSD?: Record<string, number>;
+  /** What the model writing each tool's input cost, at the output rate; keyed like `toolCarriedUSD`. */
+  toolInputUSD?: Record<string, number>;
+}
+
+/**
+ * One tool's output within one slot. A result's size lands in the slot it
+ * arrived in; its re-sends land in the slots of the requests that carried it.
+ */
+export interface ToolOutputTally {
+  /** Results the tool returned. */
+  results: number;
+  /** Characters of result text the model was given. */
+  chars: number;
+  /** The largest single result, in characters. */
+  largest: number;
+  /** Characters of input the model wrote for its calls. */
+  inputChars: number;
+  /**
+   * Estimated tokens of this tool's input and results sent with the slot's
+   * model requests: each counts once per request until a compaction.
+   */
+  carried: number;
+  /** A shell tool's output by command (`git diff`); absent for other tools. */
+  commands?: Record<string, ToolOutputTally>;
+}
+
+/** One tool result, as the drill-down behind a Tool output row lists it. */
+export interface ToolResultRecord {
+  eventId: string;
+  timestamp: string;
+  /** Tool key, `mcp__server__tool` for MCP tools. */
+  tool: string;
+  /** A shell tool's command signature (`git diff`). */
+  command?: string;
+  /** The command text, or the gist of the call's arguments. */
+  detail?: string;
+  chars: number;
+  /** Characters of input the model wrote for the call. */
+  inputChars: number;
+  inputUSD: number | null;
+  /** Estimated tokens of the call's input and result re-sent with later requests. */
+  carriedTokens: number;
+  carriedUSD: number | null;
+}
+
+/** A session in a drill-down: where to open it and its share of the output. */
+export interface ToolResultSession {
+  provider: ProviderId;
+  id: string;
+  label: string;
+  project: string;
+  results: number;
+  chars: number;
+  largest: number;
+  inputChars: number;
+  inputUSD: number | null;
+  carriedTokens: number;
+  carriedUSD: number | null;
+}
+
+/** Every result behind one Tool output row, over the dashboard's filters. */
+export interface ToolResultsResponse {
+  /** All matching results, not only those listed. */
+  total: Omit<ToolResultSession, "provider" | "id" | "label" | "project"> & { sessions: number };
+  /** Most re-sent first. */
+  sessions: ToolResultSession[];
+  /** The most re-sent results, up to the requested limit. */
+  results: (ToolResultRecord & { provider: ProviderId; sessionId: string })[];
+}
+
+/** One tool's output over a session or a date range. */
+export interface ToolOutputRow {
+  /** Tool name, or `mcp__server` / `mcp__server__tool` for MCP tools. */
+  name: string;
+  results: number;
+  chars: number;
+  largest: number;
+  /** Characters of input the model wrote for the tool's calls. */
+  inputChars: number;
+  /** What writing that input cost at the output rate; null when unpriced. */
+  inputUSD: number | null;
+  /** Estimated tokens of input and results re-sent with later requests. */
+  carriedTokens: number;
+  /** Null when none of the requests that carried it had a price. */
+  carriedUSD: number | null;
+  /** A shell tool's output by command, most re-sent first; absent for other tools. */
+  commands?: ToolOutputRow[];
 }
 
 /** One session as the analytics dashboard sees it. */
@@ -415,7 +513,9 @@ export type TokenHintId =
   | "compacted"
   | "hostContext"
   | "instructions"
-  | "shellCalls";
+  | "shellCalls"
+  | "heavyTool"
+  | "mcpPayload";
 
 /**
  * A suggestion for spending fewer tokens. The words are the browser's
@@ -443,6 +543,16 @@ export interface TokenAnalysis {
   /** Everything the agent injects itself: system messages plus attached context. */
   systemContextChars: number;
   toolResultChars: number;
+  /** Output by tool, most re-sent first; MCP tools keep their full name. */
+  toolOutput: ToolOutputRow[];
+  /** The session's biggest single results, largest first. */
+  largestResults: {
+    eventId: string;
+    tool: string;
+    chars: number;
+    /** For a shell tool: the command's signature and the start of its text. */
+    command?: { signature: string; text: string };
+  }[];
   assistantChars: number;
   compactionCount: number;
   hookEventCount: number;

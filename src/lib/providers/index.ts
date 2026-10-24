@@ -7,15 +7,30 @@ import { opencodeProvider } from "./opencode";
 import { hermesProvider } from "./hermes";
 import { geminiProvider } from "./gemini";
 import { cursorProvider } from "./cursor";
-import { analyzeTokenUsage, computeSessionStats } from "./analysis";
-import { priceBucket, priceBuckets, priceEvents, priceKeyOf } from "./pricing";
+import {
+  analyzeTokenUsage,
+  computeSessionStats,
+  toolOutputResults,
+  type ToolOutputMatch,
+} from "./analysis";
+import {
+  priceBucket,
+  priceBuckets,
+  priceEvents,
+  priceKeyOf,
+  resendRate,
+  writeRate,
+} from "./pricing";
+import { CHARS_PER_TOKEN } from "@/lib/tool-names";
 import { settleHealth } from "./health";
 import { findGitRoot, hostPath, ON_HOST, tildePath } from "./fs-utils";
 import { isRunning } from "@/lib/session-state";
 import { firstLine } from "@/lib/format";
 import path from "path";
+import { ACTIVITY_SLOT_MS } from "./types";
 import type {
   ActivitySlot,
+  AgentEvent,
   AnalyticsSession,
   LogFile,
   ProviderId,
@@ -23,6 +38,9 @@ import type {
   SessionDetail,
   SessionMeta,
   SessionProvider,
+  ToolResultRecord,
+  ToolResultSession,
+  ToolResultsResponse,
   UsageSlice,
 } from "./types";
 
@@ -174,6 +192,8 @@ function pricedActivity(
   const unpriced = new Set<string>();
   const priceKeys: Record<string, string> = {};
   const custom = new Set<string>();
+  // Priced lines per slot, for the rate its requests re-sent tool output at.
+  const slotLines = new Map<number, ReturnType<typeof priceBucket>["lines"]>();
   for (const bucket of meta.usage ?? []) {
     const model = bucket.model ?? "unknown";
     const { cost, lines } = priceBucket(bucket);
@@ -187,6 +207,7 @@ function pricedActivity(
     const slot = bucket.t === undefined ? undefined : slots.get(bucket.t);
     if (!slot) continue;
     if (cost !== null) slot.costUSD = (slot.costUSD ?? 0) + cost;
+    slotLines.set(slot.t, [...(slotLines.get(slot.t) ?? []), ...lines]);
 
     // Speed tiers of one model share a slice: the usage page groups by model.
     const key = `${slot.t}|${model}`;
@@ -215,6 +236,27 @@ function pricedActivity(
     slice.cacheWriteTokens += (bucket.cacheWriteTokens ?? 0) + (bucket.cacheWrite1hTokens ?? 0);
     if (cost !== null) slice.costUSD = (slice.costUSD ?? 0) + cost;
   }
+  for (const slot of slots.values()) {
+    if (!slot.toolOutput) continue;
+    const lines = slotLines.get(slot.t) ?? [];
+    const resend = resendRate(lines);
+    const write = writeRate(lines);
+    const carried: Record<string, number> = {};
+    const input: Record<string, number> = {};
+    // A shell tool's commands are keyed `tool\ncommand`, as analytics reads them.
+    const tallies = Object.entries(slot.toolOutput).flatMap(([key, tally]) => [
+      [key, tally] as const,
+      ...Object.entries(tally.commands ?? {}).map(([sig, c]) => [`${key}\n${sig}`, c] as const),
+    ]);
+    for (const [key, tally] of tallies) {
+      if (resend !== null && tally.carried > 0) carried[key] = tally.carried * resend;
+      if (write !== null && tally.inputChars > 0) {
+        input[key] = (tally.inputChars / CHARS_PER_TOKEN) * write;
+      }
+    }
+    if (Object.keys(carried).length > 0) slot.toolCarriedUSD = carried;
+    if (Object.keys(input).length > 0) slot.toolInputUSD = input;
+  }
   return {
     activity: [...slots.values()],
     usage: [...slices.values()],
@@ -239,6 +281,141 @@ export function listAnalyticsSessions(): AnalyticsSession[] {
       health: settleHealth(meta.health, isRunning(meta.updated_at)),
       ...pricedActivity(meta),
     }));
+}
+
+/** What a Tool output drill-down asks for: one row, under the dashboard's filters. */
+export interface ToolResultsQuery extends ToolOutputMatch {
+  /** Epoch milliseconds the range starts at; null for all time. */
+  from: number | null;
+  provider: string;
+  project: string;
+  model: string;
+  /** Results to list; the totals and sessions always cover all of them. */
+  limit: number;
+  /** Only this session's results. */
+  session?: { provider: string; id: string };
+}
+
+/** Whether a slot holds output for the row the query names. */
+function slotMatches(slot: ActivitySlot, query: ToolResultsQuery): boolean {
+  for (const [key, tally] of Object.entries(slot.toolOutput ?? {})) {
+    if (key !== query.tool && !key.startsWith(`${query.tool}__`)) continue;
+    if (query.command === undefined ? tally.results > 0 : tally.commands?.[query.command]?.results)
+      return true;
+  }
+  return false;
+}
+
+/**
+ * Every result behind one Tool output row. The cached activity slots pick the
+ * sessions worth reading, so only transcripts that hold a match are parsed.
+ */
+export function listToolResults(query: ToolResultsQuery): ToolResultsResponse {
+  const all = rawSessions();
+  const projectOf = projectResolver(all);
+  // Slots start on a 15-minute boundary; one that began before `from` may still hold matches.
+  const earliest = query.from === null ? null : query.from - ACTIVITY_SLOT_MS;
+  const sessions: ToolResultSession[] = [];
+  const results: ToolResultsResponse["results"] = [];
+
+  for (const meta of all) {
+    if (query.provider !== "all" && meta.provider !== query.provider) continue;
+    if (query.session && (meta.provider !== query.session.provider || meta.id !== query.session.id))
+      continue;
+    if (query.model !== "all" && meta.model !== query.model) continue;
+    const project = projectOf(meta).project ?? "unknown";
+    if (query.project !== "all" && project !== query.project) continue;
+    const touched = (meta.activity ?? []).some(
+      (slot) => (earliest === null || slot.t >= earliest) && slotMatches(slot, query),
+    );
+    if (!touched) continue;
+
+    let events: AgentEvent[];
+    try {
+      events = getProvider(meta.provider)?.getSession(meta.id)?.events ?? [];
+    } catch {
+      continue; // A transcript that no longer parses has nothing to list.
+    }
+    const found = toolOutputResults(events, query, query.from);
+    if (found.length === 0) continue;
+    const session: ToolResultSession = {
+      provider: meta.provider,
+      id: meta.id,
+      label: meta.title ?? firstLine(meta.name) ?? meta.id,
+      project,
+      results: 0,
+      chars: 0,
+      largest: 0,
+      inputChars: 0,
+      inputUSD: null,
+      carriedTokens: 0,
+      carriedUSD: null,
+    };
+    for (const record of found) {
+      addResult(session, record);
+      results.push({ ...record, provider: meta.provider, sessionId: meta.id });
+    }
+    sessions.push(session);
+  }
+
+  const total = {
+    sessions: sessions.length,
+    results: 0,
+    chars: 0,
+    largest: 0,
+    inputChars: 0,
+    inputUSD: null,
+    carriedTokens: 0,
+    carriedUSD: null,
+  };
+  for (const record of results) addResult(total, record);
+  const byCarried = (a: { carriedTokens: number; chars: number }, b: typeof a) =>
+    b.carriedTokens - a.carriedTokens || b.chars - a.chars;
+  return {
+    total,
+    sessions: sessions.sort(byCarried),
+    results: results.sort(byCarried).slice(0, query.limit),
+  };
+}
+
+/**
+ * One tool result and the call that asked for it, for a drill-down row opened
+ * in place. Null when the session or the event is gone.
+ */
+export function getToolResult(
+  providerId: string,
+  id: string,
+  eventId: string,
+): { result: AgentEvent; call?: AgentEvent } | null {
+  const events = getProvider(providerId)?.getSession(id)?.events;
+  const result = events?.find((e) => e.id === eventId);
+  if (!events || !result) return null;
+  const callId = result.data.toolCallId;
+  const call =
+    typeof callId === "string"
+      ? events.find(
+          (e) =>
+            e.data.toolCallId === callId &&
+            (e.type === "tool.execution_start" || e.type === "external_tool.requested"),
+        )
+      : undefined;
+  return { result, ...(call ? { call } : {}) };
+}
+
+function addResult(
+  into: Pick<
+    ToolResultSession,
+    "results" | "chars" | "largest" | "inputChars" | "inputUSD" | "carriedTokens" | "carriedUSD"
+  >,
+  record: ToolResultRecord,
+) {
+  into.results++;
+  into.chars += record.chars;
+  into.largest = Math.max(into.largest, record.chars);
+  into.inputChars += record.inputChars;
+  if (record.inputUSD !== null) into.inputUSD = (into.inputUSD ?? 0) + record.inputUSD;
+  into.carriedTokens += record.carriedTokens;
+  if (record.carriedUSD !== null) into.carriedUSD = (into.carriedUSD ?? 0) + record.carriedUSD;
 }
 
 export function listProviders(): ProviderInfo[] {

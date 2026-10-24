@@ -17,7 +17,7 @@ const SERVER = path.join(PKG_DIR, "app", "server.js");
 // Report commands print to the terminal instead of starting the server; they
 // live in the bundle scripts/build-cli.mjs writes to <package>/cli/.
 const CLI = path.join(PKG_DIR, "cli", "cli.mjs");
-const COMMANDS = ["usage", "stats", "sessions"];
+const COMMANDS = ["usage", "stats", "tools", "sessions"];
 
 const HELP = `Usage: ${NAME} [options]
        ${NAME} <command> [options]
@@ -28,6 +28,7 @@ session transcripts in a local web UI, or print a report in the terminal.
 Commands:
   usage               Tokens and estimated cost by day, model, project or agent
   stats               Sessions, messages, tool calls and time, by agent
+  tools               Which tools and MCP servers filled the context, and what it cost
   sessions            Recent sessions with their cost and health
 
   Run a command with --help for its options.

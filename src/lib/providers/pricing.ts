@@ -173,6 +173,46 @@ export function costOf(usage: BilledUsage, timestamp?: string): UsageLine[] {
   }));
 }
 
+/**
+ * USD per token for context a request re-sends: the cache-read rate when the
+ * request read from the cache, the input rate otherwise. Null when unpriced.
+ */
+export function resendRate(lines: Pick<CostLine, "kind" | "tokens" | "usd">[]): number | null {
+  for (const kinds of [["cacheRead"], ["input"]]) {
+    let tokens = 0;
+    let usd = 0;
+    for (const line of lines) {
+      if (!kinds.includes(line.kind) || line.usd === null) continue;
+      tokens += line.tokens;
+      usd += line.usd;
+    }
+    if (tokens > 0) return usd / tokens;
+  }
+  return null;
+}
+
+/** USD per token the model's own writing cost on a request; null when unpriced. */
+export function writeRate(lines: Pick<CostLine, "kind" | "tokens" | "usd">[]): number | null {
+  let tokens = 0;
+  let usd = 0;
+  for (const line of lines) {
+    if (line.kind !== "output" || line.usd === null) continue;
+    tokens += line.tokens;
+    usd += line.usd;
+  }
+  return tokens > 0 ? usd / tokens : null;
+}
+
+/** Whether the event is a model request the agent was billed for. */
+export function isBilledRequest(event: AgentEvent): boolean {
+  return !isInherited(event) && billedUsageOf(event).length > 0;
+}
+
+/** The event's billed usage as priced lines, every model it named together. */
+export function eventCostLines(event: AgentEvent): UsageLine[] {
+  return billedUsageOf(event).flatMap((usage) => costOf(usage, event.timestamp));
+}
+
 function tokenCount(u: BilledUsage) {
   return (
     u.inputTokens +

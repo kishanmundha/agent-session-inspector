@@ -466,7 +466,7 @@ function ToolSectionHeading({ label, note, copyValue }: { label: string; note?: 
 }
 
 /** Arguments one per key, so a command or a file body keeps its line breaks. */
-function ToolArguments({ args, chars }: { args: Record<string, unknown>; chars?: number }) {
+export function ToolArguments({ args, chars }: { args: Record<string, unknown>; chars?: number }) {
   const t = useT();
   const entries = Object.entries(args);
   if (entries.length === 0) return null;
@@ -504,7 +504,7 @@ function ToolArguments({ args, chars }: { args: Record<string, unknown>; chars?:
 }
 
 /** What a tool returned: its text as written, plus what was left out of it. */
-function ToolResultView({
+export function ToolResultView({
   result,
   chars,
   truncated,

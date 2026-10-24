@@ -135,6 +135,22 @@ project, model and agent.
 **Skills and MCP tools.** The Analytics tab counts which skills were loaded and
 which MCP servers and tools were called, for the selected range.
 
+**Tool output.** Which tools and MCP servers filled the context, over any date
+range: the **input** the model wrote for their calls (commands, scripts, file
+contents), the **output** they returned, and how much of both was **re-sent**.
+Both stay in the prompt of every later request until a compaction, so a big
+`Write` or tool result early in a long session is paid for many times; the
+re-sent count adds that up and prices it at each request's cache-read rate, and
+the cost adds the model writing the input at its output rate. Expand
+a shell tool to split it by command (`cat`, `git diff`, `npm run test`, …) or an
+MCP server to split it by tool. Click any name for a page of every result
+behind it in the range, by result or by session; open a row there to read what
+the call asked for and what it returned, without leaving the list. The table points at what to trim (whole-file
+reads, noisy commands, MCP servers that return large payloads), and each
+session's Token Optimizer has the same table plus links to its largest results,
+with the command that produced each one. Sizes are estimated at about 4 characters per
+token, since transcripts rarely record a result's tokens.
+
 > Screenshots use synthetic demo data. To reproduce them locally, see
 > [CONTRIBUTING.md](CONTRIBUTING.md#demo-data).
 
@@ -146,6 +162,7 @@ transcripts, prints a report and exits:
 ```bash
 npx agent-session-inspector usage      # tokens and estimated cost per day
 npx agent-session-inspector stats      # sessions, messages, tools and time, by agent
+npx agent-session-inspector tools      # which tools and MCP servers filled the context
 npx agent-session-inspector sessions   # recent sessions with cost and health
 ```
 
@@ -187,6 +204,7 @@ only with a new one. Costs are US dollars, or `null` where no price is known.
 | ---------- | -------------------------------------------------------------------------------------------------------- |
 | `usage`    | `by`, `rows[]`, `total`, `unpricedModels`. A row has `key`, `sessions`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `totalTokens`, `costUSD`; `total` has the same without `key`. |
 | `stats`    | `totals`, `messagesPerSession`, `agents[]`, `projects[]`, `tools[]`, `skills[]`, `mcpServers[]`, `unpricedModels`. |
+| `tools`    | `charsPerToken`, `tools[]`, `total` (rows before `--limit`), `unpricedModels`. A row has `name` (`mcp__server` for an MCP server), `sessions`, `results`, `chars` (output), `largest`, `inputChars`, `inputUSD` (writing the input), `carriedTokens` and `carriedUSD` (re-sending input and output); an MCP server adds `tools[]` and a shell tool `commands[]`, each with the same fields. |
 | `sessions` | `sort`, `total` (matches before `--limit`), `sessions[]`. A session has `agent`, `id`, `title`, `project`, `model`, `createdAt`, `updatedAt`, `userMessages`, `toolCalls`, `inputTokens`, `outputTokens`, `estimatedCostUSD`, `health`. |
 
 ## Supported agents

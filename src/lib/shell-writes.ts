@@ -245,3 +245,94 @@ export function shellWrittenPaths(command: string, cwd?: string): string[] {
   }
   return [...paths];
 }
+
+/** Commands that set up the shell rather than do the work. */
+const SETUP = new Set(["cd", "pushd", "popd", "export", "source", ".", "set", "unset", "true", ":", "read", "local"]);
+
+/** Keywords that open a segment whose own command follows them: `do cat x`, `if grep …`. */
+const LEADING_KEYWORDS = new Set(["do", "then", "else", "elif", "if", "while", "until", "!", "{"]);
+
+/** Segments that are only shell syntax: a loop header, a closing keyword. */
+const SYNTAX_ONLY = new Set(["for", "select", "case", "esac", "done", "fi", "}", "function"]);
+
+/**
+ * Commands that only print a label or prepare a folder; another command in
+ * the same line names it better: `mkdir -p src && cat > src/a.ts`.
+ */
+const PREAMBLE = new Set(["echo", "printf", "mkdir", "touch"]);
+
+/** Commands that write a file when redirected, told apart from reading: `cat >` vs `cat`. */
+const REDIRECT_WRITERS = new Set(["cat", "echo", "printf", "tee"]);
+
+/** Programs whose first argument names what they do: `git diff`, `docker ps`. */
+const SUBCOMMANDS =
+  /^(git|gh|npm|pnpm|yarn|bun|npx|pnpx|bunx|deno|cargo|go|docker|podman|kubectl|helm|terraform|brew|apt|apt-get|pip[\d.]*|uv|poetry|dotnet|gradle|gradlew|mvn|make|just|turbo|nx|swift|xcodebuild|xcrun|aws|gcloud|az|vercel|supabase|firebase|wrangler|prisma|rails|bundle|mix|composer|php|artisan)$/;
+
+/** Package-manager verbs followed by the script or tool that really runs. */
+const RUNNERS = new Set(["run", "exec", "dlx", "x", "test"]);
+
+/** Flags that take the next word as their value, so it is not the subcommand. */
+const VALUE_FLAGS = /^(-C|-c|--prefix|--dir|--cwd|--filter|-F|--workspace|-w|--git-dir|--work-tree|--manifest-path|--project|--context|-n|--namespace)$/;
+
+/** The first argument that is neither a flag nor a flag's value. */
+function firstOperand(args: string[]): number {
+  for (let i = 0; i < args.length; i++) {
+    if (VALUE_FLAGS.test(args[i])) i++;
+    else if (!args[i].startsWith("-")) return i;
+  }
+  return -1;
+}
+
+const isWord = (word: string | undefined): word is string =>
+  !!word && word.length <= 40 && /^[\w@][\w@:./+-]*$/.test(word) && !word.startsWith("-");
+
+/**
+ * What a shell command runs, short enough to group calls by: the program and,
+ * for tools with subcommands, the subcommand (`git diff`, `npm run build`,
+ * `python -m pytest`), and `cat >` for a file written through a redirect.
+ * Setup like `cd dir &&`, wrappers like `sudo`, loop
+ * syntax, `echo` labels and `mkdir` are skipped; pipes keep the first program. "other"
+ * when nothing can be named.
+ */
+export function commandSignature(command: string): string {
+  const { shell, bodies } = splitHeredocs(command);
+  let preamble: string | undefined;
+  for (const { words, inputs, writes } of parseShell(shell)) {
+    let start = 0;
+    while (
+      start < words.length &&
+      (/^\w+=/.test(words[start]) || WRAPPERS.has(words[start]) || LEADING_KEYWORDS.has(words[start]))
+    ) {
+      start++;
+    }
+    const name = words[start]?.split("/").pop() ?? "";
+    if (!name || SETUP.has(name) || SYNTAX_ONLY.has(name)) continue;
+    // `cat > file <<EOF` writes a whole file through the shell: worth its own row.
+    if (REDIRECT_WRITERS.has(name) && (writes.length > 0 || name === "tee")) return `${name} >`;
+    if (PREAMBLE.has(name)) {
+      preamble ??= name;
+      continue;
+    }
+    const args = words.slice(start + 1);
+
+    if (SHELLS.test(name)) {
+      const flag = args.findIndex((a) => /^-[a-zA-Z]*c$/.test(a));
+      const heredocs = inputs.flatMap((input) => bodies[Number(HEREDOC_REF.exec(input)?.[1])] ?? []);
+      const script = flag >= 0 ? args[flag + 1] : heredocs[0];
+      return script ? commandSignature(script) : name;
+    }
+    if (!isWord(name)) return "other";
+    if (/^python[\d.]*$/.test(name) && args[0] === "-m" && isWord(args[1])) return `${name} -m ${args[1]}`;
+    if (!SUBCOMMANDS.test(name)) return name;
+    const at = firstOperand(args);
+    const sub = args[at];
+    if (!isWord(sub)) return name;
+    if (RUNNERS.has(sub)) {
+      const rest = args.slice(at + 1);
+      const target = rest[firstOperand(rest)];
+      if (isWord(target)) return `${name} ${sub} ${target}`;
+    }
+    return `${name} ${sub}`;
+  }
+  return preamble ?? "other";
+}

@@ -13,6 +13,9 @@ import { Segmented } from "@/components/common/segmented";
 import { Skeleton } from "@/components/common/skeleton";
 import { UnpricedNotice } from "@/components/common/unpriced-notice";
 import { StatCard, StatCardGrid } from "@/components/common/stat-card";
+import { ToolOutputTable } from "@/components/common/tool-output-table";
+import { toolResultsHref } from "./tool-results-view";
+import { toolCostUSD } from "@/lib/tool-names";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -229,6 +232,8 @@ export function AnalyticsDashboard({
       : data.mcpServers.flatMap((server) =>
           server.tools.map((tool) => ({ name: `${server.name} › ${tool.name}`, value: tool.value })),
         );
+  const carriedTokens = data.toolOutput.reduce((sum, r) => sum + r.carriedTokens, 0);
+  const carriedUSD = data.toolOutput.reduce((sum, r) => sum + (toolCostUSD(r) ?? 0), 0);
   const perMinute = (count: number, ms: number) =>
     ms > 0 ? fixed(count / activeMinutes(ms), 1) : "—";
 
@@ -494,6 +499,36 @@ export function AnalyticsDashboard({
               <BarList items={mcpItems} limit={8} emptyLabel={t("analytics.noMcp")} />
             </Panel>
           </div>
+
+          <Panel
+            title={t("toolOutput.title")}
+            note={
+              carriedTokens > 0
+                ? t("toolOutput.note", {
+                    tokens: formatTokens(carriedTokens) ?? "0",
+                    cost: formatCost(carriedUSD),
+                  })
+                : undefined
+            }
+          >
+            {data.toolOutput.length === 0 ? (
+              <p className="text-xs text-muted-foreground">{t("toolOutput.empty")}</p>
+            ) : (
+              <>
+                <ToolOutputTable
+                  rows={data.toolOutput}
+                  limit={12}
+                  sessions
+                  hrefFor={(target) =>
+                    toolResultsHref(target, { range, project, provider, model })
+                  }
+                />
+                <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                  {t("toolOutput.footnote")}
+                </p>
+              </>
+            )}
+          </Panel>
 
           <Panel title={t("analytics.agentComparison")}>
             <Table className="min-w-[720px]">

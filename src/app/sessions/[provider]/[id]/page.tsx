@@ -462,6 +462,7 @@ function Session({ provider, id }: { provider: string; id: string }) {
                   stats={data.stats}
                   eventTypeCounts={eventTypeCounts}
                   onFocusHint={focusEvents}
+                  onOpenEvent={openEvent}
                 />
               </TabsContent>
             </Tabs>

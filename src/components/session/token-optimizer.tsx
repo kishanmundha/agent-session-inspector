@@ -9,8 +9,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BarList } from "@/components/common/bar-list";
+import { ToolOutputTable } from "@/components/common/tool-output-table";
 import { cn } from "@/lib/utils";
-import { formatNumber, formatPercent } from "@/lib/format";
+import { formatNumber, formatPercent, formatTokens } from "@/lib/format";
+import { CHARS_PER_TOKEN, toolLabel } from "@/lib/tool-names";
 import { useT } from "@/i18n/client";
 import type { SessionStats, TokenAnalysis, TokenHint } from "./types";
 
@@ -39,11 +41,13 @@ export function TokenOptimizer({
   stats,
   eventTypeCounts,
   onFocusHint,
+  onOpenEvent,
 }: {
   analysis: TokenAnalysis;
   stats: SessionStats;
   eventTypeCounts: { name: string; value: number }[];
   onFocusHint: (focus: NonNullable<TokenHint["focus"]>) => void;
+  onOpenEvent: (eventId: string) => void;
 }) {
   const t = useT();
   const breakdown: { label: string; note?: string; chars: number; bar: string; text: string }[] = [
@@ -244,6 +248,61 @@ export function TokenOptimizer({
           ))}
         </div>
       </section>
+
+      {analysis.toolOutput.length > 0 && (
+        <section className="rounded-xl border border-border bg-card p-5">
+          <h2 className="mb-3 text-sm font-semibold text-foreground">
+            {t("toolOutput.title")}
+          </h2>
+          <ToolOutputTable rows={analysis.toolOutput} limit={10} />
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            {t("toolOutput.footnote")}
+          </p>
+
+          {analysis.largestResults.length > 0 && (
+            <>
+              <h3 className="mb-2 mt-5 text-xs uppercase tracking-wider text-muted-foreground">
+                {t("toolOutput.largestResults")}
+              </h3>
+              <ol className="divide-y divide-border">
+                {analysis.largestResults.map((result) => {
+                  const label = result.command
+                    ? `${toolLabel(result.tool)} › ${result.command.signature}`
+                    : toolLabel(result.tool);
+                  return (
+                  <li key={result.eventId}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenEvent(result.eventId)}
+                      className="flex w-full items-center gap-3 py-1.5 text-left text-xs hover:bg-muted/50"
+                      aria-label={t("toolOutput.openResult", { tool: label })}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-mono text-foreground">{label}</span>
+                        {result.command && (
+                          <span
+                            className="block truncate font-mono text-muted-foreground"
+                            title={result.command.text}
+                          >
+                            {result.command.text}
+                          </span>
+                        )}
+                      </span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {t("toolOutput.tokensEstimate", {
+                          amount: formatTokens(Math.round(result.chars / CHARS_PER_TOKEN)) ?? "0",
+                        })}
+                      </span>
+                      <ArrowRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    </button>
+                  </li>
+                  );
+                })}
+              </ol>
+            </>
+          )}
+        </section>
+      )}
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="rounded-xl border border-border bg-card p-5">

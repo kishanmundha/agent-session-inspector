@@ -4,7 +4,7 @@
  * the launcher in bin/ when the first argument is one of COMMANDS there.
  */
 import { GROUPINGS, parseOptions, SORTS, UsageError, type Options } from "./args";
-import { sessionsReport, statsReport, usageReport } from "./reports";
+import { sessionsReport, statsReport, toolsReport, usageReport } from "./reports";
 
 const NAME = "agent-session-inspector";
 
@@ -37,6 +37,20 @@ agent, project and tool.
 
 Options:
   -n, --limit <n>      Projects and tools to list (default: 20)
+${FILTERS}
+`,
+  },
+  tools: {
+    run: toolsReport,
+    help: `Usage: ${NAME} tools [options]
+
+What each tool and MCP server returned to the model, and what re-sending that
+output with every later request cost. Shell tools are split by command (git
+diff, npm test, …) and MCP servers by tool. Use it to find what to trim.
+
+Options:
+  -n, --limit <n>      Tools and MCP servers to list (default: 20)
+  -c, --commands <n>   Commands to list under each shell tool (default: 5; 0 hides)
 ${FILTERS}
 `,
   },

@@ -1,4 +1,10 @@
-import type { AnalyticsSession, ProviderId } from "@/lib/providers/types";
+import type {
+  AnalyticsSession,
+  ProviderId,
+  ToolOutputRow,
+  ToolOutputTally,
+} from "@/lib/providers/types";
+import { mcpServerOf } from "@/lib/tool-names";
 
 /**
  * Cross-session aggregation for the analytics dashboard. It runs in the
@@ -83,6 +89,19 @@ export interface McpServerRow {
   tools: { name: string; value: number }[];
 }
 
+/**
+ * One built-in tool or one MCP server (`mcp__server`), with what its results
+ * added to the context and what re-sending them cost.
+ */
+export interface ToolOutputSummary extends Omit<ToolOutputRow, "commands"> {
+  /** Sessions it returned output in. */
+  sessions: number;
+  /** An MCP server's tools, keyed `mcp__server__tool`; absent for built-in tools. */
+  tools?: (ToolOutputRow & { sessions: number })[];
+  /** A shell tool's commands; absent for other tools. */
+  commands?: (ToolOutputRow & { sessions: number })[];
+}
+
 export interface Analytics {
   totals: Counts & { projects: number; activeDays: number };
   messagesPerSession: { mean: number; median: number; p90: number };
@@ -97,6 +116,8 @@ export interface Analytics {
   tools: { name: string; value: number }[];
   skills: SkillRow[];
   mcpServers: McpServerRow[];
+  /** Most re-sent first. */
+  toolOutput: ToolOutputSummary[];
   agents: AgentRow[];
   /** Models left out of every cost figure because they have no price. */
   unpricedModels: string[];
@@ -125,6 +146,36 @@ export function dayKey(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
 }
+
+const emptyOutput = (name: string): Omit<ToolOutputRow, "commands"> => ({
+  name,
+  results: 0,
+  chars: 0,
+  largest: 0,
+  inputChars: 0,
+  inputUSD: null,
+  carriedTokens: 0,
+  carriedUSD: null,
+});
+
+/** Adds one slot's tally to a row, with the slot's prices for re-sending and writing it. */
+function addTally(
+  row: Omit<ToolOutputRow, "commands">,
+  tally: ToolOutputTally,
+  usd: { carried?: number; input?: number },
+) {
+  row.results += tally.results;
+  row.chars += tally.chars;
+  row.largest = Math.max(row.largest, tally.largest);
+  row.inputChars += tally.inputChars;
+  row.carriedTokens += tally.carried;
+  if (usd.carried !== undefined) row.carriedUSD = (row.carriedUSD ?? 0) + usd.carried;
+  if (usd.input !== undefined) row.inputUSD = (row.inputUSD ?? 0) + usd.input;
+}
+
+/** Most re-sent first; output size breaks ties, so unpriced agents still rank. */
+const byCarried = (a: ToolOutputRow, b: ToolOutputRow) =>
+  b.carriedTokens - a.carriedTokens || b.chars - a.chars;
 
 function quantile(sorted: number[], q: number): number {
   if (sorted.length === 0) return 0;
@@ -156,6 +207,11 @@ export function computeAnalytics(
   const skills = new Map<string, SkillRow>();
   const mcp = new Map<string, Map<string, number>>();
   const agents = new Map<ProviderId, AgentRow & { tools: Map<string, number> }>();
+  type OutputTool = ToolOutputRow & { sessions: number };
+  const output = new Map<
+    string,
+    ToolOutputSummary & { byTool: Map<string, OutputTool>; byCommand: Map<string, OutputTool> }
+  >();
   let earliest = today.getTime();
 
   for (const session of all) {
@@ -183,6 +239,7 @@ export function computeAnalytics(
     const seenDays = new Set<string>();
     const seenHours = new Set<number>();
     const seenSkills = new Set<string>();
+    const seenOutput = new Set<string>();
     let inRange = false;
 
     for (const slot of session.activity) {
@@ -240,6 +297,40 @@ export function computeAnalytics(
         let serverTools = mcp.get(server);
         if (!serverTools) mcp.set(server, (serverTools = new Map()));
         serverTools.set(tool, (serverTools.get(tool) ?? 0) + count);
+      }
+      for (const [key, tally] of Object.entries(slot.toolOutput ?? {})) {
+        const server = mcpServerOf(key);
+        const name = server === null ? key : `mcp__${server}`;
+        let group = output.get(name);
+        if (!group) {
+          group = { ...emptyOutput(name), sessions: 0, byTool: new Map(), byCommand: new Map() };
+          output.set(name, group);
+        }
+        let tool = group.byTool.get(key);
+        if (!tool) group.byTool.set(key, (tool = { ...emptyOutput(key), sessions: 0 }));
+        const usd = { carried: slot.toolCarriedUSD?.[key], input: slot.toolInputUSD?.[key] };
+        addTally(group, tally, usd);
+        addTally(tool, tally, usd);
+        // A session counts once towards its server and once towards each tool.
+        const counted: [string, OutputTool, ToolOutputTally][] = [
+          [name, group, tally],
+          [key, tool, tally],
+        ];
+        for (const [signature, commandTally] of Object.entries(tally.commands ?? {})) {
+          let command = group.byCommand.get(signature);
+          if (!command) group.byCommand.set(signature, (command = { ...emptyOutput(signature), sessions: 0 }));
+          const commandKey = `${key}\n${signature}`;
+          addTally(command, commandTally, {
+            carried: slot.toolCarriedUSD?.[commandKey],
+            input: slot.toolInputUSD?.[commandKey],
+          });
+          counted.push([`${key}\n${signature}`, command, commandTally]);
+        }
+        for (const [mark, target, source] of counted) {
+          if ((source.results === 0 && source.inputChars === 0) || seenOutput.has(mark)) continue;
+          seenOutput.add(mark);
+          target.sessions++;
+        }
       }
     }
 
@@ -319,6 +410,15 @@ export function computeAnalytics(
         };
       })
       .sort((a, b) => b.value - a.value),
+    toolOutput: [...output.values()]
+      .map(({ byTool, byCommand, ...group }) => ({
+        ...group,
+        ...(mcpServerOf(group.name) !== null
+          ? { tools: [...byTool.values()].sort(byCarried) }
+          : {}),
+        ...(byCommand.size > 0 ? { commands: [...byCommand.values()].sort(byCarried) } : {}),
+      }))
+      .sort(byCarried),
     agents: [...agents.values()]
       .filter((a) => a.sessions > 0)
       .sort((a, b) => b.messages - a.messages)

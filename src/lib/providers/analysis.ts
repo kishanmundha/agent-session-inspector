@@ -5,10 +5,23 @@ import type {
   SessionStats,
   TokenAnalysis,
   TokenHint,
+  ToolOutputRow,
+  ToolOutputTally,
+  ToolResultRecord,
 } from "./types";
 import { ACTIVITY_SLOT_MS } from "./types";
-import { bucketUsage, isInherited } from "./pricing";
+import {
+  bucketUsage,
+  eventCostLines,
+  isBilledRequest,
+  isInherited,
+  resendRate,
+  writeRate,
+} from "./pricing";
 import { assessHealth } from "./health";
+import { CHARS_PER_TOKEN, mcpServerOf } from "@/lib/tool-names";
+import { SHELL_TOOL, shellCommand } from "@/lib/edits";
+import { commandSignature } from "@/lib/shell-writes";
 
 /**
  * Cumulative session totals an adapter can attach to any event (usually a
@@ -140,6 +153,248 @@ function mcpToolOf(type: string, name: string): string | null {
   return name.includes("__") ? name : `other__${name}`;
 }
 
+
+/** The name a tool's output is filed under: MCP tools as `mcp__server__tool`. */
+function toolOutputKey(type: string, name: string): string {
+  const mcp = mcpToolOf(type, name);
+  return mcp ? `mcp__${mcp}` : name;
+}
+
+/** The tool a result came from and, for a shell tool, the command it ran. */
+interface OutputSource {
+  key: string;
+  command?: { signature: string; text: string };
+}
+
+interface ToolOutputVisitor {
+  /**
+   * The model wrote `chars` of input for a call; `writer` is the billed
+   * request that wrote it, when one came before. `entry` is as for `carried`.
+   */
+  input?(call: AgentEvent, source: OutputSource, chars: number, writer?: AgentEvent, entry?: string): void;
+  /**
+   * A tool returned `chars` of result text; `call` is the event that asked
+   * for it, when the transcript linked the two. `entry` is as for `carried`.
+   */
+  result?(event: AgentEvent, source: OutputSource, chars: number, call?: AgentEvent, entry?: string): void;
+  /**
+   * A model request re-sent `tokens` of the source's earlier input and
+   * results. With `perResult`, it is called once per call, named by `entry`:
+   * the call's id, or the event's own id when the transcript gave none.
+   */
+  carried?(request: AgentEvent, source: OutputSource, tokens: number, entry?: string): void;
+  /** Report each call's re-sends on its own rather than summed per source. */
+  perResult?: boolean;
+}
+
+/** Longest command text kept to show beside a large result. */
+const COMMAND_TEXT_CHARS = 160;
+
+const LEADING_CD = /^(cd\s+("[^"]*"|'[^']*'|\S+)\s*(&&|;)\s*)+/;
+
+function sourceOf(type: string, data: Record<string, unknown>): OutputSource {
+  const name = toolNameOf(data) ?? "unknown";
+  const key = toolOutputKey(type, name);
+  if (!SHELL_TOOL.test(name)) return { key };
+  // Codex's `exec` custom tool takes JavaScript in `input`, not a command line.
+  const args = data.arguments as Record<string, unknown> | undefined;
+  if (name === "exec" && args && typeof args === "object" && "input" in args && !("command" in args || "cmd" in args)) {
+    return { key };
+  }
+  const text = shellCommand(data);
+  if (!text) return { key };
+  return {
+    key,
+    command: {
+      signature: commandSignature(text),
+      // A leading `cd somewhere &&` only says where; the rest says what ran.
+      text: text.trim().replace(LEADING_CD, "").slice(0, COMMAND_TEXT_CHARS),
+    },
+  };
+}
+
+/**
+ * Follows every tool result from the moment it arrives until a compaction
+ * drops it, reporting each model request that sent it along. Results a fork
+ * inherited are the parent's output, but the fork still pays to re-send them.
+ */
+function walkToolOutput(events: AgentEvent[], visit: ToolOutputVisitor) {
+  const callsById = new Map<string, { source: OutputSource; call: AgentEvent }>();
+  // Estimated tokens of each tool's (and command's, or call's) input and output still in context.
+  const live = new Map<string, { source: OutputSource; tokens: number; entry: string }>();
+  const keep = (source: OutputSource, entry: string, chars: number) => {
+    const key = visit.perResult ? entry : `${source.key}\n${source.command?.signature ?? ""}`;
+    const held = live.get(key) ?? { source, tokens: 0, entry };
+    held.tokens += chars / CHARS_PER_TOKEN;
+    live.set(key, held);
+  };
+  // The latest billed request: the one that wrote a call that follows it.
+  let writer: AgentEvent | undefined;
+
+  for (const e of events) {
+    const d = e.data;
+    // Input joins the context from the next request on, not the one that wrote it.
+    let written: { source: OutputSource; entry: string; chars: number } | null = null;
+    switch (e.type) {
+      case "tool.execution_start":
+      case "external_tool.requested": {
+        const id = d.toolCallId;
+        const source = sourceOf(e.type, d);
+        if (typeof id === "string") callsById.set(id, { source, call: e });
+        const chars = num(d.argumentChars);
+        if (chars === 0) break;
+        const entry = typeof id === "string" ? id : e.id;
+        if (isBilledRequest(e)) writer = e;
+        if (!isInherited(e)) visit.input?.(e, source, chars, writer, entry);
+        written = { source, entry, chars };
+        break;
+      }
+      case "tool.execution_complete":
+      case "external_tool.completed": {
+        const chars = num(d.resultChars);
+        if (chars === 0) break;
+        const id = d.toolCallId;
+        const requested =
+          e.type === "external_tool.completed" ? "external_tool.requested" : "tool.execution_start";
+        const linked = typeof id === "string" ? callsById.get(id) : undefined;
+        const source = linked?.source ?? {
+          key: toolOutputKey(requested, toolNameOf(d) ?? "unknown"),
+        };
+        const entry = linked && typeof id === "string" ? id : e.id;
+        keep(source, entry, chars);
+        if (!isInherited(e)) visit.result?.(e, source, chars, linked?.call, entry);
+        break;
+      }
+      case "session.compaction_start":
+      case "session.compaction_complete":
+        live.clear();
+        break;
+    }
+    if (isBilledRequest(e)) {
+      for (const { source, tokens, entry } of live.values()) visit.carried?.(e, source, tokens, entry);
+      writer = e;
+    }
+    if (written) keep(written.source, written.entry, written.chars);
+  }
+}
+
+/** Argument fields that say what a call was about, most telling first. */
+const GIST_FIELDS = ["file_path", "filePath", "path", "url", "query", "pattern", "command", "prompt"];
+
+/** A one-line idea of what a call asked for: its command, or its main argument. */
+function callGist(source: OutputSource, call?: AgentEvent): string | undefined {
+  if (source.command) return source.command.text;
+  const args = call?.data.arguments;
+  if (typeof args === "string") return args.slice(0, COMMAND_TEXT_CHARS) || undefined;
+  if (!args || typeof args !== "object") return undefined;
+  const fields = args as Record<string, unknown>;
+  for (const field of GIST_FIELDS) {
+    const value = fields[field];
+    if (typeof value === "string" && value) return value.slice(0, COMMAND_TEXT_CHARS);
+  }
+  const json = JSON.stringify(args);
+  return json === "{}" ? undefined : json.slice(0, COMMAND_TEXT_CHARS);
+}
+
+/**
+ * Which results a drill-down wants: one tool (`Bash`), every tool of an MCP
+ * server (`mcp__server`), or one command of a shell tool.
+ */
+export interface ToolOutputMatch {
+  tool: string;
+  command?: string;
+}
+
+function matches(source: OutputSource, match: ToolOutputMatch): boolean {
+  const tool =
+    source.key === match.tool ||
+    (mcpServerOf(match.tool) === match.tool.slice("mcp__".length) &&
+      source.key.startsWith(`${match.tool}__`));
+  return tool && (match.command === undefined || source.command?.signature === match.command);
+}
+
+/**
+ * Every result in the session that `match` names and that arrived at or after
+ * `from`, with what re-sending it cost in requests from then on.
+ */
+export function toolOutputResults(
+  events: AgentEvent[],
+  match: ToolOutputMatch,
+  from: number | null,
+): ToolResultRecord[] {
+  // By call: its input can be written and re-sent before its result arrives.
+  const calls = new Map<string, Omit<ToolResultRecord, "eventId" | "timestamp"> & { at?: AgentEvent }>();
+  const callOf = (source: OutputSource, entry: string) => {
+    let call = calls.get(entry);
+    if (!call) {
+      call = {
+        tool: source.key,
+        ...(source.command ? { command: source.command.signature } : {}),
+        chars: 0,
+        inputChars: 0,
+        inputUSD: null,
+        carriedTokens: 0,
+        carriedUSD: null,
+      };
+      calls.set(entry, call);
+    }
+    return call;
+  };
+  const rates = new Map<AgentEvent, number | null>();
+  const writeRates = new Map<AgentEvent, number | null>();
+  walkToolOutput(events, {
+    perResult: true,
+    input(event, source, chars, writer, entry) {
+      if (!entry || !matches(source, match)) return;
+      const call = callOf(source, entry);
+      call.inputChars += chars;
+      const rate = writer ? cachedRate(writeRates, writer, writeRate) : null;
+      if (rate != null) call.inputUSD = (call.inputUSD ?? 0) + (chars / CHARS_PER_TOKEN) * rate;
+      const gist = callGist(source, event);
+      if (gist) call.detail = gist;
+    },
+    result(e, source, chars, request, entry) {
+      if (!entry || !matches(source, match)) return;
+      const call = callOf(source, entry);
+      call.chars += chars;
+      call.at = e;
+      if (!call.detail) {
+        const gist = callGist(source, request);
+        if (gist) call.detail = gist;
+      }
+    },
+    carried(request, source, tokens, entry) {
+      if (!entry || !matches(source, match)) return;
+      const call = callOf(source, entry);
+      call.carriedTokens += tokens;
+      const rate = cachedRate(rates, request, resendRate);
+      if (rate != null) call.carriedUSD = (call.carriedUSD ?? 0) + tokens * rate;
+    },
+  });
+  // A call is listed once its result arrived in the range.
+  const records: ToolResultRecord[] = [];
+  for (const { at, ...call } of calls.values()) {
+    if (!at || (from !== null && Date.parse(at.timestamp) < from)) continue;
+    records.push({
+      ...call,
+      eventId: at.id,
+      timestamp: at.timestamp,
+      carriedTokens: Math.round(call.carriedTokens),
+    });
+  }
+  return records;
+}
+
+/** A request's rate, priced once however many tools it re-sent or wrote. */
+function cachedRate(
+  cache: Map<AgentEvent, number | null>,
+  request: AgentEvent,
+  rateOf: (lines: ReturnType<typeof eventCostLines>) => number | null,
+): number | null {
+  if (!cache.has(request)) cache.set(request, rateOf(eventCostLines(request)));
+  return cache.get(request) ?? null;
+}
+
 /** A longer gap between events is time away from the session, not time in it. */
 const IDLE_GAP_MS = 5 * 60_000;
 
@@ -212,11 +467,47 @@ export function summarizeActivity(events: AgentEvent[]): ActivitySlot[] {
     for (const slot of slots.values()) slot.outputTokens = fromTotals.get(slot.t) ?? 0;
   }
 
+  const emptyTally = (): ToolOutputTally => ({
+    results: 0,
+    chars: 0,
+    largest: 0,
+    inputChars: 0,
+    carried: 0,
+  });
+  // The tool's tally in the event's slot, and its command's tally under it.
+  const talliesOf = (e: AgentEvent, source: OutputSource): ToolOutputTally[] => {
+    const slot = slots.get(Math.floor(Date.parse(e.timestamp) / ACTIVITY_SLOT_MS) * ACTIVITY_SLOT_MS);
+    if (!slot) return [];
+    slot.toolOutput ??= {};
+    const tool = (slot.toolOutput[source.key] ??= emptyTally());
+    if (!source.command) return [tool];
+    tool.commands ??= {};
+    return [tool, (tool.commands[source.command.signature] ??= emptyTally())];
+  };
+  walkToolOutput(events, {
+    result(e, source, chars) {
+      for (const tally of talliesOf(e, source)) {
+        tally.results++;
+        tally.chars += chars;
+        tally.largest = Math.max(tally.largest, chars);
+      }
+    },
+    input(call, source, chars) {
+      for (const tally of talliesOf(call, source)) tally.inputChars += chars;
+    },
+    carried(e, source, tokens) {
+      for (const tally of talliesOf(e, source)) tally.carried += tokens;
+    },
+  });
+  for (const slot of slots.values()) {
+    for (const tally of Object.values(slot.toolOutput ?? {})) {
+      tally.carried = Math.round(tally.carried);
+      for (const command of Object.values(tally.commands ?? {})) command.carried = Math.round(command.carried);
+    }
+  }
+
   return [...slots.values()].sort((a, b) => a.t - b.t);
 }
-
-/** Rough char→token ratio used only for order-of-magnitude hints. */
-const CHARS_PER_TOKEN = 4;
 
 /**
  * Provider-agnostic context-cost review. Hints are heuristics: they point at
@@ -320,6 +611,75 @@ export function analyzeTokenUsage(
     .slice(0, 8)
     .map(([name, count]) => ({ name, count }));
 
+  const emptyRow = (name: string): ToolOutputRow => ({
+    name,
+    results: 0,
+    chars: 0,
+    largest: 0,
+    inputChars: 0,
+    inputUSD: null,
+    carriedTokens: 0,
+    carriedUSD: null,
+  });
+  const outputRows = new Map<string, ToolOutputRow & { byCommand?: Map<string, ToolOutputRow> }>();
+  // The tool's row, and its command's row under it.
+  const rowsOf = (source: OutputSource): ToolOutputRow[] => {
+    let row = outputRows.get(source.key);
+    if (!row) outputRows.set(source.key, (row = emptyRow(source.key)));
+    if (!source.command) return [row];
+    row.byCommand ??= new Map();
+    const signature = source.command.signature;
+    let command = row.byCommand.get(signature);
+    if (!command) row.byCommand.set(signature, (command = emptyRow(signature)));
+    return [row, command];
+  };
+  const largest: TokenAnalysis["largestResults"] = [];
+  // Every tool a request re-sent shares its rate; price each request once.
+  const rates = new Map<AgentEvent, number | null>();
+  const writeRates = new Map<AgentEvent, number | null>();
+  walkToolOutput(events, {
+    input(_call, source, chars, writer) {
+      const rate = writer ? cachedRate(writeRates, writer, writeRate) : null;
+      for (const row of rowsOf(source)) {
+        row.inputChars += chars;
+        if (rate != null) row.inputUSD = (row.inputUSD ?? 0) + (chars / CHARS_PER_TOKEN) * rate;
+      }
+    },
+    result(e, source, chars) {
+      for (const row of rowsOf(source)) {
+        row.results++;
+        row.chars += chars;
+        row.largest = Math.max(row.largest, chars);
+      }
+      largest.push({
+        eventId: e.id,
+        tool: source.key,
+        chars,
+        ...(source.command ? { command: source.command } : {}),
+      });
+    },
+    carried(e, source, tokens) {
+      const rate = cachedRate(rates, e, resendRate);
+      for (const row of rowsOf(source)) {
+        row.carriedTokens += tokens;
+        if (rate != null) row.carriedUSD = (row.carriedUSD ?? 0) + tokens * rate;
+      }
+    },
+  });
+  const settled = (row: ToolOutputRow): ToolOutputRow => ({
+    ...row,
+    carriedTokens: Math.round(row.carriedTokens),
+  });
+  const byCarried = (a: ToolOutputRow, b: ToolOutputRow) =>
+    b.carriedTokens - a.carriedTokens || b.chars - a.chars;
+  const toolOutput = [...outputRows.values()]
+    .map(({ byCommand, ...row }) => ({
+      ...settled(row),
+      ...(byCommand ? { commands: [...byCommand.values()].map(settled).sort(byCarried) } : {}),
+    }))
+    .sort(byCarried);
+  const largestResults = largest.sort((a, b) => b.chars - a.chars).slice(0, 5);
+
   const hints: TokenHint[] = [];
   const totalToolCalls = Object.values(toolCallCounts).reduce((a, b) => a + b, 0);
 
@@ -350,6 +710,8 @@ export function analyzeTokenUsage(
       focus: { categories: ["tool"], subKeys: ["tool.execution_complete"] },
     });
   }
+
+  hints.push(...toolOutputHints(toolOutput));
 
   const rereads = [...readPaths.entries()].filter(([, n]) => n > 2);
   if (rereads.length > 0) {
@@ -467,8 +829,64 @@ export function analyzeTokenUsage(
     // messages already counted above.
     systemContextChars: systemMessageChars + attachmentChars,
     toolResultChars,
+    toolOutput,
+    largestResults,
     assistantChars,
     compactionCount,
     hookEventCount,
   };
+}
+
+/**
+ * One tool whose results took most of what the session re-sent, and the MCP
+ * server whose calls return the most per call. Both count only when the
+ * amounts are big enough to be worth acting on.
+ */
+function toolOutputHints(rows: ToolOutputRow[]): TokenHint[] {
+  const hints: TokenHint[] = [];
+  const carried = rows.reduce((sum, r) => sum + r.carriedTokens, 0);
+  const top = rows[0];
+  if (top && carried > 200_000 && top.carriedTokens / carried >= 0.4) {
+    hints.push({
+      severity: top.carriedTokens > 1_000_000 ? "high" : "medium",
+      id: "heavyTool",
+      values: {
+        tool: top.name,
+        percent: Math.round((top.carriedTokens / carried) * 100),
+        thousands: Math.round(top.carriedTokens / 1000),
+        count: top.results,
+      },
+      saving: "varies",
+      // A shell tool's heaviest command finds its calls better than the tool name.
+      focus: { categories: ["tool", "external_tool"], search: top.commands?.[0]?.name ?? top.name },
+    });
+  }
+
+  const servers = new Map<string, { results: number; chars: number }>();
+  for (const row of rows) {
+    const server = mcpServerOf(row.name);
+    if (!server) continue;
+    const sum = servers.get(server) ?? { results: 0, chars: 0 };
+    sum.results += row.results;
+    sum.chars += row.chars;
+    servers.set(server, sum);
+  }
+  const [heaviest] = [...servers.entries()]
+    .filter(([, s]) => s.results >= 3)
+    .map(([server, s]) => ({ server, ...s, avg: s.chars / s.results / CHARS_PER_TOKEN }))
+    .sort((a, b) => b.avg - a.avg);
+  if (heaviest && heaviest.avg >= 5_000) {
+    hints.push({
+      severity: heaviest.avg >= 15_000 ? "high" : "medium",
+      id: "mcpPayload",
+      values: {
+        server: heaviest.server,
+        avgK: Math.round(heaviest.avg / 100) / 10,
+        count: heaviest.results,
+      },
+      saving: "varies",
+      focus: { categories: ["external_tool"], search: heaviest.server },
+    });
+  }
+  return hints;
 }
