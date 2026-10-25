@@ -46,6 +46,7 @@ import { useT } from "@/i18n/client";
 import { PROVIDER_ORDER, providerStyle } from "@/lib/provider-meta";
 import { ACTIVITY_SLOT_MS } from "@/lib/providers/types";
 import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
+import type { HomeFilters } from "@/lib/home-filters";
 import { anyValue, oneOf, useStoredState } from "@/lib/use-stored-state";
 import { cn } from "@/lib/utils";
 
@@ -272,18 +273,24 @@ export function ActivityDashboard({
   project,
   onProjectChange,
   projectOptions,
+  filters,
+  onFiltersChange,
 }: {
   reloadToken: number;
   /** Shared by every tab on the page; "all" for no filter. */
   project: string;
   onProjectChange: (project: string) => void;
   projectOptions: { value: string; label: string }[];
+  /** Range, agent and model, shared by every tab on the page like the project. */
+  filters: HomeFilters;
+  onFiltersChange: (patch: Partial<HomeFilters>) => void;
 }) {
   const t = useT();
   const { sessions, error } = useAnalyticsSessions(reloadToken);
   const today = dayKey(new Date());
   const [storedRange, setStoredRange] = useStoredState<string>("activity-range", "", anyValue, "session");
-  const [storedProvider, setProvider] = useStoredState<string>("activity-provider", "all", anyValue);
+  const pickedProvider = filters.provider;
+  const setProvider = (provider: string) => onFiltersChange({ provider });
   const [shareKey, setShareKey] = useStoredState<ShareKey>(
     "activity-share",
     "activeMs",
@@ -309,7 +316,7 @@ export function ActivityDashboard({
 
   // A stored agent with no sessions any more reads as all agents.
   const provider =
-    !sessions || sessions.some((s) => s.provider === storedProvider) ? storedProvider : "all";
+    !sessions || sessions.some((s) => s.provider === pickedProvider) ? pickedProvider : "all";
   const filter: DayFilter = useMemo(() => ({ project, provider }), [project, provider]);
 
   const activeDays = useMemo(() => (sessions ? activeDaysOf(sessions, filter) : []), [sessions, filter]);

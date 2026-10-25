@@ -39,6 +39,7 @@ import { APP_INFO } from "@/lib/app-info";
 import { providerStyle, supportedAgents } from "@/lib/provider-meta";
 import type { ProviderInfo } from "@/components/session/types";
 import { ALL_PROJECTS, projectOf, summarizeProjects } from "@/lib/projects";
+import { useHomeFilters } from "@/lib/home-filters";
 import { SORT_KEYS, sortSessions, useSessionSort } from "@/lib/session-sort";
 import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
 import { cn } from "@/lib/utils";
@@ -70,7 +71,7 @@ function Home() {
   const [projectParam, setProject] = useQueryParam("project", ALL_PROJECTS);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [provider, setProvider] = useState<string>("all");
+  const [filters, setFilters] = useHomeFilters();
   const [logs, setLogs] = useState<LogFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -140,6 +141,13 @@ function Home() {
     ],
     [projects, t],
   );
+
+  // An agent from a stale link, or one with no sessions any more, reads as all.
+  const provider =
+    loading || availableProviders.some((p) => p.id === filters.provider)
+      ? filters.provider
+      : "all";
+  const setProvider = (id: string) => setFilters({ provider: id });
 
   const projectSessions = useMemo(
     () =>
@@ -309,6 +317,8 @@ function Home() {
               reloadToken={reloadToken}
               project={project}
               onProjectChange={setProject}
+              filters={filters}
+              onFiltersChange={setFilters}
               projectOptions={projectOptions}
             />
           </TabsContent>
@@ -318,6 +328,8 @@ function Home() {
               reloadToken={reloadToken}
               project={project}
               onProjectChange={setProject}
+              filters={filters}
+              onFiltersChange={setFilters}
               projectOptions={projectOptions}
             />
           </TabsContent>
@@ -327,6 +339,8 @@ function Home() {
               reloadToken={reloadToken}
               project={project}
               onProjectChange={setProject}
+              filters={filters}
+              onFiltersChange={setFilters}
               projectOptions={projectOptions}
             />
           </TabsContent>
@@ -336,6 +350,8 @@ function Home() {
               reloadToken={reloadToken}
               project={project}
               onProjectChange={setProject}
+              filters={filters}
+              onFiltersChange={setFilters}
               projectOptions={projectOptions}
             />
           </TabsContent>

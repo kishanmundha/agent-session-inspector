@@ -37,7 +37,8 @@ import {
   type UsageFilter,
 } from "@/lib/usage";
 import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
-import { anyValue, oneOf, useStoredState } from "@/lib/use-stored-state";
+import type { HomeFilters } from "@/lib/home-filters";
+import { oneOf, useStoredState } from "@/lib/use-stored-state";
 import { cn } from "@/lib/utils";
 import {
   OTHER,
@@ -64,28 +65,30 @@ export function UsageDashboard({
   project,
   onProjectChange,
   projectOptions,
+  filters,
+  onFiltersChange,
 }: {
   reloadToken: number;
   /** Shared by every tab on the page; "all" for no filter. */
   project: string;
   onProjectChange: (project: string) => void;
   projectOptions: { value: string; label: string }[];
+  /** Range, agent and model, shared by every tab on the page like the project. */
+  filters: HomeFilters;
+  onFiltersChange: (patch: Partial<HomeFilters>) => void;
 }) {
   const t = useT();
   const locale = useLocale();
   const { sessions, error } = useAnalyticsSessions(reloadToken);
   const [costOpen, setCostOpen] = useState(false);
-  const [range, setRange] = useStoredState<string>(
-    "usage-range",
-    "30",
-    oneOf(RANGES.map((r) => r.value)),
-  );
-  const [storedProvider, setProvider] = useStoredState<string>("usage-provider", "all", anyValue);
-  const [storedModel, setModel] = useStoredState<string>("usage-model", "all", anyValue);
-  // A remembered agent or model with no sessions any more reads as "all".
+  const { range, provider: pickedProvider, model: pickedModel } = filters;
+  const setRange = (value: string) => onFiltersChange({ range: value as HomeFilters["range"] });
+  const setProvider = (provider: string) => onFiltersChange({ provider });
+  const setModel = (model: string) => onFiltersChange({ model });
+  // An agent or model with no sessions any more reads as "all".
   const provider =
-    !sessions || sessions.some((s) => s.provider === storedProvider) ? storedProvider : "all";
-  const model = !sessions || usageModelsOf(sessions).includes(storedModel) ? storedModel : "all";
+    !sessions || sessions.some((s) => s.provider === pickedProvider) ? pickedProvider : "all";
+  const model = !sessions || usageModelsOf(sessions).includes(pickedModel) ? pickedModel : "all";
   const [unit, setUnit] = useStoredState<Unit>(
     "usage-unit",
     "costUSD",

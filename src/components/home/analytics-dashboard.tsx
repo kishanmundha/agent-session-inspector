@@ -48,7 +48,8 @@ import {
 import { PROVIDER_ORDER, providerStyle, supportedAgents } from "@/lib/provider-meta";
 import { useLocale, useT } from "@/i18n/client";
 import { useAnalyticsSessions } from "@/lib/use-analytics-sessions";
-import { anyValue, oneOf, useStoredState } from "@/lib/use-stored-state";
+import type { HomeFilters } from "@/lib/home-filters";
+import { oneOf, useStoredState } from "@/lib/use-stored-state";
 import { cn } from "@/lib/utils";
 import { CalendarHeatmap, HourHeatmap, WeeklyBars } from "./analytics-charts";
 
@@ -90,28 +91,30 @@ export function AnalyticsDashboard({
   project,
   onProjectChange,
   projectOptions,
+  filters,
+  onFiltersChange,
 }: {
   reloadToken: number;
   /** Shared by every tab on the page; "all" for no filter. */
   project: string;
   onProjectChange: (project: string) => void;
   projectOptions: { value: string; label: string }[];
+  /** Range, agent and model, shared by every tab on the page like the project. */
+  filters: HomeFilters;
+  onFiltersChange: (patch: Partial<HomeFilters>) => void;
 }) {
   const t = useT();
   const locale = useLocale();
   const { sessions, error } = useAnalyticsSessions(reloadToken);
   const [costOpen, setCostOpen] = useState(false);
-  const [range, setRange] = useStoredState<string>(
-    "analytics-range",
-    "90",
-    oneOf(RANGES.map((r) => r.value)),
-  );
-  const [storedProvider, setProvider] = useStoredState<string>("analytics-provider", "all", anyValue);
-  const [storedModel, setModel] = useStoredState<string>("analytics-model", "all", anyValue);
-  // A remembered agent or model with no sessions any more reads as "all".
+  const { range, provider: pickedProvider, model: pickedModel } = filters;
+  const setRange = (value: string) => onFiltersChange({ range: value as HomeFilters["range"] });
+  const setProvider = (provider: string) => onFiltersChange({ provider });
+  const setModel = (model: string) => onFiltersChange({ model });
+  // An agent or model with no sessions any more reads as "all".
   const provider =
-    !sessions || sessions.some((s) => s.provider === storedProvider) ? storedProvider : "all";
-  const model = !sessions || modelsOf(sessions).includes(storedModel) ? storedModel : "all";
+    !sessions || sessions.some((s) => s.provider === pickedProvider) ? pickedProvider : "all";
+  const model = !sessions || modelsOf(sessions).includes(pickedModel) ? pickedModel : "all";
   const [calendarMetric, setCalendarMetric] = useStoredState<Metric>(
     "analytics-calendar-metric",
     "messages",

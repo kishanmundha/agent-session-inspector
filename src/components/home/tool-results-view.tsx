@@ -23,6 +23,7 @@ import { RANGES, addDays, startOfDay, type RangeValue } from "@/lib/analytics";
 import { formatCost, formatDateTime, formatNumber, formatTokens } from "@/lib/format";
 import { providerStyle } from "@/lib/provider-meta";
 import { CHARS_PER_TOKEN, mcpServerOf, toolCostUSD, toolLabel } from "@/lib/tool-names";
+import { DEFAULT_RANGE } from "@/lib/home-filters";
 import { useQueryParam } from "@/lib/use-tab-param";
 import type {
   AgentEvent,
@@ -58,11 +59,20 @@ export function toolResultsHref(target: ToolResultsTarget, filters: ToolResultsF
   return `/tool-output?${params}`;
 }
 
+/** Back to Analytics with the same filters, which the home tabs read from the same names. */
+function backHref(filters: ToolResultsFilters): string {
+  const params = new URLSearchParams({ tab: "analytics" });
+  if (filters.range !== DEFAULT_RANGE) params.set("range", filters.range);
+  if (filters.project !== "all") params.set("project", filters.project);
+  if (filters.provider !== "all") params.set("agent", filters.provider);
+  if (filters.model !== "all") params.set("model", filters.model);
+  return `/?${params}`;
+}
+
 type View = "results" | "sessions";
 
 const VIEWS: View[] = ["results", "sessions"];
 
-const DEFAULT_RANGE: RangeValue = "30";
 
 /** How many results a list shows; the totals cover every one. */
 const RESULT_LIMIT = 200;
@@ -198,7 +208,7 @@ export function ToolResultsView() {
     <div className="space-y-5">
       <div className="space-y-2">
         <Link
-          href="/?tab=analytics"
+          href={backHref({ range: rangeValue, project, provider, model })}
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" aria-hidden />
