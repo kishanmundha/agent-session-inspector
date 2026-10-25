@@ -7,6 +7,7 @@ export const fr: Messages = {
     description:
       "Visualisez les sessions de Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes et d’autres agents de code",
     skipToContent: "Aller au contenu",
+    demoBanner: "Mode démo : ce sont des sessions synthétiques, pas des transcriptions de cette machine.",
   },
   common: {
     none: "Aucun",
@@ -138,6 +139,7 @@ export const fr: Messages = {
     noMatchDetail:
       "Rien ne correspond à « {query} ». Essayez un nom de dépôt, une branche ou un id de session.",
     noProjectSessions: "Aucune session {agent} dans {project}.",
+    tryDemo: "Aucun agent sur cette machine ? Lancez {command} pour explorer avec des données d’exemple.",
     noSessionsDetail:
       "Les sessions apparaissent ici dès qu’un agent compatible écrit une transcription sur cette machine : {agents}.",
   },

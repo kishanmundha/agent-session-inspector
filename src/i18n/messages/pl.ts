@@ -11,6 +11,7 @@ export const pl: Messages = {
     description:
       "Wizualizacja sesji Copilota, Claude Code, Codexa, Cursora, Gemini CLI, OpenCode, Hermesa i innych agentów programistycznych",
     skipToContent: "Przejdź do treści",
+    demoBanner: "Tryb demo: to syntetyczne sesje, a nie transkrypcje z tego komputera.",
   },
   common: {
     none: "Brak",
@@ -147,6 +148,7 @@ export const pl: Messages = {
     noMatchDetail:
       "Nic nie pasuje do „{query}”. Spróbuj nazwy repozytorium, gałęzi lub id sesji.",
     noProjectSessions: "Brak sesji {agent} w projekcie {project}.",
+    tryDemo: "Nie masz jeszcze agenta na tym komputerze? Uruchom {command}, aby rozejrzeć się na przykładowych danych.",
     noSessionsDetail:
       "Sesje pojawią się tutaj, gdy obsługiwany agent zapisze transkrypcję na tym komputerze: {agents}.",
   },

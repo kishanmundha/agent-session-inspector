@@ -7,6 +7,7 @@ export const ko: Messages = {
     description:
       "Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes 등 코딩 에이전트의 세션을 시각화합니다",
     skipToContent: "본문으로 건너뛰기",
+    demoBanner: "데모 모드: 이 기기의 기록이 아닌 합성 세션입니다.",
   },
   common: {
     none: "없음",
@@ -135,6 +136,7 @@ export const ko: Messages = {
     noSessions: "아직 세션이 없습니다",
     noMatchDetail: "“{query}”와 일치하는 항목이 없습니다. 저장소 이름, 브랜치, 세션 ID로 검색해 보세요.",
     noProjectSessions: "{project}에 {agent} 세션이 없습니다.",
+    tryDemo: "이 기기에 아직 에이전트가 없나요? {command}를 실행해 샘플 데이터로 둘러보세요.",
     noSessionsDetail:
       "지원되는 에이전트가 이 컴퓨터에 트랜스크립트를 기록하면 여기에 세션이 표시됩니다: {agents}.",
   },

@@ -6,6 +6,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -18,6 +19,9 @@ const SERVER = path.join(PKG_DIR, "app", "server.js");
 // live in the bundle scripts/build-cli.mjs writes to <package>/cli/.
 const CLI = path.join(PKG_DIR, "cli", "cli.mjs");
 const COMMANDS = ["usage", "stats", "tools", "sessions"];
+
+// --demo points the app at a home directory of synthetic sessions.
+const DEMO_DATA = path.join(PKG_DIR, "scripts", "demo-data.mjs");
 
 const HELP = `Usage: ${NAME} [options]
        ${NAME} <command> [options]
@@ -37,6 +41,7 @@ Options:
   -p, --port <port>   Port to listen on (default: 4747, or the next free one)
   -H, --host <host>   Interface to bind (default: 127.0.0.1)
       --no-open       Don't open the browser
+      --demo          Show synthetic sample sessions instead of your own
   -v, --version       Print the version
   -h, --help          Show this help
 `;
@@ -47,7 +52,7 @@ function fail(message) {
 }
 
 function parseArgs(argv) {
-  const opts = { port: null, host: "127.0.0.1", open: true };
+  const opts = { port: null, host: "127.0.0.1", open: true, demo: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const [flag, inline] = arg.startsWith("--") ? arg.split("=", 2) : [arg];
@@ -66,6 +71,9 @@ function parseArgs(argv) {
         break;
       case "--no-open":
         opts.open = false;
+        break;
+      case "--demo":
+        opts.demo = true;
         break;
       case "-v":
       case "--version":
@@ -169,6 +177,23 @@ if (port === null) {
   port = await pickPort(Number(process.env.PORT) || 4747, opts.host);
 } else if (!(await isFree(port, opts.host))) {
   fail(`port ${port} is already in use`);
+}
+
+if (opts.demo) {
+  if (!existsSync(DEMO_DATA)) fail(`no demo data generator found at ${DEMO_DATA}`);
+  const { writeDemoHome } = await import(pathToFileURL(DEMO_DATA).href);
+  // Every provider finds its transcripts from the home directory (or these
+  // overrides), so swapping them keeps the user's own sessions out of view.
+  const home = writeDemoHome(path.join(os.tmpdir(), `${NAME}-demo`));
+  process.env.HOME = home;
+  process.env.USERPROFILE = home;
+  process.env.APPDATA = path.join(home, "AppData", "Roaming");
+  process.env.ASI_HOME = path.join(home, ".agent-session-inspector");
+  for (const name of ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "HERMES_HOME", "ASI_HOST_HOME", "ASI_HOST_APP_DATA"]) {
+    delete process.env[name];
+  }
+  process.env.ASI_DEMO = "1";
+  console.log(`Demo mode: showing synthetic sessions from ${home}`);
 }
 
 process.env.NODE_ENV = "production";

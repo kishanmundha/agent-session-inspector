@@ -7,6 +7,7 @@ export const vi: Messages = {
     description:
       "Trực quan hóa phiên làm việc của Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes và các agent lập trình khác",
     skipToContent: "Chuyển đến nội dung",
+    demoBanner: "Chế độ demo: đây là các phiên tổng hợp, không phải bản ghi từ máy này.",
   },
   common: {
     none: "Không có",
@@ -135,6 +136,7 @@ export const vi: Messages = {
     noSessions: "Chưa có phiên nào",
     noMatchDetail: "Không có gì khớp với “{query}”. Hãy thử tên repo, nhánh hoặc id phiên.",
     noProjectSessions: "Không có phiên {agent} nào trong {project}.",
+    tryDemo: "Máy này chưa có tác tử nào? Chạy {command} để khám phá với dữ liệu mẫu.",
     noSessionsDetail:
       "Phiên sẽ xuất hiện ở đây khi một agent được hỗ trợ ghi bản ghi trên máy này: {agents}.",
   },

@@ -48,3 +48,6 @@ next-env.d.ts
 
 # archify
 /.archify/
+
+# pnpm demo
+/.demo-home

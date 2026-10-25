@@ -7,6 +7,7 @@ export const zhTW: Messages = {
     description:
       "視覺化 Copilot、Claude Code、Codex、Cursor、Gemini CLI、OpenCode、Hermes 等程式設計代理程式的工作階段",
     skipToContent: "跳至主要內容",
+    demoBanner: "示範模式：這些是合成的工作階段，並非本機的紀錄。",
   },
   common: {
     none: "無",
@@ -131,6 +132,7 @@ export const zhTW: Messages = {
     noSessions: "還沒有工作階段",
     noMatchDetail: "沒有與「{query}」相符的內容。請試試存放庫名稱、分支或工作階段 ID。",
     noProjectSessions: "{project} 中沒有 {agent} 工作階段。",
+    tryDemo: "本機還沒有代理程式？執行 {command}，用範例資料看看。",
     noSessionsDetail: "支援的代理程式在這台電腦寫入對話紀錄後，工作階段就會顯示在這裡：{agents}。",
   },
   ranges: {

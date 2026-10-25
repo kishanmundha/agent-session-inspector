@@ -7,6 +7,7 @@ export const id: Messages = {
     description:
       "Visualisasikan sesi dari Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes, dan agen coding lainnya",
     skipToContent: "Lompat ke konten",
+    demoBanner: "Mode demo: ini sesi sintetis, bukan transkrip dari mesin ini.",
   },
   common: {
     none: "Tidak ada",
@@ -136,6 +137,7 @@ export const id: Messages = {
     noMatchDetail:
       "Tidak ada yang cocok dengan “{query}”. Coba nama repositori, branch, atau id sesi.",
     noProjectSessions: "Tidak ada sesi {agent} di {project}.",
+    tryDemo: "Belum ada agen di mesin ini? Jalankan {command} untuk melihat-lihat dengan data contoh.",
     noSessionsDetail:
       "Sesi akan muncul di sini setelah agen yang didukung menulis transkrip di komputer ini: {agents}.",
   },

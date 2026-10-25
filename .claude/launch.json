@@ -9,6 +9,15 @@
         "dev"
       ],
       "port": 4747
+    },
+    {
+      "name": "demo",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "run",
+        "demo"
+      ],
+      "port": 4747
     }
   ]
 }

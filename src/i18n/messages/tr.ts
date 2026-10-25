@@ -11,6 +11,7 @@ export const tr: Messages = {
     description:
       "Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes ve diğer kodlama ajanlarının oturumlarını görselleştirin",
     skipToContent: "İçeriğe atla",
+    demoBanner: "Demo modu: bunlar bu makinedeki dökümler değil, sentetik oturumlardır.",
   },
   common: {
     none: "Yok",
@@ -139,6 +140,7 @@ export const tr: Messages = {
     noSessions: "Henüz oturum yok",
     noMatchDetail: "“{query}” ile eşleşen bir şey yok. Bir depo adı, dal veya oturum kimliği deneyin.",
     noProjectSessions: "Proje: {project} · {agent} oturumu yok.",
+    tryDemo: "Bu makinede henüz ajan yok mu? Örnek verilerle göz atmak için {command} çalıştırın.",
     noSessionsDetail:
       "Desteklenen bir ajan bu makinede döküm yazdığında oturumlar burada görünür: {agents}.",
   },

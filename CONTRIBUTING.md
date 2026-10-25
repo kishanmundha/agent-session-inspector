@@ -44,8 +44,16 @@ pnpm --silent cli usage --days 1 --json | jq '.total.costUSD'
 ## Demo data
 
 To try the UI without your own transcripts (or to retake the screenshots),
-generate a fake home directory with a few synthetic sessions and point the app
-at it:
+run the dev server on a fake home directory of synthetic sessions:
+
+```bash
+pnpm demo
+```
+
+That writes the sessions to `.demo-home` with `scripts/demo-data.mjs`, dated so
+the newest ended an hour ago, and shows a demo banner. The packaged app does the same with
+`--demo`, writing to the system temp directory. To generate the files on their
+own:
 
 ```bash
 node scripts/demo-data.mjs /tmp/asi-demo

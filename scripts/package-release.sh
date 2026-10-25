@@ -33,6 +33,9 @@ cp "bin/$NAME.mjs" "$STAGE/bin/$NAME.mjs"
 chmod +x "$STAGE/bin/$NAME.mjs"
 # The report commands (usage, stats, sessions) run from their own bundle.
 node scripts/build-cli.mjs "$STAGE/cli/cli.mjs"
+# --demo writes its sample sessions with this.
+mkdir -p "$STAGE/scripts"
+cp scripts/demo-data.mjs "$STAGE/scripts/demo-data.mjs"
 echo "$VERSION" > "$STAGE/VERSION"
 cp README.md LICENSE "$STAGE/"
 
@@ -76,7 +79,7 @@ node -e '
 	console.log(JSON.stringify({
 		name, version, description, keywords, author, license, homepage, bugs, repository, engines,
 		bin: { [name]: `bin/${name}.mjs` },
-		files: ["app", "bin", "cli", "VERSION"],
+		files: ["app", "bin", "cli", "scripts", "VERSION"],
 	}, null, 2));
 ' "$ROOT/package.json" "$NAME" "$VERSION" > "$STAGE/package.json"
 

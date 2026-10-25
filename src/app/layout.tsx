@@ -66,6 +66,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         >
           {messages.meta.skipToContent}
         </a>
+        {/* Set by the launcher's --demo flag, which swaps in synthetic sessions. */}
+        {process.env.ASI_DEMO === "1" && (
+          <div
+            role="status"
+            className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-center text-xs text-amber-800 dark:text-amber-200"
+          >
+            {messages.meta.demoBanner}
+          </div>
+        )}
         <FaviconSync />
         <I18nProvider locale={locale} messages={messages}>
           <TooltipProvider>

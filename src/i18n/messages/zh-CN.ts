@@ -7,6 +7,7 @@ export const zhCN: Messages = {
     description:
       "可视化 Copilot、Claude Code、Codex、Cursor、Gemini CLI、OpenCode、Hermes 等编程智能体的会话",
     skipToContent: "跳到正文",
+    demoBanner: "演示模式：这些是合成的会话，并非本机的记录。",
   },
   common: {
     none: "无",
@@ -131,6 +132,7 @@ export const zhCN: Messages = {
     noSessions: "还没有会话",
     noMatchDetail: "没有与“{query}”匹配的内容。试试仓库名称、分支或会话 ID。",
     noProjectSessions: "{project} 中没有 {agent} 会话。",
+    tryDemo: "本机还没有智能体？运行 {command}，用示例数据看看。",
     noSessionsDetail: "受支持的智能体在本机写入转录后，会话就会出现在这里：{agents}。",
   },
   ranges: {

@@ -7,6 +7,7 @@ export const ja: Messages = {
     description:
       "Copilot、Claude Code、Codex、Cursor、Gemini CLI、OpenCode、Hermes などのコーディングエージェントのセッションを可視化します",
     skipToContent: "本文へスキップ",
+    demoBanner: "デモモード：これはこのマシンのトランスクリプトではなく、合成されたセッションです。",
   },
   common: {
     none: "なし",
@@ -136,6 +137,7 @@ export const ja: Messages = {
     noMatchDetail:
       "「{query}」に一致するものはありません。リポジトリ名、ブランチ、セッション ID で試してください。",
     noProjectSessions: "{project} に {agent} のセッションはありません。",
+    tryDemo: "このマシンにまだエージェントがありませんか？{command} を実行するとサンプルデータで試せます。",
     noSessionsDetail:
       "対応エージェントがこのマシンにトランスクリプトを書き込むと、ここにセッションが表示されます: {agents}。",
   },

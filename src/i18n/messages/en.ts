@@ -13,6 +13,7 @@ export const en = {
     description:
       "Visualize sessions from Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes and other coding agents",
     skipToContent: "Skip to content",
+    demoBanner: "Demo mode: these are synthetic sessions, not transcripts from this machine.",
   },
   common: {
     none: "None",
@@ -144,6 +145,7 @@ export const en = {
     noSessions: "No sessions yet",
     noMatchDetail: "Nothing matches “{query}”. Try a repository name, branch or session id.",
     noProjectSessions: "No {agent} sessions in {project}.",
+    tryDemo: "No agent on this machine yet? Run {command} to look around with sample data.",
     noSessionsDetail:
       "Sessions appear here once a supported agent writes a transcript on this machine: {agents}.",
   },

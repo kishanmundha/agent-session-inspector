@@ -10,6 +10,7 @@ export const th: Messages = {
     description:
       "แสดงภาพเซสชันของ Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes และเอเจนต์เขียนโค้ดอื่นๆ",
     skipToContent: "ข้ามไปยังเนื้อหา",
+    demoBanner: "โหมดสาธิต: นี่คือเซสชันจำลอง ไม่ใช่ทรานสคริปต์จากเครื่องนี้",
   },
   common: {
     none: "ไม่มี",
@@ -138,6 +139,7 @@ export const th: Messages = {
     noSessions: "ยังไม่มีเซสชัน",
     noMatchDetail: "ไม่มีรายการที่ตรงกับ “{query}” ลองใช้ชื่อรีโป แบรนช์ หรือ id ของเซสชัน",
     noProjectSessions: "ไม่มีเซสชัน {agent} ใน {project}",
+    tryDemo: "ยังไม่มีเอเจนต์ในเครื่องนี้ใช่ไหม รัน {command} เพื่อลองดูด้วยข้อมูลตัวอย่าง",
     noSessionsDetail:
       "เซสชันจะปรากฏที่นี่เมื่อเอเจนต์ที่รองรับเขียนบันทึกลงในเครื่องนี้: {agents}",
   },

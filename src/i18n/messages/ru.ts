@@ -11,6 +11,7 @@ export const ru: Messages = {
     description:
       "Визуализация сессий Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes и других агентов для программирования",
     skipToContent: "Перейти к содержимому",
+    demoBanner: "Демо-режим: это синтетические сессии, а не транскрипты с этого компьютера.",
   },
   common: {
     none: "Нет",
@@ -147,6 +148,7 @@ export const ru: Messages = {
     noMatchDetail:
       "Ничего не найдено по запросу «{query}». Попробуйте название репозитория, ветку или id сессии.",
     noProjectSessions: "В проекте {project} нет сессий {agent}.",
+    tryDemo: "На этом компьютере ещё нет агента? Запустите {command}, чтобы осмотреться на примерах данных.",
     noSessionsDetail:
       "Сессии появятся здесь, когда поддерживаемый агент запишет транскрипт на этом компьютере: {agents}.",
   },

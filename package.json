@@ -40,6 +40,7 @@
     "start": "next start -p 4747",
     "lint": "eslint",
     "cli": "node scripts/build-cli.mjs && node bin/agent-session-inspector.mjs",
+    "demo": "node scripts/demo-data.mjs .demo-home && HOME=\"$PWD/.demo-home\" ASI_DEMO=1 next dev -p 4747",
     "deploy:docker": "./scripts/deploy-docker.sh",
     "package": "./scripts/package-release.sh"
   },

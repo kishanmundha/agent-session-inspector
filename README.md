@@ -36,6 +36,13 @@ It serves on [http://localhost:4747](http://localhost:4747) (or the next free
 port), bound to `127.0.0.1` only, and opens your browser. `--port`, `--host` and
 `--no-open` change that; `--help` lists everything.
 
+No agent installed yet, or just want to look around first? `--demo` opens the
+app on a set of synthetic sessions from several agents instead of your own:
+
+```bash
+npx agent-session-inspector --demo
+```
+
 `npx agent-session-inspector@latest` picks up a new release. To keep the command
 around instead, install it globally:
 
@@ -151,7 +158,8 @@ session's Token Optimizer has the same table plus links to its largest results,
 with the command that produced each one. Sizes are estimated at about 4 characters per
 token, since transcripts rarely record a result's tokens.
 
-> Screenshots use synthetic demo data. To reproduce them locally, see
+> Screenshots use synthetic demo data: `npx agent-session-inspector --demo`
+> shows the same sessions. To reproduce them from a checkout, see
 > [CONTRIBUTING.md](CONTRIBUTING.md#demo-data).
 
 ## Terminal reports

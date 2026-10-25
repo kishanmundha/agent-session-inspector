@@ -11,6 +11,7 @@ export const az: Messages = {
     description:
       "Copilot, Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Hermes və digər kodlaşdırma agentlərinin sessiyalarını vizuallaşdırın",
     skipToContent: "Məzmuna keç",
+    demoBanner: "Demo rejimi: bunlar bu maşındakı transkriptlər deyil, sintetik sessiyalardır.",
   },
   common: {
     none: "Yoxdur",
@@ -139,6 +140,7 @@ export const az: Messages = {
     noSessions: "Hələ sessiya yoxdur",
     noMatchDetail: "“{query}” ilə heç nə uyğun gəlmir. Repozitori adı, budaq və ya sessiya id-si ilə yoxlayın.",
     noProjectSessions: "{project} layihəsində {agent} sessiyası yoxdur.",
+    tryDemo: "Bu maşında hələ agent yoxdur? Nümunə məlumatlarla tanış olmaq üçün {command} işə salın.",
     noSessionsDetail:
       "Dəstəklənən agent bu kompüterdə transkript yazdıqdan sonra sessiyalar burada görünür: {agents}.",
   },

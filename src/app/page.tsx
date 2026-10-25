@@ -439,6 +439,20 @@ function Home() {
                       <Button variant="outline" size="sm" onClick={() => setSearch("")}>
                         {t("common.clearSearch")}
                       </Button>
+                    ) : project === ALL_PROJECTS && sessions.length === 0 ? (
+                      <p className="max-w-sm text-xs leading-relaxed text-muted-foreground">
+                        {t.rich(
+                          "home.tryDemo",
+                          {
+                            code: (chunks) => (
+                              <code className="rounded bg-muted px-1 py-0.5 font-mono text-foreground">
+                                {chunks}
+                              </code>
+                            ),
+                          },
+                          { command: "<code>npx agent-session-inspector --demo</code>" },
+                        )}
+                      </p>
                     ) : undefined
                   }
                 />
