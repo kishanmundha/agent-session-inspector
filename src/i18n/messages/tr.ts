@@ -680,10 +680,7 @@ export const tr: Messages = {
   },
   paths: {
     noResearch: "Araştırma dosyası yok",
-    noFiles: "Dosya yok",
     noResearchDetail: "Ajan bulgularını kaydettiğinde araştırma notları burada görünür.",
-    noFilesDetail:
-      "Kaydedilmiş dosya yok. Copilot çalışma alanı dosyalarını burada listeler; Claude Code ve Codex oturumda düzenlenen dosyaları listeler.",
     filter: "Yolları filtrele…",
     filterLabel: "Yolları filtrele",
     noMatches: "“{query}” ile eşleşen yol yok",
@@ -698,8 +695,14 @@ export const tr: Messages = {
     turns: { other: "{count} tur" },
     start: "Başlangıç",
     openPrompt: "Bu istemi zaman çizelgesinde aç",
-    openEdit: "Düzenlemeyi zaman çizelgesinde aç",
     noMatches: "“{query}” ile eşleşen dosya yok",
+    openInTimeline: "Zaman çizelgesinde aç",
+    command: "Komut",
+    deleted: "Dosya silindi",
+    previewCut: "Önizleme kısaltıldı. Tamamı için çağrıyı zaman çizelgesinde açın.",
+    recorded: "Ayrıca kaydedilenler",
+    recordedNote:
+      "Ajanın kendi kayıtlarında geçen ama zaman çizelgesinde eşleşen bir düzenlemesi olmayan dosyalar; örneğin oturumun yanına kaydettiği dosyalar.",
   },
   optimizer: {
     systemContext: "Sistem bağlamı",
@@ -942,7 +945,6 @@ export const tr: Messages = {
     tabs: {
       events: "Olaylar",
       checkpoints: "Kontrol noktaları",
-      files: "Dosyalar",
       edits: "Düzenlemeler",
       research: "Araştırma",
       workspace: "Meta veriler",

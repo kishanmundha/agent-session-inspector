@@ -9,7 +9,6 @@ import {
   CircleDollarSign,
   ClipboardList,
   FilePen,
-  FileText,
   FlaskConical,
   Lightbulb,
   Zap,
@@ -37,7 +36,7 @@ import {
 } from "@/components/session/checkpoints-list";
 import type { EventFocusRequest, SessionData } from "@/components/session/types";
 import { costTimeline } from "@/lib/cost-timeline";
-import { editsByTurn } from "@/lib/edits";
+import { editsByTurn, unmatchedFiles } from "@/lib/edits";
 import { firstLine } from "@/lib/format";
 import { isRunning } from "@/lib/session-state";
 import { useQueryParam, useTabParam } from "@/lib/use-tab-param";
@@ -46,7 +45,6 @@ import { useT } from "@/i18n/client";
 const SESSION_TABS = [
   "events",
   "checkpoints",
-  "files",
   "edits",
   "research",
   "workspace",
@@ -191,10 +189,12 @@ function Session({ provider, id }: { provider: string; id: string }) {
     };
   }, [data]);
 
-  const editCount = useMemo(
-    () => editsByTurn(data?.events ?? [], data?.meta.cwd).reduce((sum, turn) => sum + turn.edits, 0),
-    [data],
-  );
+  // Edits, plus the files the agent recorded that no edit accounts for.
+  const editCount = useMemo(() => {
+    const turns = editsByTurn(data?.events ?? [], data?.meta.cwd);
+    const edits = turns.reduce((sum, turn) => sum + turn.edits, 0);
+    return edits + unmatchedFiles(turns, data?.files ?? []).length;
+  }, [data]);
 
   // Real working time: the span between the first and last recorded event.
   const activeMs = useMemo(() => {
@@ -353,11 +353,6 @@ function Session({ provider, id }: { provider: string; id: string }) {
                       <TabCount value={data.checkpoints.length} />
                     </TabsTrigger>
                   )}
-                  <TabsTrigger value="files" className="px-3">
-                    <FileText className="size-4" aria-hidden />
-                    {t("sessionPage.tabs.files")}
-                    <TabCount value={data.files.length} />
-                  </TabsTrigger>
                   <TabsTrigger value="edits" className="px-3">
                     <FilePen className="size-4" aria-hidden />
                     {t("sessionPage.tabs.edits")}
@@ -418,16 +413,17 @@ function Session({ provider, id }: { provider: string; id: string }) {
                 <CheckpointsList checkpoints={data.checkpoints} />
               </TabsContent>
 
-              <TabsContent value="files" className="pt-2">
-                <PathList paths={data.files} kind="file" />
-              </TabsContent>
-
               <TabsContent value="edits" className="pt-2">
-                <SessionEdits events={data.events} cwd={data.meta.cwd} onOpenEvent={openEvent} />
+                <SessionEdits
+                  events={data.events}
+                  cwd={data.meta.cwd}
+                  recorded={data.files}
+                  onOpenEvent={openEvent}
+                />
               </TabsContent>
 
               <TabsContent value="research" className="pt-2">
-                <PathList paths={data.research} kind="research" />
+                <PathList paths={data.research} />
               </TabsContent>
 
               <TabsContent value="workspace" className="pt-2">

@@ -673,10 +673,7 @@ export const ko: Messages = {
   },
   paths: {
     noResearch: "조사 파일이 없습니다",
-    noFiles: "파일이 없습니다",
     noResearchDetail: "에이전트가 조사 결과를 저장하면 여기에 조사 메모가 표시됩니다.",
-    noFilesDetail:
-      "기록된 파일이 없습니다. Copilot은 작업 공간 파일을, Claude Code와 Codex는 세션에서 편집한 파일을 여기에 표시합니다.",
     filter: "경로 필터…",
     filterLabel: "경로 필터",
     noMatches: "“{query}”와 일치하는 경로가 없습니다",
@@ -691,8 +688,14 @@ export const ko: Messages = {
     turns: { other: "{count}턴" },
     start: "시작",
     openPrompt: "이 프롬프트를 타임라인에서 열기",
-    openEdit: "이 편집을 타임라인에서 열기",
     noMatches: "“{query}”와 일치하는 파일이 없습니다",
+    openInTimeline: "타임라인에서 열기",
+    command: "명령",
+    deleted: "파일 삭제됨",
+    previewCut: "미리보기가 잘렸습니다. 전체를 보려면 타임라인에서 호출을 여세요.",
+    recorded: "함께 기록됨",
+    recordedNote:
+      "에이전트 자체 기록에는 있지만 타임라인에 해당 편집이 없는 파일입니다. 세션 옆에 저장한 파일 등이 여기에 해당합니다.",
   },
   optimizer: {
     systemContext: "시스템 컨텍스트",
@@ -934,7 +937,6 @@ export const ko: Messages = {
     tabs: {
       events: "이벤트",
       checkpoints: "체크포인트",
-      files: "파일",
       edits: "편집",
       research: "조사",
       workspace: "메타데이터",

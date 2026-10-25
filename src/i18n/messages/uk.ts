@@ -859,10 +859,7 @@ export const uk: Messages = {
   },
   paths: {
     noResearch: "Файлів досліджень немає",
-    noFiles: "Файлів немає",
     noResearchDetail: "Нотатки досліджень з'являються тут, коли агент зберігає знайдене.",
-    noFilesDetail:
-      "Файли не записано. Copilot показує тут файли робочої області, а Claude Code і Codex — файли, змінені в сесії.",
     filter: "Фільтр шляхів…",
     filterLabel: "Фільтр шляхів",
     noMatches: "Немає шляхів за запитом «{query}»",
@@ -887,8 +884,14 @@ export const uk: Messages = {
     turns: { one: "{count} хід", few: "{count} ходи", many: "{count} ходів", other: "{count} ходу" },
     start: "Початок",
     openPrompt: "Відкрити цей запит на часовій шкалі",
-    openEdit: "Відкрити зміну на часовій шкалі",
     noMatches: "Немає файлів за запитом «{query}»",
+    openInTimeline: "Відкрити на стрічці",
+    command: "Команда",
+    deleted: "Файл видалено",
+    previewCut: "Попередній перегляд обрізано. Відкрийте виклик на стрічці, щоб побачити його повністю.",
+    recorded: "Також записано",
+    recordedNote:
+      "Файли з власних записів агента, для яких на стрічці немає відповідної правки, наприклад файли, збережені поруч із сесією.",
   },
   optimizer: {
     systemContext: "Системний контекст",
@@ -1136,7 +1139,6 @@ export const uk: Messages = {
     tabs: {
       events: "Події",
       checkpoints: "Контрольні точки",
-      files: "Файли",
       edits: "Зміни",
       research: "Дослідження",
       workspace: "Метадані",

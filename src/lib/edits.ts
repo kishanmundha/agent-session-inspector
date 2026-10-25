@@ -6,6 +6,12 @@ import { shellWrittenPaths } from "./shell-writes";
  * that led to them. Runs in the browser, on the events the session page holds.
  */
 
+/** One call that wrote a file: the event to preview it from and open in the timeline. */
+export interface FileChange {
+  eventId: string;
+  tool: string;
+}
+
 /** One file changed during a turn. */
 export interface TurnFile {
   path: string;
@@ -15,6 +21,8 @@ export interface TurnFile {
   tools: string[];
   /** The first of those calls, to open in the timeline. */
   eventId: string;
+  /** Every one of those calls, in order. */
+  changes: FileChange[];
 }
 
 export interface TurnEdits {
@@ -31,9 +39,12 @@ export interface TurnEdits {
 
 const FILE_ARG_KEYS = ["file_path", "filePath", "notebook_path", "path", "target_file"] as const;
 
+/** Arguments that hold a list of edits, each naming its own file. */
+const EDIT_LIST_KEYS = ["replacements", "edits"] as const;
+
 /** Tools that write a file, across every agent's naming. */
 const EDIT_TOOL =
-  /^(edit|write|multiedit|notebookedit|update|create|patch|apply_patch|replace|search_replace|str_replace\w*|(copilot_)?(write|edit|create|replace|insert)\w*(file|string|edit|notebook)\w*)$/i;
+  /^(edit|write|multiedit|notebookedit|update|create|patch|replace|search_replace|str_replace\w*|(copilot_)?apply_?patch|(copilot_)?(multi_?)?(write|edit|create|replace|insert)\w*(file|string|edit|notebook)\w*)$/i;
 
 /** Tools that run a shell command, which may write files of its own. */
 export const SHELL_TOOL =
@@ -46,27 +57,70 @@ function toolNameOf(data: Record<string, unknown>): string {
   return typeof name === "string" ? name : "";
 }
 
-/** The files one edit-tool call names, from a path argument or a patch body. */
+/** The path argument of a call or of one edit in its list, if it has one. */
+export function filePathArg(args: Record<string, unknown>): string | undefined {
+  for (const key of FILE_ARG_KEYS) {
+    const value = args[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return undefined;
+}
+
+/** The edits of a multi-file call, such as VS Code's `multi_replace_string_in_file`. */
+export function editList(args: Record<string, unknown>): Record<string, unknown>[] {
+  for (const key of EDIT_LIST_KEYS) {
+    const list = args[key];
+    if (Array.isArray(list)) {
+      return list.filter((item): item is Record<string, unknown> => !!item && typeof item === "object");
+    }
+  }
+  return [];
+}
+
+/** The patch body of a call, given as its whole argument or under a patch key. */
+export function patchText(raw: unknown): string | undefined {
+  const args = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const patch = typeof raw === "string" ? raw : (args.input ?? args.patch ?? args.patchText);
+  return typeof patch === "string" ? patch : undefined;
+}
+
+/** The files one edit-tool call names: a path argument, a list of edits, or a patch body. */
 function editedPaths(data: Record<string, unknown>): string[] {
   const raw = data.arguments;
   const args = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  for (const key of FILE_ARG_KEYS) {
-    const value = args[key];
-    if (typeof value === "string" && value) return [value];
-  }
-  const patch = typeof raw === "string" ? raw : (args.input ?? args.patch ?? args.patchText);
-  if (typeof patch !== "string") return [];
-  return patchedFiles(patch);
+  const path = filePathArg(args);
+  if (path) return [path];
+  const listed = editList(args).map(filePathArg).filter((p): p is string => !!p);
+  if (listed.length > 0) return [...new Set(listed)];
+  const patch = patchText(raw);
+  return patch ? patchedFiles(patch) : [];
 }
 
-const patchedFiles = (patch: string) => [
+export const patchedFiles = (patch: string) => [
   ...new Set([...patch.matchAll(PATCH_FILE)].map((m) => m[1].trim())),
 ];
+
+/**
+ * Codex's code-mode `exec` custom tool, which takes JavaScript in `input`
+ * rather than a command line. Its local shell call shares the name but
+ * carries a `command`.
+ */
+function isCodeModeExec(data: Record<string, unknown>): boolean {
+  const args = data.arguments;
+  return (
+    toolNameOf(data) === "exec" &&
+    !!args &&
+    typeof args === "object" &&
+    "input" in args &&
+    !("command" in args || "cmd" in args)
+  );
+}
 
 /** The command line of a shell-tool call, whether given as text or as argv. */
 export function shellCommand(data: Record<string, unknown>): string | undefined {
   const raw = data.arguments;
   if (typeof raw === "string") return raw;
+  if (isCodeModeExec(data)) return undefined;
   const args = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const command = args.command ?? args.cmd ?? args.script ?? args.input;
   if (typeof command === "string") return command;
@@ -103,9 +157,11 @@ export function editsByTurn(events: AgentEvent[], cwd?: string): TurnEdits[] {
     if (current.files.length === 0) turns.push(current);
     current.edits++;
     const file = current.files.find((f) => f.path === path);
-    if (!file) current.files.push({ path, count: 1, tools: [tool], eventId: event.id });
+    const change = { eventId: event.id, tool };
+    if (!file) current.files.push({ path, count: 1, tools: [tool], eventId: event.id, changes: [change] });
     else {
       file.count++;
+      file.changes.push(change);
       if (!file.tools.includes(tool)) file.tools.push(tool);
     }
   };
@@ -137,4 +193,21 @@ export function editsByTurn(events: AgentEvent[], cwd?: string): TurnEdits[] {
     }
   }
   return turns;
+}
+
+/** A path and the one a patch or a report names, which may be relative to the other. */
+export function samePath(a: string, b: string): boolean {
+  if (a === b) return true;
+  const [long, short] = a.length > b.length ? [a, b] : [b, a];
+  return long.endsWith(`/${short.replace(/^\.\//, "")}`);
+}
+
+/**
+ * Files the agent's own records list that no edit in the timeline accounts
+ * for, such as the workspace files Copilot saves beside a session.
+ */
+export function unmatchedFiles(turns: TurnEdits[], recorded: string[]): string[] {
+  // Exact paths: a name Copilot saved beside the session is not a workspace file of the same name.
+  const edited = new Set(turns.flatMap((turn) => turn.files.map((f) => f.path)));
+  return [...new Set(recorded)].filter((path) => !edited.has(path));
 }

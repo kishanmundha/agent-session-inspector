@@ -677,10 +677,7 @@ export const id: Messages = {
   },
   paths: {
     noResearch: "Tidak ada file riset",
-    noFiles: "Tidak ada file",
     noResearchDetail: "Catatan riset muncul di sini saat agen menyimpan temuannya.",
-    noFilesDetail:
-      "Tidak ada file yang tercatat. Copilot menampilkan file workspace-nya di sini; Claude Code dan Codex menampilkan file yang diedit dalam sesi.",
     filter: "Filter path…",
     filterLabel: "Filter path",
     noMatches: "Tidak ada path yang cocok dengan “{query}”",
@@ -695,8 +692,14 @@ export const id: Messages = {
     turns: { other: "{count} giliran" },
     start: "Awal",
     openPrompt: "Buka prompt ini di linimasa",
-    openEdit: "Buka perubahan ini di linimasa",
     noMatches: "Tidak ada file yang cocok dengan “{query}”",
+    openInTimeline: "Buka di linimasa",
+    command: "Perintah",
+    deleted: "File dihapus",
+    previewCut: "Pratinjau dipotong. Buka panggilan di linimasa untuk melihat semuanya.",
+    recorded: "Juga tercatat",
+    recordedNote:
+      "File yang disebut catatan agen tanpa perubahan yang cocok di linimasa, seperti file yang disimpannya di samping sesi.",
   },
   optimizer: {
     systemContext: "Konteks sistem",
@@ -940,7 +943,6 @@ export const id: Messages = {
     tabs: {
       events: "Event",
       checkpoints: "Checkpoint",
-      files: "File",
       edits: "Perubahan",
       research: "Riset",
       workspace: "Metadata",

@@ -675,10 +675,7 @@ export const th: Messages = {
   },
   paths: {
     noResearch: "ไม่มีไฟล์ค้นคว้า",
-    noFiles: "ไม่มีไฟล์",
     noResearchDetail: "บันทึกการค้นคว้าจะปรากฏที่นี่เมื่อเอเจนต์บันทึกสิ่งที่พบ",
-    noFilesDetail:
-      "ไม่มีไฟล์ที่บันทึกไว้ Copilot แสดงไฟล์ใน workspace ที่นี่ ส่วน Claude Code และ Codex แสดงไฟล์ที่เซสชันแก้ไข",
     filter: "กรองพาธ…",
     filterLabel: "กรองพาธ",
     noMatches: "ไม่มีพาธที่ตรงกับ “{query}”",
@@ -693,8 +690,14 @@ export const th: Messages = {
     turns: { other: "{count} เทิร์น" },
     start: "เริ่มต้น",
     openPrompt: "เปิดพรอมต์นี้ในไทม์ไลน์",
-    openEdit: "เปิดการแก้ไขนี้ในไทม์ไลน์",
     noMatches: "ไม่มีไฟล์ที่ตรงกับ “{query}”",
+    openInTimeline: "เปิดในไทม์ไลน์",
+    command: "คำสั่ง",
+    deleted: "ลบไฟล์แล้ว",
+    previewCut: "ตัวอย่างถูกตัดให้สั้นลง เปิดการเรียกในไทม์ไลน์เพื่อดูทั้งหมด",
+    recorded: "บันทึกไว้ด้วย",
+    recordedNote:
+      "ไฟล์ที่บันทึกของเอเจนต์ระบุไว้ แต่ไม่มีการแก้ไขที่ตรงกันในไทม์ไลน์ เช่น ไฟล์ที่บันทึกไว้คู่กับเซสชัน",
   },
   optimizer: {
     systemContext: "บริบทระบบ",
@@ -936,7 +939,6 @@ export const th: Messages = {
     tabs: {
       events: "เหตุการณ์",
       checkpoints: "เช็กพอยต์",
-      files: "ไฟล์",
       edits: "การแก้ไข",
       research: "การค้นคว้า",
       workspace: "เมทาดาทา",

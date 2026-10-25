@@ -676,10 +676,7 @@ export const vi: Messages = {
   },
   paths: {
     noResearch: "Không có tệp nghiên cứu",
-    noFiles: "Không có tệp",
     noResearchDetail: "Ghi chú nghiên cứu sẽ xuất hiện ở đây khi agent lưu kết quả tìm được.",
-    noFilesDetail:
-      "Không có tệp nào được ghi nhận. Copilot liệt kê tệp trong workspace ở đây; Claude Code và Codex liệt kê các tệp phiên đã sửa.",
     filter: "Lọc đường dẫn…",
     filterLabel: "Lọc đường dẫn",
     noMatches: "Không có đường dẫn nào khớp với “{query}”",
@@ -694,8 +691,14 @@ export const vi: Messages = {
     turns: { other: "{count} lượt" },
     start: "Bắt đầu",
     openPrompt: "Mở prompt này trên dòng thời gian",
-    openEdit: "Mở chỉnh sửa này trên dòng thời gian",
     noMatches: "Không có tệp nào khớp với “{query}”",
+    openInTimeline: "Mở trong dòng thời gian",
+    command: "Lệnh",
+    deleted: "Đã xóa tệp",
+    previewCut: "Bản xem trước đã bị cắt. Mở lệnh gọi trong dòng thời gian để xem toàn bộ.",
+    recorded: "Cũng được ghi lại",
+    recordedNote:
+      "Các tệp mà bản ghi của chính agent liệt kê nhưng không có chỉnh sửa tương ứng trong dòng thời gian, chẳng hạn tệp được lưu cạnh phiên.",
   },
   optimizer: {
     systemContext: "Ngữ cảnh hệ thống",
@@ -939,7 +942,6 @@ export const vi: Messages = {
     tabs: {
       events: "Sự kiện",
       checkpoints: "Checkpoint",
-      files: "Tệp",
       edits: "Chỉnh sửa",
       research: "Nghiên cứu",
       workspace: "Siêu dữ liệu",

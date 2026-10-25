@@ -660,10 +660,7 @@ export const zhTW: Messages = {
   },
   paths: {
     noResearch: "沒有研究檔案",
-    noFiles: "沒有檔案",
     noResearchDetail: "代理程式儲存研究結果後，研究筆記會顯示在這裡。",
-    noFilesDetail:
-      "沒有記錄任何檔案。Copilot 會在這裡列出工作區檔案；Claude Code 和 Codex 會列出工作階段中編輯過的檔案。",
     filter: "篩選路徑…",
     filterLabel: "篩選路徑",
     noMatches: "沒有與「{query}」相符的路徑",
@@ -678,8 +675,14 @@ export const zhTW: Messages = {
     turns: { other: "{count} 個回合" },
     start: "開始",
     openPrompt: "在時間軸中開啟此提示",
-    openEdit: "在時間軸中開啟此編輯",
     noMatches: "沒有與「{query}」相符的檔案",
+    openInTimeline: "在時間軸中開啟",
+    command: "命令",
+    deleted: "檔案已刪除",
+    previewCut: "預覽已截斷。在時間軸中開啟該呼叫即可查看全部內容。",
+    recorded: "其他記錄",
+    recordedNote:
+      "代理自身記錄中列出、但時間軸上沒有對應編輯的檔案，例如儲存在工作階段旁的檔案。",
   },
   optimizer: {
     systemContext: "系統脈絡",
@@ -913,7 +916,6 @@ export const zhTW: Messages = {
     tabs: {
       events: "事件",
       checkpoints: "檢查點",
-      files: "檔案",
       edits: "編輯",
       research: "研究",
       workspace: "中繼資料",

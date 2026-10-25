@@ -656,10 +656,7 @@ export const zhCN: Messages = {
   },
   paths: {
     noResearch: "没有调研文件",
-    noFiles: "没有文件",
     noResearchDetail: "智能体保存调研结果后，调研笔记会出现在这里。",
-    noFilesDetail:
-      "没有记录文件。Copilot 在这里列出工作区文件；Claude Code 和 Codex 列出会话中编辑过的文件。",
     filter: "筛选路径…",
     filterLabel: "筛选路径",
     noMatches: "没有与“{query}”匹配的路径",
@@ -673,8 +670,14 @@ export const zhCN: Messages = {
     turns: { other: "{count} 轮" },
     start: "开始",
     openPrompt: "在时间线中打开此提示词",
-    openEdit: "在时间线中打开此编辑",
     noMatches: "没有与“{query}”匹配的文件",
+    openInTimeline: "在时间线中打开",
+    command: "命令",
+    deleted: "文件已删除",
+    previewCut: "预览已截断。在时间线中打开该调用可查看全部内容。",
+    recorded: "其他记录",
+    recordedNote:
+      "代理自身记录中列出、但时间线上没有对应编辑的文件，例如保存在会话旁的文件。",
   },
   optimizer: {
     systemContext: "系统上下文",
@@ -908,7 +911,6 @@ export const zhCN: Messages = {
     tabs: {
       events: "事件",
       checkpoints: "检查点",
-      files: "文件",
       edits: "编辑",
       research: "调研",
       workspace: "元数据",

@@ -748,10 +748,7 @@ export const ptBR: Messages = {
   },
   paths: {
     noResearch: "Nenhum arquivo de pesquisa",
-    noFiles: "Nenhum arquivo",
     noResearchDetail: "As notas de pesquisa aparecem aqui quando o agente salva o que encontrou.",
-    noFilesDetail:
-      "Nenhum arquivo registrado. O Copilot lista aqui os arquivos do workspace; o Claude Code e o Codex listam os arquivos que a sessão editou.",
     filter: "Filtrar caminhos…",
     filterLabel: "Filtrar caminhos",
     noMatches: "Nenhum caminho corresponde a “{query}”",
@@ -766,8 +763,14 @@ export const ptBR: Messages = {
     turns: { one: "{count} turno", other: "{count} turnos" },
     start: "Início",
     openPrompt: "Abrir este prompt na linha do tempo",
-    openEdit: "Abrir a edição na linha do tempo",
     noMatches: "Nenhum arquivo corresponde a “{query}”",
+    openInTimeline: "Abrir na linha do tempo",
+    command: "Comando",
+    deleted: "Arquivo excluído",
+    previewCut: "Prévia cortada. Abra a chamada na linha do tempo para ver tudo.",
+    recorded: "Também registrados",
+    recordedNote:
+      "Arquivos que os registros do agente listam sem uma edição correspondente na linha do tempo, como arquivos salvos junto à sessão.",
   },
   optimizer: {
     systemContext: "Contexto do sistema",
@@ -1020,7 +1023,6 @@ export const ptBR: Messages = {
     tabs: {
       events: "Eventos",
       checkpoints: "Checkpoints",
-      files: "Arquivos",
       edits: "Edições",
       research: "Pesquisa",
       workspace: "Metadados",

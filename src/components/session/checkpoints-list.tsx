@@ -93,28 +93,19 @@ export function CheckpointsList({
   );
 }
 
-/** Shared renderer for the Files and Research tabs. */
-export function PathList({
-  paths,
-  kind,
-}: {
-  paths: string[];
-  kind: "file" | "research";
-}) {
+/** The Research tab: the notes the agent saved beside the session. */
+export function PathList({ paths }: { paths: string[] }) {
   const t = useT();
   const [filter, setFilter] = useState("");
   const q = filter.trim().toLowerCase();
   const visible = q ? paths.filter((p) => p.toLowerCase().includes(q)) : paths;
-  const Icon = kind === "research" ? FlaskConical : FileText;
 
   if (paths.length === 0) {
     return (
       <EmptyState
-        icon={Icon}
-        title={kind === "research" ? t("paths.noResearch") : t("paths.noFiles")}
-        description={
-          kind === "research" ? t("paths.noResearchDetail") : t("paths.noFilesDetail")
-        }
+        icon={FlaskConical}
+        title={t("paths.noResearch")}
+        description={t("paths.noResearchDetail")}
       />
     );
   }
@@ -135,7 +126,7 @@ export function PathList({
           key={p}
           className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-sm transition-colors hover:bg-muted/50"
         >
-          <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <FlaskConical className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           <span className="min-w-0 flex-1 truncate font-mono text-foreground">{p}</span>
           <CopyButton value={p} label={t("unpriced.copyPath")} />
         </div>

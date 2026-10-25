@@ -687,10 +687,7 @@ export const ja: Messages = {
   },
   paths: {
     noResearch: "調査ファイルはありません",
-    noFiles: "ファイルはありません",
     noResearchDetail: "エージェントが調査結果を保存すると、ここに調査メモが表示されます。",
-    noFilesDetail:
-      "記録されたファイルはありません。Copilot はワークスペースのファイルを、Claude Code と Codex はセッションで編集したファイルをここに表示します。",
     filter: "パスを絞り込む…",
     filterLabel: "パスを絞り込む",
     noMatches: "「{query}」に一致するパスはありません",
@@ -705,8 +702,14 @@ export const ja: Messages = {
     turns: { other: "{count} ターン" },
     start: "開始",
     openPrompt: "このプロンプトをタイムラインで開く",
-    openEdit: "この編集をタイムラインで開く",
     noMatches: "「{query}」に一致するファイルはありません",
+    openInTimeline: "タイムラインで開く",
+    command: "コマンド",
+    deleted: "ファイルを削除",
+    previewCut: "プレビューは途中までです。すべて見るにはタイムラインで呼び出しを開いてください。",
+    recorded: "その他の記録",
+    recordedNote:
+      "エージェント自身の記録にあり、タイムラインに対応する編集がないファイルです。セッションと一緒に保存したファイルなどが含まれます。",
   },
   optimizer: {
     systemContext: "システムコンテキスト",
@@ -950,7 +953,6 @@ export const ja: Messages = {
     tabs: {
       events: "イベント",
       checkpoints: "チェックポイント",
-      files: "ファイル",
       edits: "編集",
       research: "調査",
       workspace: "メタデータ",

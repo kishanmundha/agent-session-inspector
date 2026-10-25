@@ -684,10 +684,7 @@ export const az: Messages = {
   },
   paths: {
     noResearch: "Tədqiqat faylı yoxdur",
-    noFiles: "Fayl yoxdur",
     noResearchDetail: "Agent tapıntılarını saxlayanda tədqiqat qeydləri burada görünür.",
-    noFilesDetail:
-      "Fayl qeydə alınmayıb. Copilot burada iş sahəsi fayllarını, Claude Code və Codex isə sessiyada redaktə edilən faylları göstərir.",
     filter: "Yolları süz…",
     filterLabel: "Yolları süz",
     noMatches: "“{query}” ilə uyğun yol yoxdur",
@@ -702,8 +699,14 @@ export const az: Messages = {
     turns: { other: "{count} növbə" },
     start: "Başlanğıc",
     openPrompt: "Bu sorğunu zaman xəttində aç",
-    openEdit: "Redaktəni zaman xəttində aç",
     noMatches: "“{query}” ilə uyğun fayl yoxdur",
+    openInTimeline: "Zaman xəttində aç",
+    command: "Əmr",
+    deleted: "Fayl silindi",
+    previewCut: "Önbaxış qısaldılıb. Hamısını görmək üçün çağırışı zaman xəttində açın.",
+    recorded: "Həmçinin qeydə alınıb",
+    recordedNote:
+      "Agentin öz qeydlərində olan, lakin zaman xəttində uyğun redaktəsi olmayan fayllar, məsələn sessiyanın yanında saxladığı fayllar.",
   },
   optimizer: {
     systemContext: "Sistem konteksti",
@@ -946,7 +949,6 @@ export const az: Messages = {
     tabs: {
       events: "Hadisələr",
       checkpoints: "Yoxlama nöqtələri",
-      files: "Fayllar",
       edits: "Redaktələr",
       research: "Tədqiqat",
       workspace: "Metaməlumat",

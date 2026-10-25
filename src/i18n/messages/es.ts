@@ -742,10 +742,7 @@ export const es: Messages = {
   },
   paths: {
     noResearch: "No hay archivos de investigación",
-    noFiles: "No hay archivos",
     noResearchDetail: "Las notas de investigación aparecen aquí cuando el agente guarda sus hallazgos.",
-    noFilesDetail:
-      "No hay archivos registrados. Copilot lista aquí los archivos de su espacio de trabajo; Claude Code y Codex, los archivos que editó la sesión.",
     filter: "Filtrar rutas…",
     filterLabel: "Filtrar rutas",
     noMatches: "Ninguna ruta coincide con «{query}»",
@@ -760,8 +757,14 @@ export const es: Messages = {
     turns: { one: "{count} turno", other: "{count} turnos" },
     start: "Inicio",
     openPrompt: "Abrir esta instrucción en la línea de tiempo",
-    openEdit: "Abrir la edición en la línea de tiempo",
     noMatches: "Ningún archivo coincide con «{query}»",
+    openInTimeline: "Abrir en la cronología",
+    command: "Comando",
+    deleted: "Archivo eliminado",
+    previewCut: "Vista previa recortada. Abre la llamada en la cronología para verla entera.",
+    recorded: "También registrados",
+    recordedNote:
+      "Archivos que los registros del agente mencionan sin un cambio correspondiente en la cronología, como los que guardó junto a la sesión.",
   },
   optimizer: {
     systemContext: "Contexto del sistema",
@@ -1011,7 +1014,6 @@ export const es: Messages = {
     tabs: {
       events: "Eventos",
       checkpoints: "Puntos de control",
-      files: "Archivos",
       edits: "Ediciones",
       research: "Investigación",
       workspace: "Metadatos",

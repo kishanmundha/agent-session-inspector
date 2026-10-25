@@ -752,10 +752,7 @@ export const fr: Messages = {
   },
   paths: {
     noResearch: "Aucun fichier de recherche",
-    noFiles: "Aucun fichier",
     noResearchDetail: "Les notes de recherche apparaissent ici quand l’agent enregistre ses découvertes.",
-    noFilesDetail:
-      "Aucun fichier enregistré. Copilot liste ici les fichiers de son espace de travail ; Claude Code et Codex, les fichiers modifiés pendant la session.",
     filter: "Filtrer les chemins…",
     filterLabel: "Filtrer les chemins",
     noMatches: "Aucun chemin ne correspond à « {query} »",
@@ -770,8 +767,14 @@ export const fr: Messages = {
     turns: { one: "{count} tour", other: "{count} tours" },
     start: "Début",
     openPrompt: "Ouvrir ce prompt dans la chronologie",
-    openEdit: "Ouvrir la modification dans la chronologie",
     noMatches: "Aucun fichier ne correspond à « {query} »",
+    openInTimeline: "Ouvrir dans la chronologie",
+    command: "Commande",
+    deleted: "Fichier supprimé",
+    previewCut: "Aperçu tronqué. Ouvrez l’appel dans la chronologie pour tout voir.",
+    recorded: "Également enregistrés",
+    recordedNote:
+      "Fichiers que les enregistrements de l’agent mentionnent sans modification correspondante dans la chronologie, comme ceux qu’il a enregistrés à côté de la session.",
   },
   optimizer: {
     systemContext: "Contexte système",
@@ -1024,7 +1027,6 @@ export const fr: Messages = {
     tabs: {
       events: "Événements",
       checkpoints: "Points de contrôle",
-      files: "Fichiers",
       edits: "Modifications",
       research: "Recherche",
       workspace: "Métadonnées",

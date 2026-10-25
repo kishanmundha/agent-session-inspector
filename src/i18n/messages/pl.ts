@@ -859,10 +859,7 @@ export const pl: Messages = {
   },
   paths: {
     noResearch: "Brak plików z badań",
-    noFiles: "Brak plików",
     noResearchDetail: "Notatki z badań pojawią się tutaj, gdy agent zapisze swoje ustalenia.",
-    noFilesDetail:
-      "Nie zapisano plików. Copilot wymienia tu pliki obszaru roboczego; Claude Code i Codex — pliki edytowane w sesji.",
     filter: "Filtruj ścieżki…",
     filterLabel: "Filtruj ścieżki",
     noMatches: "Brak ścieżek pasujących do „{query}”",
@@ -887,8 +884,14 @@ export const pl: Messages = {
     turns: { one: "{count} tura", few: "{count} tury", many: "{count} tur", other: "{count} tury" },
     start: "Początek",
     openPrompt: "Otwórz ten prompt na osi czasu",
-    openEdit: "Otwórz tę zmianę na osi czasu",
     noMatches: "Brak plików pasujących do „{query}”",
+    openInTimeline: "Otwórz na osi czasu",
+    command: "Polecenie",
+    deleted: "Plik usunięty",
+    previewCut: "Podgląd skrócony. Otwórz wywołanie na osi czasu, aby zobaczyć całość.",
+    recorded: "Również zapisane",
+    recordedNote:
+      "Pliki wymienione we własnych zapisach agenta, bez odpowiadającej im zmiany na osi czasu, np. pliki zapisane obok sesji.",
   },
   optimizer: {
     systemContext: "Kontekst systemowy",
@@ -1137,7 +1140,6 @@ export const pl: Messages = {
     tabs: {
       events: "Zdarzenia",
       checkpoints: "Punkty kontrolne",
-      files: "Pliki",
       edits: "Zmiany",
       research: "Badania",
       workspace: "Metadane",

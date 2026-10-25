@@ -196,11 +196,6 @@ function sourceOf(type: string, data: Record<string, unknown>): OutputSource {
   const name = toolNameOf(data) ?? "unknown";
   const key = toolOutputKey(type, name);
   if (!SHELL_TOOL.test(name)) return { key };
-  // Codex's `exec` custom tool takes JavaScript in `input`, not a command line.
-  const args = data.arguments as Record<string, unknown> | undefined;
-  if (name === "exec" && args && typeof args === "object" && "input" in args && !("command" in args || "cmd" in args)) {
-    return { key };
-  }
   const text = shellCommand(data);
   if (!text) return { key };
   return {

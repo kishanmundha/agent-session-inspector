@@ -738,10 +738,7 @@ export const de: Messages = {
   },
   paths: {
     noResearch: "Keine Recherchedateien",
-    noFiles: "Keine Dateien",
     noResearchDetail: "Recherchenotizen erscheinen hier, wenn der Agent seine Ergebnisse speichert.",
-    noFilesDetail:
-      "Keine Dateien erfasst. Copilot listet hier seine Workspace-Dateien auf; Claude Code und Codex die Dateien, die die Sitzung bearbeitet hat.",
     filter: "Pfade filtern…",
     filterLabel: "Pfade filtern",
     noMatches: "Keine Pfade passen zu „{query}“",
@@ -756,8 +753,14 @@ export const de: Messages = {
     turns: { one: "{count} Runde", other: "{count} Runden" },
     start: "Beginn",
     openPrompt: "Diesen Prompt in der Zeitleiste öffnen",
-    openEdit: "Die Änderung in der Zeitleiste öffnen",
     noMatches: "Keine Dateien passen zu „{query}“",
+    openInTimeline: "In der Zeitleiste öffnen",
+    command: "Befehl",
+    deleted: "Datei gelöscht",
+    previewCut: "Vorschau gekürzt. Öffne den Aufruf in der Zeitleiste, um alles zu sehen.",
+    recorded: "Ebenfalls erfasst",
+    recordedNote:
+      "Dateien, die die Aufzeichnungen des Agenten nennen, ohne passende Änderung in der Zeitleiste, etwa Dateien, die er neben der Sitzung gespeichert hat.",
   },
   optimizer: {
     systemContext: "Systemkontext",
@@ -1004,7 +1007,6 @@ export const de: Messages = {
     tabs: {
       events: "Ereignisse",
       checkpoints: "Checkpoints",
-      files: "Dateien",
       edits: "Änderungen",
       research: "Recherche",
       workspace: "Metadaten",

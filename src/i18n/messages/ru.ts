@@ -859,10 +859,7 @@ export const ru: Messages = {
   },
   paths: {
     noResearch: "Файлов исследований нет",
-    noFiles: "Файлов нет",
     noResearchDetail: "Заметки исследований появляются здесь, когда агент сохраняет найденное.",
-    noFilesDetail:
-      "Файлы не записаны. Copilot показывает здесь файлы рабочей области, а Claude Code и Codex — файлы, изменённые в сессии.",
     filter: "Фильтр путей…",
     filterLabel: "Фильтр путей",
     noMatches: "Нет путей по запросу «{query}»",
@@ -887,8 +884,14 @@ export const ru: Messages = {
     turns: { one: "{count} ход", few: "{count} хода", many: "{count} ходов", other: "{count} хода" },
     start: "Начало",
     openPrompt: "Открыть этот запрос на временной шкале",
-    openEdit: "Открыть правку на временной шкале",
     noMatches: "Нет файлов по запросу «{query}»",
+    openInTimeline: "Открыть на ленте",
+    command: "Команда",
+    deleted: "Файл удалён",
+    previewCut: "Предпросмотр обрезан. Откройте вызов на ленте, чтобы увидеть его целиком.",
+    recorded: "Также записаны",
+    recordedNote:
+      "Файлы из собственных записей агента, для которых на ленте нет соответствующей правки, например файлы, сохранённые рядом с сессией.",
   },
   optimizer: {
     systemContext: "Системный контекст",
@@ -1137,7 +1140,6 @@ export const ru: Messages = {
     tabs: {
       events: "События",
       checkpoints: "Контрольные точки",
-      files: "Файлы",
       edits: "Правки",
       research: "Исследования",
       workspace: "Метаданные",

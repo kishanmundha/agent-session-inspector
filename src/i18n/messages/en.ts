@@ -738,10 +738,7 @@ export const en = {
   },
   paths: {
     noResearch: "No research files",
-    noFiles: "No files",
     noResearchDetail: "Research notes appear here when the agent saves its findings.",
-    noFilesDetail:
-      "No files recorded. Copilot lists its workspace files here; Claude Code and Codex list the files the session edited.",
     filter: "Filter paths…",
     filterLabel: "Filter paths",
     noMatches: "No paths match “{query}”",
@@ -756,8 +753,14 @@ export const en = {
     turns: { one: "{count} turn", other: "{count} turns" },
     start: "Start",
     openPrompt: "Open this prompt in the timeline",
-    openEdit: "Open the edit in the timeline",
     noMatches: "No files match “{query}”",
+    openInTimeline: "Open in timeline",
+    command: "Command",
+    deleted: "File deleted",
+    previewCut: "Preview cut short. Open the call in the timeline for all of it.",
+    recorded: "Also recorded",
+    recordedNote:
+      "Files the agent's own records list with no matching edit in the timeline, such as files it saved beside the session.",
   },
   optimizer: {
     systemContext: "System context",
@@ -1003,7 +1006,6 @@ export const en = {
     tabs: {
       events: "Events",
       checkpoints: "Checkpoints",
-      files: "Files",
       edits: "Edits",
       research: "Research",
       workspace: "Metadata",
