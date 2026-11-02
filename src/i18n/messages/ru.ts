@@ -1190,6 +1190,8 @@ export const ru: Messages = {
     subagent_message: "Сообщение субагента",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Предпросмотр",
     showLess: "Свернуть",
     showMore: {
       one: "Показать больше ({count} символ)",

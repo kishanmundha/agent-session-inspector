@@ -987,6 +987,8 @@ export const ko: Messages = {
     subagent_message: "서브에이전트 메시지",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "미리보기",
     showLess: "접기",
     showMore: { other: "더 보기 ({count}자)" },
     showFullPrompt: { other: "시스템 프롬프트 전체 보기 ({count}자)" },

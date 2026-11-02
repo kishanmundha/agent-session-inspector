@@ -13,6 +13,8 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   CircleX,
+  Code,
+  Eye,
   Filter,
   Info,
   Link2,
@@ -27,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CopyButton } from "@/components/common/copy-button";
+import { MessageMarkdown, markdownText, hasRenderableMarkdown } from "./markdown-content";
 import { EventAboutDialog, fetchOriginalRecords } from "./event-about-dialog";
 import { InputTokensIcon, OutputTokensIcon } from "@/components/common/token-icons";
 import { SearchInput } from "@/components/common/search-input";
@@ -370,35 +373,24 @@ function formatCompactNumber(n: number) {
   return formatNumber(n);
 }
 
-function UserMessageCard({ data }: { data: Record<string, unknown> }) {
-  const t = useT();
+function UserMessageCard({ data, showPreview }: { data: Record<string, unknown>; showPreview: boolean }) {
   const content = (data.content as string) || "";
-  const [expanded, setExpanded] = useState(false);
-  const preview = content.slice(0, 300);
-  const hasMore = content.length > 300;
   return (
-    <div>
-      <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-        {expanded ? content : preview}{hasMore && !expanded && "..."}
-      </div>
-      {hasMore && (
-        <Button variant="link" size="xs" onClick={() => setExpanded(!expanded)} className="h-auto px-0 font-normal text-violet-600 dark:text-violet-400 mt-1">
-          {expanded ? t("timeline.showLess") : t("timeline.showMore", { count: content.length })}
-        </Button>
-      )}
-    </div>
+    <MessageMarkdown
+      content={content}
+      showPreview={showPreview}
+      previewChars={300}
+      controlClassName="text-violet-600 dark:text-violet-400"
+    />
   );
 }
 
-function AssistantMessageCard({ data }: { data: Record<string, unknown> }) {
+function AssistantMessageCard({ data, showPreview }: { data: Record<string, unknown>; showPreview: boolean }) {
   const t = useT();
   const content = (data.content as string) || "";
   const toolRequests = (data.toolRequests as unknown[]) || [];
   const model = data.model as string;
   const outputTokens = data.outputTokens as number | undefined;
-  const [expanded, setExpanded] = useState(false);
-  const preview = content.slice(0, 400);
-  const hasMore = content.length > 400;
 
   return (
     <div className="space-y-2">
@@ -415,16 +407,12 @@ function AssistantMessageCard({ data }: { data: Record<string, unknown> }) {
         )}
       </div>
       {content && (
-        <div>
-          <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-            {expanded ? content : preview}{hasMore && !expanded && "..."}
-          </div>
-          {hasMore && (
-            <Button variant="link" size="xs" onClick={() => setExpanded(!expanded)} className="h-auto px-0 font-normal text-sky-600 dark:text-sky-400 mt-1">
-              {expanded ? t("timeline.showLess") : t("timeline.showMore", { count: content.length })}
-            </Button>
-          )}
-        </div>
+        <MessageMarkdown
+          content={content}
+          showPreview={showPreview}
+          previewChars={400}
+          controlClassName="text-sky-600 dark:text-sky-400"
+        />
       )}
       {toolRequests.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1">
@@ -1176,13 +1164,10 @@ function AssistantTurnCard({ data, type }: { data: Record<string, unknown>; type
   );
 }
 
-function ThinkingCard({ data }: { data: Record<string, unknown> }) {
+function ThinkingCard({ data, showPreview }: { data: Record<string, unknown>; showPreview: boolean }) {
   const t = useT();
   const content = (data.content as string) || "";
   const charLength = (data.charLength as number) ?? content.length;
-  const [expanded, setExpanded] = useState(false);
-  const preview = content.slice(0, 400);
-  const hasMore = content.length > 400;
 
   if (!content) {
     return (
@@ -1197,20 +1182,13 @@ function ThinkingCard({ data }: { data: Record<string, unknown> }) {
       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
         {t("timeline.reasoningChars", { count: charLength })}
       </p>
-      <div className="text-sm italic leading-relaxed text-muted-foreground whitespace-pre-wrap">
-        {expanded ? content : preview}
-        {hasMore && !expanded && "…"}
-      </div>
-      {hasMore && (
-        <Button
-          variant="link"
-          size="xs"
-          onClick={() => setExpanded(!expanded)}
-          className="h-auto px-0 font-normal text-indigo-600 dark:text-indigo-400"
-        >
-          {expanded ? t("timeline.showLess") : t("timeline.showMore", { count: charLength })}
-        </Button>
-      )}
+      <MessageMarkdown
+        content={content}
+        showPreview={showPreview}
+        previewChars={400}
+        controlClassName="text-indigo-600 dark:text-indigo-400"
+        rawClassName="text-sm italic leading-relaxed text-muted-foreground whitespace-pre-wrap"
+      />
     </div>
   );
 }
@@ -2137,6 +2115,7 @@ function EventCard({
   costShare = 0,
   turn,
   clientVersion,
+  viewMode,
 }: {
   event: AgentEvent;
   prevTimestamp?: string;
@@ -2157,6 +2136,8 @@ function EventCard({
   /** Bumped by the toolbar; `open` forces every row open, `closed` closes them. */
   expandAll: { nonce: number; mode: "open" | "closed" } | null;
   clientVersion?: string;
+  /** The timeline's current view mode; sets whether message text renders as raw or preview by default. */
+  viewMode: ViewMode;
 }) {
   const t = useT();
   const cfg = EVENT_CONFIG[event.type] || DEFAULT_CONFIG;
@@ -2164,6 +2145,14 @@ function EventCard({
   const [showRaw, setShowRaw] = useState(false);
   /** null until the About dialog is first opened. */
   const [showAbout, setShowAbout] = useState<boolean | null>(null);
+
+  // Markdown preview: offered only when the body carries syntax that renders
+  // differently from its source. The default follows the view mode (source in
+  // "detailed", preview otherwise) until the reader flips it, then sticks.
+  const mdText = markdownText(event.type, event.data);
+  const canToggleMarkdown = mdText !== null && hasRenderableMarkdown(mdText);
+  const [mdPreview, setMdPreview] = useState<boolean | null>(null);
+  const showMarkdownPreview = canToggleMarkdown && (mdPreview ?? viewMode !== "detailed");
 
   // Local open state, re-seeded whenever the toolbar issues a new expand/collapse.
   const [openState, setOpenState] = useState({
@@ -2205,9 +2194,9 @@ function EventCard({
     }
     switch (event.type) {
       case "user.message":
-        return <UserMessageCard data={event.data} />;
+        return <UserMessageCard data={event.data} showPreview={showMarkdownPreview} />;
       case "assistant.message":
-        return <AssistantMessageCard data={event.data} />;
+        return <AssistantMessageCard data={event.data} showPreview={showMarkdownPreview} />;
       case "assistant.turn_start":
         return <AssistantTurnCard data={event.data} type="assistant.turn_start" />;
       case "assistant.turn_end":
@@ -2259,7 +2248,7 @@ function EventCard({
       case "system.message":
         return <SystemMessageCard data={event.data} />;
       case "assistant.thinking":
-        return <ThinkingCard data={event.data} />;
+        return <ThinkingCard data={event.data} showPreview={showMarkdownPreview} />;
       case "session.error":
         return <ErrorCard data={event.data} />;
       case "context.attachment":
@@ -2524,6 +2513,22 @@ function EventCard({
               <span className="mr-auto truncate pl-1 font-mono text-[11px] text-muted-foreground">
                 {merged && result ? `${event.type} + ${result.type}` : event.type}
               </span>
+              {canToggleMarkdown && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setMdPreview(!showMarkdownPreview)}
+                  aria-pressed={showMarkdownPreview}
+                  className="text-muted-foreground"
+                >
+                  {showMarkdownPreview ? (
+                    <Code className="size-3.5" aria-hidden />
+                  ) : (
+                    <Eye className="size-3.5" aria-hidden />
+                  )}
+                  {showMarkdownPreview ? t("timeline.markdownSource") : t("timeline.preview")}
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="xs"
@@ -3386,6 +3391,7 @@ export function EventsTimeline({
                     }
                     turn={cost.turnByPrompt.get(event.id)}
                     clientVersion={clientVersion}
+                    viewMode={mode}
                   />
                 </Fragment>
               );

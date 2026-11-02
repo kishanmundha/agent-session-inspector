@@ -989,6 +989,8 @@ export const th: Messages = {
     subagent_message: "ข้อความซับเอเจนต์",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "ตัวอย่าง",
     showLess: "แสดงน้อยลง",
     showMore: { other: "แสดงเพิ่ม ({count} ตัวอักษร)" },
     showFullPrompt: { other: "แสดงพรอมต์ระบบทั้งหมด ({count} ตัวอักษร)" },

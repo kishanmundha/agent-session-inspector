@@ -992,6 +992,8 @@ export const vi: Messages = {
     subagent_message: "Tin nhắn subagent",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Xem trước",
     showLess: "Thu gọn",
     showMore: { other: "Xem thêm ({count} ký tự)" },
     showFullPrompt: { other: "Xem toàn bộ prompt hệ thống ({count} ký tự)" },

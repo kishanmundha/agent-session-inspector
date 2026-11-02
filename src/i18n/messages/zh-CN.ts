@@ -961,6 +961,8 @@ export const zhCN: Messages = {
     subagent_message: "子智能体消息",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "预览",
     showLess: "收起",
     showMore: { other: "显示更多（{count} 个字符）" },
     showFullPrompt: { other: "显示完整系统提示词（{count} 个字符）" },

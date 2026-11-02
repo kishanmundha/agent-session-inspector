@@ -1189,6 +1189,8 @@ export const uk: Messages = {
     subagent_message: "Повідомлення субагента",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Попередній перегляд",
     showLess: "Згорнути",
     showMore: {
       one: "Показати більше ({count} символ)",

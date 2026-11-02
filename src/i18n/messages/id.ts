@@ -993,6 +993,8 @@ export const id: Messages = {
     subagent_message: "Pesan subagen",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Pratinjau",
     showLess: "Tampilkan lebih sedikit",
     showMore: { other: "Tampilkan lebih banyak ({count} karakter)" },
     showFullPrompt: { other: "Tampilkan seluruh prompt sistem ({count} karakter)" },

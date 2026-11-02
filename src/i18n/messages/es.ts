@@ -1064,6 +1064,8 @@ export const es: Messages = {
     subagent_message: "Mensaje de subagente",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Vista previa",
     showLess: "Mostrar menos",
     showMore: { one: "Mostrar más ({count} carácter)", other: "Mostrar más ({count} caracteres)" },
     showFullPrompt: {

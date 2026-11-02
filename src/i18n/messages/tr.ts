@@ -995,6 +995,8 @@ export const tr: Messages = {
     subagent_message: "Alt ajan mesajı",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Önizleme",
     showLess: "Daha az göster",
     showMore: { other: "Daha fazla göster ({count} karakter)" },
     showFullPrompt: { other: "Sistem isteminin tamamını göster ({count} karakter)" },

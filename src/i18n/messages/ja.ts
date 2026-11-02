@@ -1003,6 +1003,8 @@ export const ja: Messages = {
     subagent_message: "サブエージェントのメッセージ",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "プレビュー",
     showLess: "折りたたむ",
     showMore: { other: "もっと見る({count} 文字)" },
     showFullPrompt: { other: "システムプロンプトをすべて表示({count} 文字)" },

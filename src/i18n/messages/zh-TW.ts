@@ -966,6 +966,8 @@ export const zhTW: Messages = {
     subagent_message: "子代理程式訊息",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "預覽",
     showLess: "收合",
     showMore: { other: "顯示更多（{count} 個字元）" },
     showFullPrompt: { other: "顯示完整系統提示（{count} 個字元）" },

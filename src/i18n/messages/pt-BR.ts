@@ -1073,6 +1073,8 @@ export const ptBR: Messages = {
     subagent_message: "Mensagem do subagente",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Pré-visualização",
     showLess: "Mostrar menos",
     showMore: { one: "Mostrar mais ({count} caractere)", other: "Mostrar mais ({count} caracteres)" },
     showFullPrompt: {

@@ -1190,6 +1190,8 @@ export const pl: Messages = {
     subagent_message: "Wiadomość subagenta",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Podgląd",
     showLess: "Pokaż mniej",
     showMore: {
       one: "Pokaż więcej ({count} znak)",

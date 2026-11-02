@@ -999,6 +999,8 @@ export const az: Messages = {
     subagent_message: "Alt agent mesajı",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Önizləmə",
     showLess: "Daha az göstər",
     showMore: { other: "Daha çox göstər ({count} simvol)" },
     showFullPrompt: { other: "Tam sistem sorğusunu göstər ({count} simvol)" },

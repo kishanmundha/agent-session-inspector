@@ -1057,6 +1057,8 @@ export const en = {
     subagent_message: "Subagent Message",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Preview",
     showLess: "Show less",
     showMore: { one: "Show more ({count} char)", other: "Show more ({count} chars)" },
     showFullPrompt: {

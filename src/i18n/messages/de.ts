@@ -1057,6 +1057,8 @@ export const de: Messages = {
     subagent_message: "Subagent-Nachricht",
   },
   timeline: {
+    markdownSource: "Markdown",
+    preview: "Vorschau",
     showLess: "Weniger anzeigen",
     showMore: { one: "Mehr anzeigen ({count} Zeichen)", other: "Mehr anzeigen ({count} Zeichen)" },
     showFullPrompt: {
